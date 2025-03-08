@@ -1,0 +1,49 @@
+# Python Bytecode
+*.pyc
+*.pyo
+__pycache__/
+.python-version
+
+# Virtual environments
+venv/
+env/
+.env/
+
+# macOS
+.DS_Store
+
+# Windows
+Thumbs.db
+desktop.ini
+
+# VS Code
+.vscode/
+
+# JetBrains (PyCharm, etc.)
+.idea/
+
+# Sublime Text
+*.sublime-workspace
+
+# Log
+logs/
+*.log
+
+# Compiled files
+*.o
+*.out
+*.exe
+build/
+dist/
+
+# Python distribution
+*.egg
+*.egg-info
+.eggs/
+
+# Credentials
+.env
+secrets.json
+
+data/
+
