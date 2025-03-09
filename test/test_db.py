@@ -13,7 +13,7 @@ from db import DBM
 
 def test_db_sqlite():
 
-    pool = SQLiteConnectionPool(str((VA.ROOT_DIR.val / 'puti' / 'db' / 'alpha.db')), pool_size=3)
+    pool = SQLiteConnectionPool(str((PuTi.ROOT_DIR.val / 'puti' / 'db' / 'alpha.db')), pool_size=3)
     db_manager = SQLiteManagerWithPool(pool)
     user_handler = SQLiteModelHandlerWithPool(db_manager, UserModel)
 
@@ -34,7 +34,7 @@ def test_db_sqlite():
 
 
 def test_create_mentions():
-    pool = SQLiteConnectionPool(str((VA.ROOT_DIR.val / 'puti' / 'db' / 'alpha.db')), pool_size=3)
+    pool = SQLiteConnectionPool(str((PuTi.ROOT_DIR.val / 'puti' / 'db' / 'alpha.db')), pool_size=3)
     db_manager = SQLiteManagerWithPool(pool)
     mention_handler = SQLiteModelHandlerWithPool(db_manager, Mentions)
 
@@ -44,7 +44,7 @@ def test_create_mentions():
 
 
 def test_add_mentions():
-    pool = SQLiteConnectionPool(str((VA.ROOT_DIR.val / 'puti' / 'db' / 'alpha.db')), pool_size=3)
+    pool = SQLiteConnectionPool(str((PuTi.ROOT_DIR.val / 'puti' / 'db' / 'alpha.db')), pool_size=3)
     db_manager = SQLiteManagerWithPool(pool)
     mention_handler = SQLiteModelHandlerWithPool(db_manager, Mentions)
     mentions = Mentions(
@@ -70,7 +70,7 @@ def test_dbm_tb_change():
 
 
 def test_create_bot_task():
-    pool = SQLiteConnectionPool(str((VA.ROOT_DIR.val / 'puti' / 'db' / 'alpha.db')), pool_size=3)
+    pool = SQLiteConnectionPool(str((PuTi.ROOT_DIR.val / 'puti' / 'db' / 'alpha.db')), pool_size=3)
     dbm = SQLiteManagerWithPool(pool)
     dbh = SQLiteModelHandlerWithPool(dbm, BotTask)
 

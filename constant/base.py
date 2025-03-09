@@ -32,9 +32,9 @@ class Base(Enum):
         return {item.val for item in cls}
 
 
-class VA(Base):
-    PROJ_NAME = ('voyager alpha', '')
-    ROOT_DIR = (root_dir(), 'voyager alpha root path')
+class PuTi(Base):
+    PROJ_NAME = ('PuTi', '')
+    ROOT_DIR = (root_dir(), 'PuTi')
 
     POOL_SIZE = (3, 'db connection pool size')
 

@@ -5,7 +5,7 @@
 """
 import asyncio
 
-from llm import Talker
+from llm.roles.talker import Talker
 
 
 def test_chat():

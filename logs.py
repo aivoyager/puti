@@ -7,7 +7,7 @@ import sys
 
 from datetime import datetime
 from loguru import logger as _logger
-from constant import VA
+from constant.base import PuTi
 
 _print_level = 'INFO'
 _logfile_level = 'DEBUG'
@@ -34,7 +34,7 @@ class LoggerFactory(object):
 
         name_default = 'default'
         _logger.add(
-            str(VA.ROOT_DIR.val / 'logs' / name_default / f'{formatted_date}.txt'),
+            str(PuTi.ROOT_DIR.val / 'logs' / name_default / f'{formatted_date}.txt'),
             filter=lambda record: record['extra'].get('name') == name_default,
             level=logfile_level,
             enqueue=True,
@@ -45,7 +45,7 @@ class LoggerFactory(object):
 
         name_client = 'client'
         _logger.add(
-            str(VA.ROOT_DIR.val / 'logs' / name_client / f'{formatted_date}.txt'),
+            str(PuTi.ROOT_DIR.val / 'logs' / name_client / f'{formatted_date}.txt'),
             filter=lambda record: record['extra'].get('name') == name_client,
             level=logfile_level,
             enqueue=True,
@@ -56,7 +56,7 @@ class LoggerFactory(object):
 
         name_client = 'llm'
         _logger.add(
-            str(VA.ROOT_DIR.val / 'logs' / name_client / f'{formatted_date}.txt'),
+            str(PuTi.ROOT_DIR.val / 'logs' / name_client / f'{formatted_date}.txt'),
             filter=lambda record: record['extra'].get('name') == name_client,
             level=logfile_level,
             enqueue=True,

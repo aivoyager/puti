@@ -12,7 +12,7 @@ from pathlib import Path
 from collections import defaultdict
 from pydantic.v1 import ConfigError
 from utils.file_model import FileModel
-from constant.base import VA, Modules
+from constant.base import PuTi, Modules
 from utils.common import (check_module,
                           get_extra_config_path,
                           get_extra_config_dict,
@@ -22,8 +22,7 @@ __all__ = ['Config', 'conf']
 
 # Later priority is higher, storing your secret key in somewhere else
 DEFAULT_CONF_PATHS: List[Path] = [
-    VA.ROOT_DIR.val / 'conf' / 'conf.yaml',
-    VA.ROOT_DIR.val / 'conf' / 'config2.yaml',
+    Path('/Users/wangshuang/PycharmProjects/data/config2.yaml'),
 ]
 
 # Definition rule
@@ -31,7 +30,7 @@ DEFAULT_CONF_PATHS: List[Path] = [
 # key: {module}_{sub_name}_{FIELD in sub model}
 EXTRA_CONF_PATHS: List[Tuple[str, Path]] = [
     # ('client_twitter_cookies', VoyagerAlpha.ROOT_DIR.val / 'conf' / 'cookie_twitter.json'),
-    ('client_twitter_cookies', VA.ROOT_DIR.val / 'conf' / 'cookie_twitter2.json'),
+    # ('client_twitter_cookies', VA.ROOT_DIR.val / 'conf' / 'cookie_twitter2.json'),
 ]
 
 

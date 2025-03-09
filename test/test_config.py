@@ -5,12 +5,12 @@
 """
 import pytest
 
-from conf import OpenaiConfig
+from conf.llm_config import OpenaiConfig
 from pathlib import Path
 from unittest.mock import patch
 from utils.yaml_model import YamlModel
-from conf import Config
-from conf import TwitterConfig
+from conf.config import Config
+from conf.client_config import TwitterConfig
 
 MOCK_ROOT_DIR = Path("/mock/root")
 MOCK_YAML_DATA = {

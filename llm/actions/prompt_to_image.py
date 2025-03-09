@@ -6,7 +6,7 @@
 import json
 
 from llm.actions.generate_images_by_prompts import generate_image_by_prompt
-from constant.base import VA
+from constant.base import PuTi
 from utils.common import generate_random_15_digit_number
 
 
@@ -32,5 +32,5 @@ def prompt_to_image(
     if negative_prompt != '':
         negative_input_id = prompt.get(k_sampler)['inputs']['negative'][0]
         prompt.get(negative_input_id)['inputs']['text'] = negative_prompt
-    return generate_image_by_prompt(prompt, str(VA.ROOT_DIR.val / 'data' / 'images'), save_previews)
+    return generate_image_by_prompt(prompt, str(PuTi.ROOT_DIR.val / 'data' / 'images'), save_previews)
 

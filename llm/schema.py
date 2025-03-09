@@ -219,7 +219,7 @@ class Role(BaseModel):
         self.rc.memory.add_batch(news)
 
         history = [] if ignore_history else self.rc.memory.get()
-        self.rc.news =
+        self.rc.news = ''
 
         watch_resp = self._wathch()
 
