@@ -3,11 +3,12 @@
 @Time:  2025-03-07 14:41
 @Description:  
 """
-from llm.schema import Action
-from llm.node import OpenAINode
+from llm.actions import Action
+from pydantic import ConfigDict
+
 
 class Talk(Action):
-    name = 'Talk'
-    node = OpenAINode(llm_name='openai')
-    desc = ''
+    model_config = ConfigDict(arbitrary_types_allowed=True)
 
+    name: str = 'Talk'
+    desc: str = 'This Action for daily conversation'

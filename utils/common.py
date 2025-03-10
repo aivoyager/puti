@@ -7,6 +7,7 @@ import traceback
 import json
 import random
 import platform
+import importlib
 
 from typing import Dict, Iterable, Callable, List, Tuple, Any, Union
 from collections import defaultdict
@@ -172,3 +173,23 @@ def get_specific_parent(cls, target_cls):
         cls = cls.__bases__[0] if cls.__bases__ else None
     return None
 
+
+def get_class_name(cls) -> str:
+    """Return class name"""
+    return f"{cls.__module__}.{cls.__name__}"
+
+
+def any_to_str(val: Any) -> str:
+    """Return the class name or the class name of the object, or 'val' if it's a string type."""
+    if isinstance(val, str):
+        return val
+    elif not callable(val):
+        return get_class_name(type(val))
+    else:
+        return get_class_name(val)
+
+
+def import_class(class_name: str, module_name: str) -> type:
+    module = importlib.import_module(module_name)
+    a_class = getattr(module, class_name)
+    return a_class
