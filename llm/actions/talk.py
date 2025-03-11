@@ -5,10 +5,16 @@
 """
 from llm.actions import Action
 from pydantic import ConfigDict
+from llm.nodes import LLMNode, OpenAINode
+from llm.messages import Message
 
 
-class Talk(Action):
+class Reply(Action):
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
-    name: str = 'Talk'
-    desc: str = 'This Action for daily conversation'
+    name: str = 'Reply'
+    desc: str = 'Use this action to reply user message.'
+
+    async def run(self, messages, llm: LLMNode = None, *args, **kwargs):
+        reply = await llm.achat(messages)
+        return reply

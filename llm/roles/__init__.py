@@ -58,6 +58,7 @@ class RoleContext(BaseModel):
     max_react_loop: int = Field(default=5, description='Max react loop number')
     state: int = Field(default=-1, description='State of the action')
     todo: Action = Field(default=None, exclude=True, description='Action to do')
+    action_taken: int = 0
 
 
 class Role(BaseModel):
@@ -76,12 +77,18 @@ class Role(BaseModel):
     )
     address: set[str] = Field(default=set(), description='')
 
-    system_message: str = Field(default='You are a helpful assistant.', description='System message')
+    system_message: PrivateAttr(str) = Field(default=None, description='System message')
     actions: List[Action] = Field(default=[], validate_default=True, description='Action list can be performed')
     states: List[str] = Field(default=[], validate_default=True, description='Action to state number map')
     identity: RoleType = Field(default=RoleType.USER, description='Role identity')
     agent_node: LLMNode = Field(default_factory=OpenAINode, description='LLM node')
     rc: RoleContext = Field(default_factory=RoleContext)
+
+    @property
+    def sys_msg(self) -> Optional[Dict[str, str]]:
+        if not self.system_message:
+            return {'role': RoleType.SYSTEM.val, 'content': self.role_definition}
+        return {'role': RoleType.SYSTEM.val, 'content': self.system_message}
 
     @property
     def role_definition(self) -> str:
@@ -106,49 +113,64 @@ class Role(BaseModel):
             self.actions.append(act_obj)
             self.states.append(f'{len(self.actions) - 1}. {action}, action name: {act_obj.name}, action description: {act_obj.desc}\n')
 
-    async def run(self, with_message: Optional[Union[str, Dict, Message]] = None, ignore_history: bool = False) -> Optional[Message]:
-        if with_message:
-            msg = None
-            if isinstance(with_message, str):
-                msg = Message(content=with_message)
-            elif isinstance(with_message, Message):
-                msg = with_message
-            elif isinstance(with_message, Dict):
-                u_name = next(iter(with_message.keys()))
-                if u_name not in RoleType.keys():
-                    raise KeyError('Unknown role: {}'.format(u_name))
-                with_message = next(iter(with_message.values()))
-                msg = Message(content=with_message, sender=u_name)
-            else:
-                raise TypeError('with_message must be str or dict or `Message`')
-        self.rc.buffer.put_one_msg(msg)
-
+    async def _perceive(self, message: Message, ignore_history: bool = False):
+        self.rc.buffer.put_one_msg(message)
         news = self.rc.buffer.pop_all()
         history = [] if ignore_history else self.rc.memory.get()
         self.rc.memory.add_batch(news)
-        self.rc.news = [n for n in news if (n.sender in self.rc.subscribe_sender or self.name in n.receiver or n.receiver == MessageRouter.ALL.val) and n not in history]
-        if not len(self.rc.news):
-            lgr.debug(f'{self.name}:{self.identity.val} no new messages, waiting.')
+        new_list = []
+        for n in news:
+            if n.sender in self.rc.subscribe_sender or self.name in n.receiver or n.receiver == {MessageRouter.ALL.val}:
+                if n not in history:
+                    new_list.append(n)
+        self.rc.news = new_list
+        if len(self.rc.news) == 0:
+            lgr.debug(f'{self} no new messages, waiting.')
         else:
-            new_texts = [f'{m.role}: {m.content[:20]}' for m in self.rc.news]
-            lgr.debug(f'{self.name}:{self.identity.val} observe {new_texts}.')
+            new_texts = [f'{m.role.val}: {m.content[:20]}...' for m in self.rc.news]
+            lgr.debug(f'{self} perceive {new_texts}.')
 
-        actions_taken = 0
-        while actions_taken < self.rc.max_react_loop:
-            # if len(self.actions) == 1:
-            #     self.rc.state = 0
-            #     to_do = self.actions[self.rc.state] if self.rc.state >= 0 else None
-            # else:
-            prompt = prompt_setting.COMMON_STATE_TEMPLATE.format(
-                history=self.rc.memory.get(),
-                states='\n'.join(self.states),
-                n_states=len(self.states) - 1,
-                previous_state=self.rc.state
-            )
-            sys_msg = {'role': RoleType.SYSTEM.val, 'content': self.role_definition}
-            message = {'role': self.identity.val, 'content': prompt}
-            choose = await self.agent_node.achat([sys_msg, message])
-            print('')
+    async def _think(self) -> Optional[Union[bool, List[Dict]]]:
+        prompt = prompt_setting.COMMON_STATE_TEMPLATE.format(
+            history='\n'.join(['{}'.format(i) for i in self.rc.memory.get()]),
+            states='\n'.join(self.states),
+            n_states=len(self.states) - 1,
+            previous_state=self.rc.state
+        )
+        message = {'role': RoleType.USER.val, 'content': prompt}
+        choose_state = await self.agent_node.achat([self.sys_msg, message])
+        if int(choose_state) == -1:
+            return False
+        else:
+            self.rc.state = int(choose_state)
+            self.rc.todo = self.actions[self.rc.state]
+            return True
+
+    async def _react(self) -> Optional[Message]:
+        messages = [self.sys_msg] + self.rc.memory.to_dict()
+        resp = await self.rc.todo.run(messages, llm=self.agent_node)
+        resp_msg = Message(content=resp, role=self.identity, cause_by=self.rc.todo, sender=self.name)
+        self.rc.memory.add_one(resp_msg)
+        self.rc.action_taken += 1
+        return resp_msg
+
+    async def run(self, with_message: Optional[Union[str, Dict, Message]] = None, ignore_history: bool = False) -> Optional[Message]:
+        if with_message:
+            msg = Message.from_any(with_message)
+        else:
+            raise NotImplementedError('Without message is not yet implemented')
+        await self._perceive(msg)
+        self.rc.action_taken = 0
+        resp = Message(content='No action taken yet', role=RoleType.SYSTEM)
+        while self.rc.action_taken < self.rc.max_react_loop:
+            todo = await self._think()
+            if not todo:
+                break
+            resp = await self._react()
+        self.rc.state = -1
+        self.rc.todo = None
+        # self.publish_message(react_resp)
+        return resp
 
     async def _get_corporate_prompt(self):
         prompt = ''
@@ -158,3 +180,9 @@ class Role(BaseModel):
             env_desc = f'You are in {self.rc.env.desc} with roles({other_roles})'
             prompt += env_desc
         return prompt
+
+    def __str__(self):
+        return f'{self.name}({self.identity.val})'
+
+    def __repr__(self):
+        return self.__str__()

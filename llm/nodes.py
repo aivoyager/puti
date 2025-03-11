@@ -70,7 +70,7 @@ class LLMNode(BaseModel, ABC):
         return new_class
 
     @abstractmethod
-    async def achat(self, msg: List[str]) -> str:
+    async def achat(self, msg: List[Dict]) -> str:
         """ Async chat """
 
 

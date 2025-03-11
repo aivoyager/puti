@@ -46,10 +46,28 @@ class Message(BaseModel):
             ) for msg in messages
         ]
 
+    @classmethod
+    def from_any(cls, msg: Optional[Union[str, Dict, 'Message']]) -> 'Message':
+        """
+            For Dict:
+                {'role': 'user', 'content': 'xxxx...'}
+        """
+        try:
+            if isinstance(msg, str):
+                msg = cls(content=msg)
+            elif isinstance(msg, Dict):
+                role_type = msg['role']
+                content = msg['content']
+                msg = cls(content=content, sender=RoleType.elem_from_str(role_type))
+        except Exception as e:
+            raise NotImplementedError('Message type error: {}'.format(e))
+        else:
+            return msg
+
     def __str__(self):
         if self.instruct_content:
-            return f"{self.role.val}: {self.instruct_content.model_dump()}"
-        return f"{self.role.val}: {self.content}"
+            return f"[name: {self.sender if self.sender else 'FromUser'} && role_type: {self.role.val}]: {self.instruct_content.model_dump()}"
+        return f"[name: {self.sender if self.sender else 'FromUser'} && role_type: {self.role.val}]: {self.content}"
 
     def __repr__(self):
         """while print in list"""

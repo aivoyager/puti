@@ -13,3 +13,4 @@ def test_chat():
     talker = Talker()
     while msg:
         msg = asyncio.run(talker.run(msg))
+        print('')
