@@ -21,6 +21,7 @@ class Message(BaseModel):
     cause_by: str = Field(default='', description='message initiator Action str', validate_default=True)
     sender: str = Field(default='', validate_default=True, description='Sender role name')
     receiver: set['str'] = Field(default={MessageRouter.ALL.val}, validate_default=True, description='Receiver role name')
+    reply_to: str = Field(default='', description='Message id reply to')
     id: str = Field(default_factory=lambda: str(uuid4()), description='Unique code of messages')
     content: str = ''
     instruct_content: Optional[BaseModel] = Field(default=None, validate_default=True)
@@ -65,9 +66,9 @@ class Message(BaseModel):
             return msg
 
     def __str__(self):
-        if self.instruct_content:
-            return f"[name: {self.sender if self.sender else 'FromUser'} && role_type: {self.role.val}]: {self.instruct_content.model_dump()}"
-        return f"[name: {self.sender if self.sender else 'FromUser'} && role_type: {self.role.val}]: {self.content}"
+        # if self.instruct_content:
+        #     return f"[name: {self.sender if self.sender else 'FromUser'} && role_type: {self.role.val} && message_id: {self.id}]: {self.instruct_content.model_dump()}"
+        return f"[name:{self.sender if self.sender else 'FromUser'}  role_type:{self.role.val} message_id:{self.id} reply_to:{self.reply_to}]: {self.content}"
 
     def __repr__(self):
         """while print in list"""

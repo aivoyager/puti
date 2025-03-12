@@ -85,6 +85,7 @@ class Role(BaseModel):
     identity: RoleType = Field(default=RoleType.USER, description='Role identity')
     agent_node: LLMNode = Field(default_factory=OpenAINode, description='LLM node')
     rc: RoleContext = Field(default_factory=RoleContext)
+    last_preserved: Message = None
 
     __hash__ = object.__hash__
 
@@ -123,14 +124,13 @@ class Role(BaseModel):
             self.actions.append(act_obj)
             self.states.append(f'{len(self.actions) - 1}. {action}, action name: {act_obj.name}, action description: {act_obj.desc}\n')
 
-    async def _perceive(self, message: Message, ignore_history: bool = False):
-        self.rc.buffer.put_one_msg(message)
+    async def _perceive(self, ignore_history: bool = False):
         news = self.rc.buffer.pop_all()
         history = [] if ignore_history else self.rc.memory.get()
         self.rc.memory.add_batch(news)
         new_list = []
         for n in news:
-            if n.sender in self.rc.subscribe_sender or self.name in n.receiver or n.receiver == {MessageRouter.ALL.val}:
+            if n.sender in self.rc.subscribe_sender or self.address | n.receiver or MessageRouter.ALL.val in n.receiver:
                 if n not in history:
                     new_list.append(n)
         self.rc.news = new_list
@@ -161,7 +161,7 @@ class Role(BaseModel):
     async def _react(self) -> Optional[Message]:
         messages = [self.sys_msg] + self.rc.memory.to_dict()
         resp = await self.rc.todo.run(messages, llm=self.agent_node)
-        resp_msg = Message(content=resp, role=self.identity, cause_by=self.rc.todo, sender=self.name)
+        resp_msg = Message(content=resp, role=self.identity, cause_by=self.rc.todo, sender=self.name, reply_to=self.rc.memory.get()[-1].id)
         self.rc.memory.add_one(resp_msg)
         self.rc.action_taken += 1
         return resp_msg
@@ -169,9 +169,9 @@ class Role(BaseModel):
     async def run(self, with_message: Optional[Union[str, Dict, Message]] = None, ignore_history: bool = False) -> Optional[Message]:
         if with_message:
             msg = Message.from_any(with_message)
-        else:
-            raise NotImplementedError('Without message is not yet implemented')
-        await self._perceive(msg)
+            self.rc.buffer.put_one_msg(msg)
+
+        await self._perceive()
         self.rc.action_taken = 0
         resp = Message(content='No action taken yet', role=RoleType.SYSTEM)
         while self.rc.action_taken < self.rc.max_react_loop:
