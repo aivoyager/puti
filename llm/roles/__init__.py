@@ -5,7 +5,7 @@
 """
 from llm.prompts import prompt_setting
 from llm.actions import Action
-from pydantic import BaseModel, Field, ConfigDict, PrivateAttr
+from pydantic import BaseModel, Field, ConfigDict, PrivateAttr, model_validator, field_validator
 from typing import Optional, List, Iterable, Literal
 from constant.llm import RoleType
 from logs import logger_factory
@@ -16,6 +16,7 @@ from llm.nodes import LLMNode, OpenAINode
 from llm.messages import Message
 from llm.envs import Env
 from llm.memory import Memory
+from utils.common import any_to_str
 
 lgr = logger_factory.llm
 
@@ -76,7 +77,7 @@ class Role(BaseModel):
         default='utilize the same language as the user requirements for seamless communication',
         validate_default=True
     )
-    address: set[str] = Field(default=set(), description='')
+    address: set[str] = Field(default=set(), description='', validate_default=True)
 
     system_message: PrivateAttr(str) = Field(default=None, description='System message')
     actions: List[Action] = Field(default=[], validate_default=True, description='Action list can be performed')
@@ -84,6 +85,13 @@ class Role(BaseModel):
     identity: RoleType = Field(default=RoleType.USER, description='Role identity')
     agent_node: LLMNode = Field(default_factory=OpenAINode, description='LLM node')
     rc: RoleContext = Field(default_factory=RoleContext)
+
+    __hash__ = object.__hash__
+
+    @model_validator(mode='after')
+    def check_address(self):
+        if not self.address:
+            self.address = {f'{any_to_str(self)}.{self.name}'}
 
     @property
     def sys_msg(self) -> Optional[Dict[str, str]]:
@@ -142,10 +150,12 @@ class Role(BaseModel):
         message = {'role': RoleType.USER.val, 'content': prompt}
         choose_state = await self.agent_node.achat([self.sys_msg, message])
         if int(choose_state) == -1:
+            lgr.debug(f"{self} think {'he' if self.sex == 'male' else 'her'} is idle.")
             return False
         else:
             self.rc.state = int(choose_state)
             self.rc.todo = self.actions[self.rc.state]
+            lgr.debug(f"{self} think {'he' if self.sex == 'male' else 'her'} will do {self.rc.todo}.")
             return True
 
     async def _react(self) -> Optional[Message]:
@@ -171,7 +181,7 @@ class Role(BaseModel):
             resp = await self._react()
         self.rc.state = -1
         self.rc.todo = None
-        # self.publish_message(react_resp)
+        self.rc.env.publish_message(resp)
         return resp
 
     async def _get_corporate_prompt(self):

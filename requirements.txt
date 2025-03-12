@@ -20,3 +20,4 @@ PyYAML==6.0.2
 twikit==2.3.3
 uvicorn==0.34.0
 websocket_client==1.8.0
+mypy==1.15.0
