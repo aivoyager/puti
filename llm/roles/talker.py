@@ -15,12 +15,13 @@ class Talker(Role):
     age: str = 25
     job: str = 'communicator'
     skill: str = 'communicate'
-    goal: str = "reply unanswered user messages"
+    goal: str = "ensure all user messages receive a necessary and relevant reply"
     constraints: str = 'utilize the same language as the user requirements for seamless communication'
-    #  when the latest entry in the chat history is not you (obstalces) (case insensitive) and the role_type of the message is user
     identity: RoleType = RoleType.ASSISTANT
     actions: List[Action] = []
     state: List[str] = []
+    extra_demands: str = ("If the user’s question has already been answered appropriately, "
+                          "you should consider your task completed and stop responding.")
 
     def __init__(self, **kwargs) -> None:
         super().__init__(**kwargs)

@@ -71,6 +71,7 @@ class Role(BaseModel):
     skill: str = ''
     goal: str = ''
     personality: str = ''
+    extra_demands: str = ''
     constraints: str = Field(
         default='utilize the same language as the user requirements for seamless communication',
         validate_default=True
@@ -100,7 +101,8 @@ class Role(BaseModel):
         goal_exp = f'You goal is {self.goal}.' if self.goal else ''
         personality_exp = f'You personality is {self.personality}.' if self.personality else ''
         constraints_exp = f'You constraints are {self.constraints}.' if self.constraints else ''
-        definition = name_exp + sex_exp + age_exp + job_exp + skill_exp + goal_exp + personality_exp + constraints_exp
+        extra_demands = f'Here are some extra demands on you: {self.extra_demands}.' if self.extra_demands else "You don't have extra demands."
+        definition = name_exp + sex_exp + age_exp + job_exp + skill_exp + goal_exp + personality_exp + constraints_exp + extra_demands
         return definition
 
     def _reset(self):
