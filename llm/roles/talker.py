@@ -18,8 +18,6 @@ class Talker(Role):
     goal: str = "Every user message has a reply from you"
     constraints: str = 'utilize the same language as the user requirements for seamless communication'
     identity: RoleType = RoleType.ASSISTANT
-    actions: List[Action] = []
-    state: List[str] = []
     extra_demands: str = ("If all messages whose role type is user have been replied by you "
                           "base on reply_to and role_type,"
                           " return -1 directly without think anything else")

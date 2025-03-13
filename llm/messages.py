@@ -12,13 +12,14 @@ from uuid import uuid4
 from constant.llm import MessageRouter
 from utils.common import any_to_str, import_class
 from llm.actions import Action
+from llm.actions import UserRequirement
 
 
 class Message(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True, extra="allow")
 
     # if design in role will loop import
-    cause_by: str = Field(default='', description='message initiator Action str', validate_default=True)
+    cause_by: Optional[Type[Action]] = Field(default=None, description='message initiator Action str', validate_default=True)
     sender: str = Field(default='', validate_default=True, description='Sender role name')
     receiver: set['str'] = Field(default={MessageRouter.ALL.val}, validate_default=True, description='Receiver role name')
     reply_to: str = Field(default='', description='Message id reply to')
@@ -32,8 +33,9 @@ class Message(BaseModel):
     @field_validator('cause_by', mode='before')
     @classmethod
     def check_cause_by(cls, cause_by: Any):
-        s = any_to_str(cause_by if cause_by else import_class('UserRequirement', 'llm.actions'))
-        return s
+        if not cause_by:
+            return UserRequirement
+        return cause_by
 
     @classmethod
     def from_messages(cls, messages: List[dict]) -> List["Message"]:
@@ -48,22 +50,33 @@ class Message(BaseModel):
         ]
 
     @classmethod
-    def from_any(cls, msg: Optional[Union[str, Dict, 'Message']]) -> 'Message':
+    def from_any(cls, msg: Optional[Union[str, Dict, 'Message']], **kwargs) -> 'Message':
         """
             For Dict:
                 {'role': 'user', 'content': 'xxxx...'}
         """
         try:
             if isinstance(msg, str):
-                msg = cls(content=msg)
+                msg = cls(content=msg, **kwargs)
             elif isinstance(msg, Dict):
                 role_type = msg['role']
                 content = msg['content']
-                msg = cls(content=content, sender=RoleType.elem_from_str(role_type))
+                msg = cls(content=content, sender=RoleType.elem_from_str(role_type), **kwargs)
         except Exception as e:
             raise NotImplementedError('Message type error: {}'.format(e))
         else:
             return msg
+
+    @classmethod
+    def to_message_list(cls, messages: List['Message']) -> List[dict]:
+        return [msg.to_message_dict() for msg in messages]
+
+    def to_message_dict(self, ample: bool = False) -> dict:
+        return {'role': self.role.val, 'content': self.ample_content if ample else self.content}
+
+    @property
+    def ample_content(self):
+        return f"[name:{self.sender if self.sender else 'FromUser'}  role_type:{self.role.val} message_id:{self.id} reply_to:{self.reply_to}]: {self.content}"
 
     def __str__(self):
         # if self.instruct_content:

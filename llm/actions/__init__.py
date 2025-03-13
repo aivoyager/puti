@@ -16,6 +16,8 @@ class Action(BaseModel, ABC):
     name: str = Field(default='', description='Action name')
     desc: str = Field(default='', description='Description of action')
 
+    __hash__ = object.__hash__
+
     @abstractmethod
     async def run(self, messages, llm: LLMNode = None, *args, **kwargs) -> Annotated[str, 'action result']:
         """ run action """

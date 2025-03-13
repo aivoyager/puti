@@ -6,10 +6,9 @@
 from llm.prompts import prompt_setting
 from llm.actions import Action
 from pydantic import BaseModel, Field, ConfigDict, PrivateAttr, model_validator, field_validator
-from typing import Optional, List, Iterable, Literal
+from typing import Optional, List, Iterable, Literal, Set, Dict, Tuple, Type, Any, Union
 from constant.llm import RoleType
 from logs import logger_factory
-from typing import Dict, Tuple, Type, Any, Union
 from constant.llm import TOKEN_COSTS, MessageRouter
 from asyncio import Queue, QueueEmpty
 from llm.nodes import LLMNode, OpenAINode
@@ -87,6 +86,8 @@ class Role(BaseModel):
     rc: RoleContext = Field(default_factory=RoleContext)
     last_preserved: Message = None
 
+    interested_actions: Set[Type[Action]] = set()
+
     __hash__ = object.__hash__
 
     @model_validator(mode='after')
@@ -102,6 +103,7 @@ class Role(BaseModel):
 
     @property
     def role_definition(self) -> str:
+        env = self._env_prompt
         name_exp = f'You name is {self.name}.' if self.name else ''
         sex_exp = f'You sex is {self.sex}.' if self.sex else ''
         age_exp = f'You age is {self.age}.' if self.age else ''
@@ -111,7 +113,7 @@ class Role(BaseModel):
         personality_exp = f'You personality is {self.personality}.' if self.personality else ''
         constraints_exp = f'You constraints are {self.constraints}.' if self.constraints else ''
         extra_demands = f'Here are some extra demands on you: {self.extra_demands}.' if self.extra_demands else "You don't have extra demands."
-        definition = name_exp + sex_exp + age_exp + job_exp + skill_exp + goal_exp + personality_exp + constraints_exp + extra_demands
+        definition = env + name_exp + sex_exp + age_exp + job_exp + skill_exp + goal_exp + personality_exp + constraints_exp + extra_demands
         return definition
 
     def _reset(self):
@@ -124,13 +126,20 @@ class Role(BaseModel):
             self.actions.append(act_obj)
             self.states.append(f'{len(self.actions) - 1}. {action}, action name: {act_obj.name}, action description: {act_obj.desc}\n')
 
-    async def _perceive(self, ignore_history: bool = False):
+    def set_interested_actions(self, actions: Set[Type[Action]]):
+        for action in actions:
+            self.interested_actions.add(action)
+
+    async def _perceive(self, ignore_history: bool = False) -> bool:
         news = self.rc.buffer.pop_all()
         history = [] if ignore_history else self.rc.memory.get()
         self.rc.memory.add_batch(news)
         new_list = []
         for n in news:
-            if n.sender in self.rc.subscribe_sender or self.address | n.receiver or MessageRouter.ALL.val in n.receiver:
+            if (n.sender in self.rc.subscribe_sender
+                    or self.address & n.receiver
+                    or MessageRouter.ALL.val in n.receiver
+                    or n.cause_by in self.interested_actions):
                 if n not in history:
                     new_list.append(n)
         self.rc.news = new_list
@@ -139,6 +148,7 @@ class Role(BaseModel):
         else:
             new_texts = [f'{m.role.val}: {m.content[:20]}...' for m in self.rc.news]
             lgr.debug(f'{self} perceive {new_texts}.')
+        return True if len(self.rc.news) > 0 else False
 
     async def _think(self) -> Optional[Union[bool, List[Dict]]]:
         prompt = prompt_setting.COMMON_STATE_TEMPLATE.format(
@@ -159,11 +169,14 @@ class Role(BaseModel):
             return True
 
     async def _react(self) -> Optional[Message]:
+        # TODO React prompt
         messages = [self.sys_msg] + self.rc.memory.to_dict()
         resp = await self.rc.todo.run(messages, llm=self.agent_node)
-        resp_msg = Message(content=resp, role=self.identity, cause_by=self.rc.todo, sender=self.name, reply_to=self.rc.memory.get()[-1].id)
+        resp_msg = Message(content=resp, role=self.identity, cause_by=self.rc.todo.__class__, sender=self.name, reply_to=self.rc.memory.get()[-1].id)
+        lgr.debug(resp_msg)
         self.rc.memory.add_one(resp_msg)
         self.rc.action_taken += 1
+        self.rc.env.publish_message(resp_msg)
         return resp_msg
 
     async def run(self, with_message: Optional[Union[str, Dict, Message]] = None, ignore_history: bool = False) -> Optional[Message]:
@@ -171,25 +184,26 @@ class Role(BaseModel):
             msg = Message.from_any(with_message)
             self.rc.buffer.put_one_msg(msg)
 
-        await self._perceive()
         self.rc.action_taken = 0
         resp = Message(content='No action taken yet', role=RoleType.SYSTEM)
         while self.rc.action_taken < self.rc.max_react_loop:
+            perceive = await self._perceive()
+            if not perceive:
+                break
             todo = await self._think()
             if not todo:
                 break
             resp = await self._react()
         self.rc.state = -1
         self.rc.todo = None
-        self.rc.env.publish_message(resp)
         return resp
 
-    async def _get_corporate_prompt(self):
+    @property
+    def _env_prompt(self):
         prompt = ''
         if self.rc.env and self.rc.env.desc:
-            all_roles = self.rc.env.members.keys()
-            other_roles = ', '.join([r for r in all_roles if r != self.name])
-            env_desc = f'You are in {self.rc.env.desc} with roles({other_roles})'
+            other_roles = self.rc.env.members.difference({self})
+            env_desc = f'You in a environment called {self.rc.env.name} {self.rc.env.desc} with roles {", ".join(map(str, other_roles))}.'
             prompt += env_desc
         return prompt
 

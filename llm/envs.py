@@ -13,6 +13,7 @@ from logs import logger_factory
 from collections import defaultdict
 from typing import TYPE_CHECKING
 from constant.llm import MessageRouter
+from capture import Capture
 if TYPE_CHECKING:
     from llm.roles import Role
 import asyncio
@@ -30,7 +31,13 @@ class Env(BaseModel):
     parent_env: 'Env' = None
     members: Set['Role'] = set()
     members_addr: Dict['Role', set[str]] = Field(default_factory=lambda: defaultdict(set), description='key is role name, value is role address')
-    history: str = ''
+    history: List[Message] = []
+    cp: SerializeAsAny[Capture] = Field(default_factory=Capture, validate_default=True, description='Capture exception')
+
+    @property
+    def prompt(self):
+        prompt = f'You in a environment called {self.name}, {self.desc}.'
+        return prompt
 
     def add_roles(self, roles: Iterable['Role']):
         for role in roles:
@@ -42,19 +49,22 @@ class Env(BaseModel):
         lgr.debug(f'Publishing message: {msg}')
         has_receiver = False
         for role, addr in self.members_addr.items():
-            if MessageRouter.ALL.val in msg.receiver or msg.receiver | role.address:
+            if (MessageRouter.ALL.val in msg.receiver or msg.receiver & role.address or msg.cause_by in role.interested_actions) and msg.sender != role.name:
                 role.rc.buffer.put_one_msg(msg)
                 has_receiver = True
         if not has_receiver:
             lgr.warning(f'No receiver for message: {msg}')
-        self.history += f'{msg}\n'
+        self.history.append(msg)
 
     async def run(self):
-        futures = []
-        for member in self.members:
-            future = member.run()
-            futures.append(future)
-        await asyncio.gather(*futures)
+        n = 0
+        while n <= 5:
+            futures = []
+            for member in self.members:
+                future = member.run()
+                futures.append(future)
+            await asyncio.gather(*futures)
+            n += 1
         print('')
 
     @property
