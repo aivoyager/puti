@@ -13,7 +13,7 @@ class Debate(Action):
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     name: str = 'Debate'
-    desc: str = 'Use this action to convince others and prove your point'
+    desc: str = 'Use this action in debating.'
 
     async def run(self, messages, llm: LLMNode = None, *args, **kwargs):
         reply = await llm.achat(messages)

@@ -14,12 +14,12 @@ class Memory(BaseModel):
 
     storage: List[SerializeAsAny['Message']] = []
 
-    def to_dict(self):
+    def to_dict(self, ample: bool = False):
         """  """
         memories = self.get()
         resp = []
         for memory in memories:
-            item = {'role': memory.role.val, 'content': memory.content}
+            item = {'role': memory.role.val, 'content': memory.content if not ample else memory.ample_content}
             resp.append(item)
         return resp
 

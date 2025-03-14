@@ -71,14 +71,14 @@ class Role(BaseModel):
     skill: str = ''
     goal: str = ''
     personality: str = ''
-    extra_demands: str = ''
+    think_extra_demands: str = ''
+    react_extra_demands: str = ''
     constraints: str = Field(
         default='utilize the same language as the user requirements for seamless communication',
         validate_default=True
     )
     address: set[str] = Field(default=set(), description='', validate_default=True)
 
-    system_message: PrivateAttr(str) = Field(default=None, description='System message')
     actions: List[Action] = Field(default=[], validate_default=True, description='Action list can be performed')
     states: List[str] = Field(default=[], validate_default=True, description='Action to state number map')
     identity: RoleType = Field(default=RoleType.USER, description='Role identity')
@@ -96,10 +96,14 @@ class Role(BaseModel):
             self.address = {f'{any_to_str(self)}.{self.name}'}
 
     @property
-    def sys_msg(self) -> Optional[Dict[str, str]]:
-        if not self.system_message:
-            return {'role': RoleType.SYSTEM.val, 'content': self.role_definition}
-        return {'role': RoleType.SYSTEM.val, 'content': self.system_message}
+    def sys_think_msg(self) -> Optional[Dict[str, str]]:
+        extra_demands = f'Here are some extra demands on you: {self.think_extra_demands}.' if self.think_extra_demands else "You don't have extra demands."
+        return {'role': RoleType.SYSTEM.val, 'content': self.role_definition + extra_demands}
+
+    @property
+    def sys_react_msg(self) -> Optional[Dict[str, str]]:
+        extra_demands = f'Here are some extra demands on you: {self.react_extra_demands}.' if self.react_extra_demands else "You don't have extra demands."
+        return {'role': RoleType.SYSTEM.val, 'content': self.role_definition + extra_demands}
 
     @property
     def role_definition(self) -> str:
@@ -112,8 +116,7 @@ class Role(BaseModel):
         goal_exp = f'You goal is {self.goal}.' if self.goal else ''
         personality_exp = f'You personality is {self.personality}.' if self.personality else ''
         constraints_exp = f'You constraints are {self.constraints}.' if self.constraints else ''
-        extra_demands = f'Here are some extra demands on you: {self.extra_demands}.' if self.extra_demands else "You don't have extra demands."
-        definition = env + name_exp + sex_exp + age_exp + job_exp + skill_exp + goal_exp + personality_exp + constraints_exp + extra_demands
+        definition = env + name_exp + sex_exp + age_exp + job_exp + skill_exp + goal_exp + personality_exp + constraints_exp
         return definition
 
     def _reset(self):
@@ -158,7 +161,7 @@ class Role(BaseModel):
             previous_state=self.rc.state
         )
         message = {'role': RoleType.USER.val, 'content': prompt}
-        choose_state = await self.agent_node.achat([self.sys_msg, message])
+        choose_state = await self.agent_node.achat([self.sys_think_msg, message])
         if int(choose_state) == -1:
             lgr.debug(f"{self} think {'he' if self.sex == 'male' else 'her'} is idle.")
             return False
@@ -170,10 +173,9 @@ class Role(BaseModel):
 
     async def _react(self) -> Optional[Message]:
         # TODO React prompt
-        messages = [self.sys_msg] + self.rc.memory.to_dict()
+        messages = [self.sys_react_msg] + self.rc.memory.to_dict(ample=True)
         resp = await self.rc.todo.run(messages, llm=self.agent_node)
         resp_msg = Message(content=resp, role=self.identity, cause_by=self.rc.todo.__class__, sender=self.name, reply_to=self.rc.memory.get()[-1].id)
-        lgr.debug(resp_msg)
         self.rc.memory.add_one(resp_msg)
         self.rc.action_taken += 1
         self.rc.env.publish_message(resp_msg)
@@ -188,6 +190,10 @@ class Role(BaseModel):
         resp = Message(content='No action taken yet', role=RoleType.SYSTEM)
         while self.rc.action_taken < self.rc.max_react_loop:
             perceive = await self._perceive()
+            if self.name == 'bot1' and perceive is True:
+                print('')
+            if self.name == 'bot2' and perceive is True:
+                print('ok')
             if not perceive:
                 break
             todo = await self._think()
