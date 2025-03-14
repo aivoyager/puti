@@ -14,8 +14,8 @@ from llm.roles.debater import Debater
 def test_chat():
     msg = 'hello, what is u name'
     talker = Talker()
-    msg = asyncio.run(talker.run(msg))
-    print(msg.content)
+    msg = talker.cp.invoke(talker.run, msg)
+    print(msg.data)
 
 
 def test_env():
@@ -37,7 +37,6 @@ def test_debate():
         receiver=debater1.address
     ))
     env.cp.invoke(env.run)
-    # asyncio.run(env.run())
 
 
 def test_state_choose():

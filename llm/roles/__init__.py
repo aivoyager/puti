@@ -5,7 +5,7 @@
 """
 from llm.prompts import prompt_setting
 from llm.actions import Action
-from pydantic import BaseModel, Field, ConfigDict, PrivateAttr, model_validator, field_validator
+from pydantic import BaseModel, Field, ConfigDict, PrivateAttr, model_validator, field_validator, SerializeAsAny
 from typing import Optional, List, Iterable, Literal, Set, Dict, Tuple, Type, Any, Union
 from constant.llm import RoleType
 from logs import logger_factory
@@ -16,6 +16,8 @@ from llm.messages import Message
 from llm.envs import Env
 from llm.memory import Memory
 from utils.common import any_to_str
+from capture import Capture
+
 
 lgr = logger_factory.llm
 
@@ -87,6 +89,8 @@ class Role(BaseModel):
     last_preserved: Message = None
 
     interested_actions: Set[Type[Action]] = set()
+
+    cp: SerializeAsAny[Capture] = Field(default_factory=Capture, validate_default=True, description='Capture exception')
 
     __hash__ = object.__hash__
 
@@ -172,13 +176,13 @@ class Role(BaseModel):
             return True
 
     async def _react(self) -> Optional[Message]:
-        # TODO React prompt
         messages = [self.sys_react_msg] + self.rc.memory.to_dict(ample=True)
         resp = await self.rc.todo.run(messages, llm=self.agent_node)
         resp_msg = Message(content=resp, role=self.identity, cause_by=self.rc.todo.__class__, sender=self.name, reply_to=self.rc.memory.get()[-1].id)
         self.rc.memory.add_one(resp_msg)
         self.rc.action_taken += 1
-        self.rc.env.publish_message(resp_msg)
+        if self.rc.env:
+            self.rc.env.publish_message(resp_msg)
         return resp_msg
 
     async def run(self, with_message: Optional[Union[str, Dict, Message]] = None, ignore_history: bool = False) -> Optional[Message]:

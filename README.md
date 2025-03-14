@@ -34,6 +34,31 @@
 </p>
 
 ## Get Started
+### 😁chat
+```python
+from llm.roles.talker import Talker
+
+msg = 'hello, what is u name'
+talker = Talker()
+msg = talker.cp.invoke(talker.run, msg)
+print(msg.data)
+```
+### 🗣️️ debate
+```python
+from llm.envs import Env
+from llm.messages import Message
+from llm.roles.debater import Debater
+
+env = Env(name='game', desc='play games with other')
+debater1 = Debater(name='bot1')
+debater2 = Debater(name='bot2')
+env.add_roles([debater1, debater2])
+env.publish_message(Message.from_any(
+    f'现在你们正在进行一场辩论赛，主题为：科技发展是有益的，还是有弊的？{debater1}为正方 {debater2}为反方',
+    receiver=debater1.address
+))
+env.cp.invoke(env.run)
+```
 ### 🔑 configuration
 ```yaml
 # conf/config.yaml
