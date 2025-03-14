@@ -190,10 +190,6 @@ class Role(BaseModel):
         resp = Message(content='No action taken yet', role=RoleType.SYSTEM)
         while self.rc.action_taken < self.rc.max_react_loop:
             perceive = await self._perceive()
-            if self.name == 'bot1' and perceive is True:
-                print('')
-            if self.name == 'bot2' and perceive is True:
-                print('ok')
             if not perceive:
                 break
             todo = await self._think()

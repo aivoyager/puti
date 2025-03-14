@@ -16,8 +16,10 @@ class Debater(Role):
     sex: Literal['male', 'female'] = 'male'
     goal: str = "debate with someone else, trying to convince them according to turn-based speaking rules"
     think_extra_demands: str = ("You need to choose state right now, Here the rules."
-                                " The speeches in the debate are round rank, judging from where you stand, if you have already spoken and the other party has no new counter-arguments, wait for the other party to speak, then return -1 and do not think about anything else")
-    react_extra_demands: str = "Speeches are made in the order of the alternating order of the debate"
+                                "Speeches are made in the order of the alternating order of the debate, judging if its need you to speak from where you stand, "
+                                "If NOT（wait for the other party to speak） then return -1 and do not think about anything else,"
+                                "If YES then select the state number of other action")
+    react_extra_demands: str = "Speeches are made in the order of the alternating order of the debate, You need to stand up for your own point of view to refute the other side's point of view"
     identity: RoleType = RoleType.USER
 
     def __init__(self, **kwargs) -> None:
