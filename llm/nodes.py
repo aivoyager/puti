@@ -3,6 +3,10 @@
 @Time:  2025-03-10 17:08
 @Description:  
 """
+import ollama
+import os
+
+from ollama import Client
 from pydantic import BaseModel, Field, ConfigDict, create_model, model_validator, PrivateAttr, SerializeAsAny, field_validator
 from typing import Optional, List, Iterable, Literal
 from constant.llm import RoleType
@@ -15,6 +19,7 @@ from logs import logger_factory
 from openai import AsyncStream
 from openai.types.chat import ChatCompletionChunk
 from openai.types import CompletionUsage
+from conf.llm_config import LlamaConfig
 
 
 lgr = logger_factory.llm
@@ -26,11 +31,13 @@ class LLMNode(BaseModel, ABC):
     llm_name: str = Field(default='openai', description='Random llm name.')
     conf: LLMConfig = Field(default_factory=OpenaiConfig, validate_default=True)
     system_prompt: List[dict] = [{'role': RoleType.SYSTEM.val, 'content': 'You are a helpful assistant.'}]
-    acli: Optional[Union[AsyncOpenAI]] = Field(None, description='Cli connect with llm.', exclude=True)
+    acli: Optional[Union[AsyncOpenAI, Client]] = Field(None, description='Cli connect with llm.', exclude=True)
     cost: Optional[Cost] = None
 
     def model_post_init(self, __context):
-        if not self.acli:
+        if not self.acli and self.llm_name == 'openai':
+            if not self.conf.API_KEY:
+                raise AttributeError('API_KEY is missing')
             self.acli = AsyncOpenAI(base_url=self.conf.BASE_URL, api_key=self.conf.API_KEY)
 
     def create_model_class(cls, class_name: str, mapping: Dict[str, Tuple[Type, Any]]):
@@ -101,3 +108,30 @@ class OpenAINode(LLMNode):
             collected_messages.append(chunk_message)
         full_reply = ''.join(collected_messages)
         return full_reply
+
+
+class LlamaNode(LLMNode):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.ollama = Client(host=self.conf.BASE_URL)
+        lgr.info(f'Llama node init from {self.conf.BASE_URL}')
+
+    async def achat(self, msg: List[Dict], **kwargs) -> str:
+        response = self.ollama.chat(
+            model=self.conf.MODEL,
+            messages=msg,
+            stream=self.conf.STREAM,
+            **kwargs
+        )
+        if self.conf.STREAM:
+            collected_messages = []
+            for chunk in response:
+                collected_messages.append(chunk.message.content)
+                print(chunk.message.content, end='')
+            full_reply = ''.join(collected_messages)
+        else:
+            full_reply = response.message.content
+        return full_reply
+
+
+llama_node = LlamaNode(llm_name='llama', conf=LlamaConfig())

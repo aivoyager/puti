@@ -10,6 +10,7 @@ from constant.base import Base
 class LLM(Base):
     OPENAI = ("openai", "")
     ZHIPUAI = ("zhipuai", "")
+    LLAMA = ("llama", "")
 
 
 class RoleType(Base):

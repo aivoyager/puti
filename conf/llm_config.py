@@ -50,3 +50,15 @@ class OpenaiConfig(LLMConfig):
         for i in field:
             if not getattr(self, i):
                 setattr(self, i, conf.get(i, None))
+
+
+class LlamaConfig(LLMConfig):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        parent = self.__class__.__bases__[0]
+        parent_fields = parent.__annotations__.keys()
+        field = self.__annotations__.keys() | parent_fields
+        conf = self._subconfig_init(module=Modules.LLM.val, llm=LLM.LLAMA.val)
+        for i in field:
+            if not getattr(self, i):
+                setattr(self, i, conf.get(i, None))

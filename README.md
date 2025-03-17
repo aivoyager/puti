@@ -33,14 +33,23 @@
     </a>
 </p>
 
+## install req for dev
+```shell
+pip install -r requirements.txt
+```
+
 ## Get Started
-### 😁chat
+### 😁chat: 
 ```python
 from llm.roles.talker import Talker
+from llm.nodes import llama_node
 
 msg = 'hello, what is u name'
-talker = Talker()
-msg = talker.cp.invoke(talker.run, msg)
+talker1 = Talker()  # default chat node is openai
+# change to llama3.1
+talker2 = Talker(agent_node=llama_node)
+msg1 = talker1.cp.invoke(talker1.run, msg)
+msg2 = talker2.cp.invoke(talker1.run, msg)
 print(msg.data)
 ```
 ### 🗣️️ debate
