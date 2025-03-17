@@ -10,16 +10,21 @@ from llm.nodes import LLMNode, OpenAINode
 from abc import ABC, abstractmethod
 
 
+class ActionArgs(BaseModel, ABC):
+    """ Action arguments """
+
+
 class Action(BaseModel, ABC):
     model_config = ConfigDict(arbitrary_types_allowed=True, extra="allow")
 
     name: str = Field(default='', description='Action name')
     desc: str = Field(default='', description='Description of action')
+    args: ActionArgs = None
 
     __hash__ = object.__hash__
 
     @abstractmethod
-    async def run(self, messages, llm: LLMNode = None, *args, **kwargs) -> Annotated[str, 'action result']:
+    async def run(self, *args, **kwargs) -> Annotated[str, 'action result']:
         """ run action """
 
     def __str__(self):
