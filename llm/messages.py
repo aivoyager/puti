@@ -30,6 +30,7 @@ class Message(BaseModel):
     attachment_urls: List[str] = Field(default=[], validate_default=True, description='URLs of attachments for multi modal')
     created_time: datetime = Field(default=datetime.now(), validate_default=True)
 
+
     @field_validator('cause_by', mode='before')
     @classmethod
     def check_cause_by(cls, cause_by: Any):
@@ -76,12 +77,10 @@ class Message(BaseModel):
 
     @property
     def ample_content(self):
-        return f"[name:{self.sender if self.sender else 'FromUser'}  role_type:{self.role.val} message_id:{self.id} reply_to:{self.reply_to}]: {self.content}"
+        return f"[name:{self.sender if self.sender else 'FromUser'}  role_type:{self.role.val} message_id:{self.id} reply_to:{self.reply_to} cause_by:{self.cause_by.__name__}]: {self.content}"
 
     def __str__(self):
-        # if self.instruct_content:
-        #     return f"[name: {self.sender if self.sender else 'FromUser'} && role_type: {self.role.val} && message_id: {self.id}]: {self.instruct_content.model_dump()}"
-        return f"[name:{self.sender if self.sender else 'FromUser'}  role_type:{self.role.val} message_id:{self.id} reply_to:{self.reply_to}]: {self.content}"
+        return f"[name:{self.sender if self.sender else 'FromUser'}  role_type:{self.role.val} message_id:{self.id} reply_to:{self.reply_to} cause_by:{self.cause_by.__name__}]: {self.content}"
 
     def __repr__(self):
         """while print in list"""

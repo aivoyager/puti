@@ -7,9 +7,18 @@ E         ollama._types.ResponseError: registry.ollama.ai/library/llama3_1:lates
 """
 import asyncio
 import json
+import asyncio
+import sys
+
 
 from ollama import Client
 from llm.nodes import LlamaNode
+from conf.llm_config import LlamaConfig
+from llm.envs import Env
+from llm.roles.talker import Talker
+from llm.messages import Message
+from llm.roles.debater import Debater
+from llm.nodes import LlamaNode, llama_node
 from conf.llm_config import LlamaConfig
 
 tools = [
@@ -106,3 +115,23 @@ def test_function_calling_llama():
     print(final.message.content)
     reply = final.message.content
     print('')
+
+
+def test_function_calling_llama_with_params():
+    # msg = 'hello, what is u name'
+    msg = '从纽约（NYC）到洛杉矶（LAX）的航班要飞多长时间'
+    talker = Talker()
+    # talker = Talker(agent_node=llama_node)
+    msg = talker.cp.invoke(talker.run, msg)
+    print(msg.data)
+
+
+
+
+
+
+
+
+
+
+

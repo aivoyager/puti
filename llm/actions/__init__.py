@@ -37,5 +37,7 @@ class Action(BaseModel, ABC):
 class UserRequirement(Action):
     """From user demands"""
 
+    name: str = 'user requirement'
+
     def run(self, messages, llm=None, **kwargs):
         """ nothing """
