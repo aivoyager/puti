@@ -30,7 +30,9 @@ then determine if you need to pass them in. If so, return state and arguments in
 (2) If the name of the latest message equal {intermediate_name}, which means that you performed an intermediate Action
  in the previous step, you CAN NOT select -1 state in this stage, you need to select the state of the other Action based on the response
   result of this Action to refine your response
-(3) For state choosing, choose the most suitable stage according to the understanding of the conversation and action description and action aruguments.
+(3) For state choosing, choose the MOST SUITABLE stage according to the understanding of the conversation and action description and action aruguments.
+    e.g. The user asks what should you have for lunch, and you have two options one is lunch, one is eat, both of them fit the bill, but should you choose lunch
+    e.g. Don't take things for granted. For example, where you are, what's the time now. You can try to use the specific actions to get information.
 (4) Check your extra demands in system message if you have, and follow the demands
 (5) If you think you have completed your goal and don't need to go to any of the stages, return {"state": -1, "arguments": {}}
 (6) Fully understand the action and their arguments before using them, if the action don't need argument, return {"state": choosing stage, "arguments": {}}

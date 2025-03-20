@@ -116,17 +116,36 @@ def test_function_calling_llama():
     print('')
 
 
-def test_function_calling_llama_with_params():
+def test_function_calling_openai_with_params():
     # msg = 'hello, what is u name'
     msg = '从纽约（NYC）到洛杉矶（LAX）的航班要飞多长时间'
-    # talker = Talker()
-    talker = Talker(agent_node=llama_node)
+    talker = Talker()
+    # TODO: llama failure
+    # talker = Talker(agent_node=llama_node)
     msg = talker.cp.invoke(talker.run, msg)
     print(msg.data)
 
 
+def test_fc_in_env():
+    env = Env()
+    talker = Talker()
+    # talker = Talker(agent_node=llama_node)
+    env.add_roles([talker])
+    env.publish_message(Message.from_any('从纽约（NYC）到洛杉矶（LAX）的航班要飞多长时间'))
+    asyncio.run(env.run())
 
 
+def test_debate():
+    env = Env(name='game', desc='play games with other')
+    debater1 = Debater(name='bot1', agent_node=llama_node)
+    debater2 = Debater(name='bot2', agent_node=llama_node)
+    env.add_roles([debater1, debater2])
+    env.publish_message(Message.from_any(
+        f'现在你们正在进行一场辩论赛，主题为：科技发展是有益的，还是有弊的？{debater1}为正方 {debater2}为反方, 每个人字数限制在50以内',
+        # f'Now you are having a debate on the topic: Is the development of science and technology beneficial or harmful? {debater1} is the positive side and {debater2} is the negative side',
+        receiver=debater1.address
+    ))
+    env.cp.invoke(env.run)
 
 
 

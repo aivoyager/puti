@@ -49,7 +49,6 @@ class FileModel(BaseModel):
         methods = {name: func for name, func in inspect.getmembers(self, predicate=inspect.ismethod) if has_decorator(func, 'read_wrapper')}
         read_func = methods.get(f'_read_{file_type}')
         data = read_func(file_path)
-        lgr.info(f"Reading file: {file_path}...")
         return data
 
     @read_wrapper
