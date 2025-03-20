@@ -19,11 +19,11 @@ class Talker(Role):
     goal: str = "Every user message has a reply from you"
     constraints: str = 'utilize the same language as the user requirements for seamless communication'
     identity: RoleType = RoleType.ASSISTANT
-    extra_demands: str = ("If all messages whose role type is user have been replied by you "
-                          "base on reply_to and role_type,"
-                          " return -1 state directly in specified json format without think anything else")
+    # think_extra_demands: str = ("If all messages whose role type is user have been replied by you "
+    #                           "base on reply_to and role_type,"
+    #                           " return -1 state directly in specified json format without think anything else,"
+    #                           "otherwise choose an state base on user requirements")
 
     def __init__(self, **kwargs) -> None:
         super().__init__(**kwargs)
         self.set_actions([GetFlightInfo, Reply])
-        self.set_interested_actions({GetFlightInfo})

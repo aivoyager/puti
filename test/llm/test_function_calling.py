@@ -2,7 +2,6 @@
 @Author: obstacles
 @Time:  2025-03-17 14:00
 @Description:
-E         ollama._types.ResponseError: registry.ollama.ai/library/llama3_1:latest does not support tools (status code: 400)
 
 """
 import asyncio
@@ -120,8 +119,8 @@ def test_function_calling_llama():
 def test_function_calling_llama_with_params():
     # msg = 'hello, what is u name'
     msg = '从纽约（NYC）到洛杉矶（LAX）的航班要飞多长时间'
-    talker = Talker()
-    # talker = Talker(agent_node=llama_node)
+    # talker = Talker()
+    talker = Talker(agent_node=llama_node)
     msg = talker.cp.invoke(talker.run, msg)
     print(msg.data)
 

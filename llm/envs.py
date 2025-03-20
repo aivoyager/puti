@@ -46,10 +46,12 @@ class Env(BaseModel):
             self.members.add(role)
 
     def publish_message(self, msg: Message):
+        """ Publish message to all members exclude myself """
         lgr.debug(f'Publishing message: {msg}')
         has_receiver = False
         for role, addr in self.members_addr.items():
-            if (MessageRouter.ALL.val in msg.receiver or msg.receiver & role.address or msg.cause_by in role.interested_actions) and msg.sender != role.name:
+            if ((MessageRouter.ALL.val in msg.receiver or msg.receiver & role.address or msg.cause_by in role.interested_actions)
+                    and msg.sender != role.name and msg.sender != role.intermediate_sender):
                 role.rc.buffer.put_one_msg(msg)
                 has_receiver = True
         if not has_receiver:

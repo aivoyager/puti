@@ -19,7 +19,7 @@ from llm.envs import Env
 from llm.memory import Memory
 from utils.common import any_to_str
 from capture import Capture
-from llm.actions import ActionArgs
+from llm.actions import ActionArgs,  IntermediateAction
 
 
 lgr = logger_factory.llm
@@ -93,7 +93,8 @@ class Role(BaseModel):
 
     interested_actions: Set[Type[Action]] = Field(
         default=set(),
-        description='Message trigger by interested action will always be received'
+        description='1. Message trigger by interested action will always be received,'
+                    '2. Our Tool Action will always be set up in Tool action Response'
     )
 
     cp: SerializeAsAny[Capture] = Field(default_factory=Capture, validate_default=True, description='Capture exception')
@@ -126,12 +127,20 @@ class Role(BaseModel):
         goal_exp = f'You goal is {self.goal}.' if self.goal else ''
         personality_exp = f'You personality is {self.personality}.' if self.personality else ''
         constraints_exp = f'You constraints are {self.constraints}.' if self.constraints else ''
-        definition = env + name_exp + sex_exp + age_exp + job_exp + skill_exp + goal_exp + personality_exp + constraints_exp
+        other_exp = (f'Here are some instructions to help you make your choice of action: '
+                     f'If the name of the sender of the message ends with intermediate,'
+                     f' it is an intermediate action, otherwise it is a full action.')
+        definition = env + name_exp + sex_exp + age_exp + job_exp + skill_exp + goal_exp + personality_exp + other_exp + constraints_exp
         return definition
 
     @property
     def interested_actions_text(self) -> str:
         return ','.join(list(map(lambda x: x.__name__, self.interested_actions)))
+
+    @property
+    def intermediate_sender(self):
+        """Make sure that sender will not be subscribed by others"""
+        return f'{self.name}_intermediate'
 
     def _reset(self):
         self.states = []
@@ -165,14 +174,20 @@ class Role(BaseModel):
     async def _perceive(self, ignore_history: bool = False) -> bool:
         news = self.rc.buffer.pop_all()
         history = [] if ignore_history else self.rc.memory.get()
-        self.rc.memory.add_batch(news)
         new_list = []
         for n in news:
-            if n.cause_by in self.interested_actions:
+            if n in history and isinstance(n.cause_by, IntermediateAction) and n.cause_by.role_name == self.name:
+                pass
+            else:
+                self.rc.memory.add_one(n)
+
+            if isinstance(n.cause_by, IntermediateAction) and n.cause_by.role_name == self.name:
                 new_list.append(n)
-            elif (n.sender in self.rc.subscribe_sender
+                continue
+            if (n.sender in self.rc.subscribe_sender
                     or self.address & n.receiver
-                    or MessageRouter.ALL.val in n.receiver):
+                    or MessageRouter.ALL.val in n.receiver
+                    or n.cause_by in self.interested_actions):
                 if n not in history:
                     new_list.append(n)
         self.rc.news = new_list
@@ -184,7 +199,14 @@ class Role(BaseModel):
         return True if len(self.rc.news) > 0 else False
 
     async def _think(self) -> Optional[Union[bool, List[Dict]]]:
-        prompt = prompt_setting.COMMON_STATE_TEMPLATE.replace('{history}', '\n'.join(['{}'.format(i) for i in self.rc.memory.get()])).replace('{states}', ''.join(self.states)).replace('{n_states}', str(len(self.states) - 1)).replace('{previous_state}', str(self.rc.state)).replace('{interested_actions}', self.interested_actions_text)
+        prompt = (
+            prompt_setting.COMMON_STATE_TEMPLATE
+            .replace('{history}', '\n'.join(map(str, self.rc.memory.get())))
+            .replace('{states}', ''.join(self.states))
+            .replace('{n_states}', str(len(self.states) - 1))
+            .replace('{previous_state}', str(self.rc.state))
+            .replace('{intermediate_name}', f'{self.name}_intermediate')
+        )
 
         # prompt = prompt_setting.COMMON_STATE_TEMPLATE.format(
         #     history='\n'.join(['{}'.format(i) for i in self.rc.memory.get()]),
@@ -202,25 +224,36 @@ class Role(BaseModel):
         else:
             self.rc.state = int(choose_state)
             self.rc.todo = self.actions[self.rc.state]
-            self.rc.todo.args = self.rc.todo.__annotations__['args'](**think_arguments)
+            if self.rc.todo.__annotations__.get('args'):
+                self.rc.todo.args = self.rc.todo.__annotations__['args'](**think_arguments)
             lgr.debug(f"{self} think {'he' if self.sex == 'male' else 'her'} will do {self.rc.todo}.")
             return True
 
     async def _react(self) -> Optional[Message]:
         messages = [self.sys_react_msg] + self.rc.memory.to_dict(ample=True)
         resp = await self.rc.todo.run(messages, llm=self.agent_node)
-        resp_msg = Message(
-            content=resp,
-            role=self.identity,
-            cause_by=self.rc.todo.__class__,
-            sender=self.name,
-            reply_to=self.rc.memory.get()[-1].id,
-        )
+        if self.rc.todo.intermediate:
+            resp_msg = Message(
+                content=resp,
+                role=self.identity,
+                cause_by=IntermediateAction(role_name=self.name),
+                sender=self.intermediate_sender,
+                reply_to=self.rc.memory.get()[-1].id,
+                receiver={self.name}
+            )
+        else:
+            resp_msg = Message(
+                content=resp,
+                role=self.identity,
+                cause_by=self.rc.todo,
+                sender=self.name,
+                reply_to=self.rc.memory.get()[-1].id,
+            )
         self.rc.memory.add_one(resp_msg)
         self.rc.action_taken += 1
         if self.rc.env:
             self.rc.env.publish_message(resp_msg)
-        if resp_msg.cause_by in self.interested_actions:
+        if self.rc.todo.intermediate:
             self.rc.buffer.put_one_msg(resp_msg)
         return resp_msg
 
@@ -235,6 +268,8 @@ class Role(BaseModel):
             perceive = await self._perceive()
             if not perceive:
                 break
+            if self.rc.action_taken == 1:
+                print('')
             todo = await self._think()
             if not todo:
                 break

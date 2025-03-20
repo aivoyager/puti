@@ -25,10 +25,11 @@ No matter what, only return fixed JSON format {"state": a number between -1 ~ {n
 ～～～
 
 Notes:
-(1) If latest message cause by you interested actions, return fixed JSON format {"state": 0 ~ {n_states}, "arguments": {argument name if action have arguments: argument value...}}, don't reply anything else.
-    Here are your interested actions: {interested_actions}
-(2) If the action for the next stage you need to enter requires arguments, check the type, requirement, and description of the arguments, 
+(1) If the action for the next stage you need to enter requires arguments, check the type, requirement, and description of the arguments, 
 then determine if you need to pass them in. If so, return state and arguments in the specified json format in (1)
+(2) If the name of the latest message equal {intermediate_name}, which means that you performed an intermediate Action
+ in the previous step, you CAN NOT select -1 state in this stage, you need to select the state of the other Action based on the response
+  result of this Action to refine your response
 (3) For state choosing, choose the most suitable stage according to the understanding of the conversation and action description and action aruguments.
 (4) Check your extra demands in system message if you have, and follow the demands
 (5) If you think you have completed your goal and don't need to go to any of the stages, return {"state": -1, "arguments": {}}

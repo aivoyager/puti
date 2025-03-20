@@ -20,6 +20,7 @@ class GetFlightInfo(Action):
     model_config = ConfigDict(arbitrary_types_allowed=True)
     name: str = "Get flight time"
     desc: str = 'Use this action get the flight times between two cities'
+    intermediate: bool = True
     args: GetFlightInfoArgs = None
 
     async def run(self, *args, **kwargs):

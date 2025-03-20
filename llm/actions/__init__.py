@@ -19,6 +19,9 @@ class Action(BaseModel, ABC):
 
     name: str = Field(default='', description='Action name')
     desc: str = Field(default='', description='Description of action')
+    intermediate: bool = Field(
+        default=False,
+        description='Intermediate action, When called over will publish message to myself rather than broadcast')
     args: ActionArgs = None
 
     __hash__ = object.__hash__
@@ -32,6 +35,15 @@ class Action(BaseModel, ABC):
 
     def __repr__(self):
         return self.__str__()
+
+
+class IntermediateAction(Action):
+    """ For message field `cause by` """
+
+    role_name: str = Field(default='', description='bind to a role for intermediate action')
+
+    def run(self, *args, **kwargs) -> Annotated[str, 'action result']:
+        pass
 
 
 class UserRequirement(Action):

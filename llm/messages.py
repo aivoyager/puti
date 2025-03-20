@@ -19,7 +19,7 @@ class Message(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True, extra="allow")
 
     # if design in role will loop import
-    cause_by: Optional[Type[Action]] = Field(default=None, description='message initiator Action str', validate_default=True)
+    cause_by: Optional[Action] = Field(default=None, description='message initiator Action str', validate_default=True)
     sender: str = Field(default='', validate_default=True, description='Sender role name')
     receiver: set['str'] = Field(default={MessageRouter.ALL.val}, validate_default=True, description='Receiver role name')
     reply_to: str = Field(default='', description='Message id reply to')
@@ -30,12 +30,11 @@ class Message(BaseModel):
     attachment_urls: List[str] = Field(default=[], validate_default=True, description='URLs of attachments for multi modal')
     created_time: datetime = Field(default=datetime.now(), validate_default=True)
 
-
     @field_validator('cause_by', mode='before')
     @classmethod
     def check_cause_by(cls, cause_by: Any):
         if not cause_by:
-            return UserRequirement
+            return UserRequirement()
         return cause_by
 
     @classmethod
@@ -77,10 +76,12 @@ class Message(BaseModel):
 
     @property
     def ample_content(self):
-        return f"[name:{self.sender if self.sender else 'FromUser'}  role_type:{self.role.val} message_id:{self.id} reply_to:{self.reply_to} cause_by:{self.cause_by.__name__}]: {self.content}"
+        reply_to_exp = f' reply_to:{self.reply_to}' if self.reply_to else ''
+        return f"[name:{self.sender if self.sender else 'FromUser'}  role_type:{self.role.val} message_id:{self.id}{reply_to_exp}]: {self.content}"
 
     def __str__(self):
-        return f"[name:{self.sender if self.sender else 'FromUser'}  role_type:{self.role.val} message_id:{self.id} reply_to:{self.reply_to} cause_by:{self.cause_by.__name__}]: {self.content}"
+        reply_to_exp = f' reply_to:{self.reply_to}' if self.reply_to else ''
+        return f"[name:{self.sender if self.sender else 'FromUser'}  role_type:{self.role.val} message_id:{self.id}{reply_to_exp}]: {self.content}"
 
     def __repr__(self):
         """while print in list"""
