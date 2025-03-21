@@ -30,9 +30,23 @@ def test_match():
     
     {"state": 0, "arguments": {"departure": "NYC", "arrival": "LAX"}}
     """
+    s2 = """
+        So, my next possible actions are either to reply to the user's message or search for Resident Evil info. Since the user asked about flight time and I already provided a response via the intermediate step, the logical next move is to send that information back as a regular reply.
+
+Therefore, the state should be 1, which is the "Reply" action, allowing me to communicate the flight duration clearly.
+</think>
+
+```json
+{"state": 1}
+```
+    """
     pattern = r'\{"state":\s*\d+,\s*"arguments":\s*\{.*?\}\}'
     match = re.search(pattern, s, re.DOTALL)
     rs = match.group()
+
+    p2 = r'\{"state":\s*\d+}'
+    rs2 = re.search(p2, s2, re.DOTALL)
+
     import json
     rs = json.loads(rs)
     print('')

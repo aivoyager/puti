@@ -23,7 +23,7 @@ class Message(BaseModel):
     sender: str = Field(default='', validate_default=True, description='Sender role name')
     receiver: set['str'] = Field(default={MessageRouter.ALL.val}, validate_default=True, description='Receiver role name')
     reply_to: str = Field(default='', description='Message id reply to')
-    id: str = Field(default_factory=lambda: str(uuid4()), description='Unique code of messages')
+    id: str = Field(default_factory=lambda: str(uuid4())[:8], description='Unique code of messages')
     content: str = ''
     instruct_content: Optional[BaseModel] = Field(default=None, validate_default=True)
     role: RoleType = Field(default=RoleType.USER, validate_default=True)

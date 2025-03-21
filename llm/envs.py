@@ -54,8 +54,8 @@ class Env(BaseModel):
                     and msg.sender != role.name and msg.sender != role.intermediate_sender):
                 role.rc.buffer.put_one_msg(msg)
                 has_receiver = True
-        if not has_receiver:
-            lgr.warning(f'No receiver for message: {msg}')
+        # if not has_receiver:
+        #     lgr.warning(f'No receiver for message: {msg}')
         self.history.append(msg)
 
     async def run(self):
@@ -65,9 +65,9 @@ class Env(BaseModel):
             for member in self.members:
                 future = member.run()
                 futures.append(future)
-            await asyncio.gather(*futures)
+            resp = await asyncio.gather(*futures)
             n += 1
-        print('')
+            print(f'round: {n} resp: {resp}')
 
     @property
     def is_idle(self):

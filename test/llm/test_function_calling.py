@@ -128,14 +128,14 @@ def test_function_calling_openai_with_params():
 
 def test_fc_in_env():
     env = Env()
-    # talker = Talker()
-    talker = Talker(agent_node=ollama_node)
+    talker = Talker()
+    # talker = Talker(agent_node=ollama_node)
     env.add_roles([talker])
-    q1 = '从纽约（NYC）到洛杉矶（LAX）的航班要飞多长时间'
-    q2 = '介绍一下生化危机中的里昂'
-    env.publish_message(Message.from_any(q2))
-    asyncio.run(env.run())
-
+    # q = '从纽约（NYC）到洛杉矶（LAX）的航班要飞多长时间'
+    q = '介绍一下生化危机中的里昂'
+    env.publish_message(Message.from_any(q))
+    resp = env.cp.invoke(env.run)
+    print('')
 
 def test_debate():
     env = Env(name='game', desc='play games with other')

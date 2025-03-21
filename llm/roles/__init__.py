@@ -72,12 +72,8 @@ class Role(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True, extra="allow")
 
     name: str = Field(default='obstacles', description='role name')
-    sex: Literal['male', 'female'] = 'male'
-    age: int = ''
-    job: str = ''
-    skill: str = ''
     goal: str = ''
-    personality: str = ''
+    skill: str = ''
     think_extra_demands: str = ''
     react_extra_demands: str = ''
     constraints: str = Field(
@@ -88,15 +84,18 @@ class Role(BaseModel):
 
     actions: List[Action] = Field(default=[], validate_default=True, description='Action list can be performed')
     states: List[str] = Field(default=[], validate_default=True, description='Action to state number map')
+
     identity: RoleType = Field(default=RoleType.USER, description='Role identity')
     agent_node: LLMNode = Field(default_factory=OpenAINode, description='LLM node')
     rc: RoleContext = Field(default_factory=RoleContext)
-    last_preserved: Message = None
+    think_answer: Message = Field(
+        default=None,
+        description='Due to some llm tools called training， May get final answer from think.'
+    )
 
     interested_actions: Set[Type[Action]] = Field(
         default=set(),
-        description='1. Message trigger by interested action will always be received,'
-                    '2. Our Tool Action will always be set up in Tool action Response'
+        description='user will receiver their interested actions'
     )
 
     cp: SerializeAsAny[Capture] = Field(default_factory=Capture, validate_default=True, description='Capture exception')
@@ -116,23 +115,17 @@ class Role(BaseModel):
     @property
     def sys_react_msg(self) -> Optional[Dict[str, str]]:
         extra_demands = f'Here are some extra demands on you: {self.react_extra_demands}.' if self.react_extra_demands else "You don't have extra demands."
-        return {'role': RoleType.SYSTEM.val, 'content': self.role_definition + extra_demands}
+        exp = f'When you get a message from {self.name}_intermediate, you need a summary of the output of your intermediate action to visualize a good output'
+        return {'role': RoleType.SYSTEM.val, 'content': self.role_definition + exp + extra_demands}
 
     @property
     def role_definition(self) -> str:
         env = self._env_prompt
         name_exp = f'You name is {self.name}.' if self.name else ''
-        sex_exp = f'You sex is {self.sex}.' if self.sex else ''
-        age_exp = f'You age is {self.age}.' if self.age else ''
-        job_exp = f'You job is {self.job}.' if self.job else ''
         skill_exp = f'You skill at {self.skill}.' if self.skill else ''
         goal_exp = f'You goal is {self.goal}.' if self.goal else ''
-        personality_exp = f'You personality is {self.personality}.' if self.personality else ''
-        constraints_exp = f'You constraints are {self.constraints}.' if self.constraints else ''
-        other_exp = (f'Here are some instructions to help you make your choice of action: '
-                     f'If the name of the sender of the message ends with intermediate,'
-                     f' it is an intermediate action, otherwise it is a full action.')
-        definition = env + name_exp + sex_exp + age_exp + job_exp + skill_exp + goal_exp + personality_exp + other_exp + constraints_exp
+        constraints_exp = f'You constraints is {self.constraints}.' if self.constraints else ''
+        definition = env + name_exp + skill_exp + goal_exp + constraints_exp
         return definition
 
     @property
@@ -151,6 +144,7 @@ class Role(BaseModel):
     def set_actions(self, actions: List[Union[Action, Type[Action]]]):
         for action in actions:
             act_obj = action()
+            intermediate_exp = '(intermediate action)' if act_obj.intermediate else ''
             args_prompt = ''
             for field_name, field_info in act_obj.model_fields.items():
                 args_model = field_info.annotation
@@ -164,7 +158,7 @@ class Role(BaseModel):
                         args.append(arg_prompt)
                     args_prompt = '\n'.join(args) + '\n'
             self.actions.append(act_obj)
-            states = f'{len(self.actions) - 1}. {act_obj.name}: {act_obj.desc}\n'
+            states = f'{len(self.actions) - 1}. {act_obj.name}{intermediate_exp}: {act_obj.desc}\n'
             if args_prompt:
                 states += args_prompt
             self.states.append(states)
@@ -201,8 +195,9 @@ class Role(BaseModel):
         return True if len(self.rc.news) > 0 else False
 
     async def _think(self) -> Optional[Union[bool, List[Dict]]]:
+        state_template = prompt_setting.COMMON_STATE_TEMPLATE
         prompt = (
-            prompt_setting.COMMON_STATE_TEMPLATE
+            state_template
             .replace('{history}', '\n'.join(map(str, self.rc.memory.get())))
             .replace('{states}', ''.join(self.states))
             .replace('{n_states}', str(len(self.states) - 1))
@@ -210,53 +205,60 @@ class Role(BaseModel):
             .replace('{intermediate_name}', f'{self.name}_intermediate')
         )
 
-        # prompt = prompt_setting.COMMON_STATE_TEMPLATE.format(
-        #     history='\n'.join(['{}'.format(i) for i in self.rc.memory.get()]),
-        #     states=''.join(self.states),
-        #     n_states=len(self.states) - 1,
-        #     previous_state=self.rc.state
-        # )
         message = {'role': RoleType.USER.val, 'content': prompt}
         think = await self.agent_node.achat([self.sys_think_msg, message])
-        if isinstance(self.agent_node, OllamaNode) and 'deepseek-r1' in self.agent_node.conf.MODEL:
+        if isinstance(self.agent_node, OllamaNode):
             pattern = r'\{"state":\s*\d+,\s*"arguments":\s*\{.*?\}\}'
-            think = re.search(pattern, think, re.DOTALL)
-            if think:
-                think = think.group().lstrip('```json').rstrip('```')
+            match = re.search(pattern, think, re.DOTALL)
+            if match:
+                think = match.group().lstrip('```json').rstrip('```')
+            elif re.search(r'\{"state":\s*\d+}', think, re.DOTALL):
+                think = re.search(r'\{"state":\s*\d+}', think, re.DOTALL).group().lstrip('```json').rstrip('```')
+            else:
+                raise RuntimeError(f'unable to parse {think}')
         think = json.loads(think)
         choose_state = think.get('state')
         think_arguments = think.get('arguments')
+        # llama 3.1 8B will put final answer in this field
+        condition = think_arguments.get('message')
+        if condition:
+            lgr.debug(f'{self.name} get final answer through think: {think_arguments["message"]}')
+            self.think_answer = Message.from_any(think_arguments.get('message'), sender=self.name, reply_to=self.rc.memory.get()[-1].id, role=RoleType.ASSISTANT)
+            return True
         if int(choose_state) == -1:
-            lgr.debug(f"{self} think {'he' if self.sex == 'male' else 'her'} is idle.")
+            lgr.debug(f"{self} is idle.")
             return False
         else:
             self.rc.state = int(choose_state)
             self.rc.todo = self.actions[self.rc.state]
             if self.rc.todo.__annotations__.get('args'):
                 self.rc.todo.args = self.rc.todo.__annotations__['args'](**think_arguments)
-            lgr.debug(f"{self} think {'he' if self.sex == 'male' else 'her'} will do {self.rc.todo}.")
+            lgr.debug(f"{self} will do {self.rc.todo}.")
             return True
 
     async def _react(self) -> Optional[Message]:
-        messages = [self.sys_react_msg] + self.rc.memory.to_dict(ample=True)
-        resp = await self.rc.todo.run(messages, llm=self.agent_node)
-        if self.rc.todo.intermediate:
-            resp_msg = Message(
-                content=resp,
-                role=self.identity,
-                cause_by=IntermediateAction(role_name=self.name),
-                sender=self.intermediate_sender,
-                reply_to=self.rc.memory.get()[-1].id,
-                receiver={self.name}
-            )
+        if not self.think_answer:
+            messages = [self.sys_react_msg] + self.rc.memory.to_dict(ample=True)
+            resp = await self.rc.todo.run(messages, llm=self.agent_node)
+            if self.rc.todo.intermediate:
+                resp_msg = Message(
+                    content=resp,
+                    role=self.identity,
+                    cause_by=IntermediateAction(role_name=self.name),
+                    sender=self.intermediate_sender,
+                    reply_to=self.rc.memory.get()[-1].id,
+                    receiver={self.name}
+                )
+            else:
+                resp_msg = Message(
+                    content=resp,
+                    role=self.identity,
+                    cause_by=self.rc.todo,
+                    sender=self.name,
+                    reply_to=self.rc.memory.get()[-1].id,
+                )
         else:
-            resp_msg = Message(
-                content=resp,
-                role=self.identity,
-                cause_by=self.rc.todo,
-                sender=self.name,
-                reply_to=self.rc.memory.get()[-1].id,
-            )
+            resp_msg = self.think_answer
         self.rc.memory.add_one(resp_msg)
         self.rc.action_taken += 1
         if self.rc.env:
@@ -276,8 +278,6 @@ class Role(BaseModel):
             perceive = await self._perceive()
             if not perceive:
                 break
-            if self.rc.action_taken == 1:
-                print('')
             todo = await self._think()
             if not todo:
                 break
