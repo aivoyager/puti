@@ -11,13 +11,13 @@ import sys
 
 
 from ollama import Client
-from llm.nodes import LlamaNode
+from llm.nodes import OllamaNode
 from conf.llm_config import LlamaConfig
 from llm.envs import Env
 from llm.roles.talker import Talker
 from llm.messages import Message
 from llm.roles.debater import Debater
-from llm.nodes import LlamaNode, llama_node
+from llm.nodes import OllamaNode, ollama_node
 from conf.llm_config import LlamaConfig
 
 tools = [
@@ -82,7 +82,7 @@ def get_weather(city):
 
 
 def test_function_calling():
-    node = LlamaNode(llm_name='llama', conf=LlamaConfig())
+    node = OllamaNode(llm_name='llama', conf=LlamaConfig())
     msg = [{"role": "user", "content": "What's the weather like in Beijing?"}]
     resp = asyncio.run(node.achat(msg, tools=tools))
     print('')
@@ -128,17 +128,19 @@ def test_function_calling_openai_with_params():
 
 def test_fc_in_env():
     env = Env()
-    talker = Talker()
-    # talker = Talker(agent_node=llama_node)
+    # talker = Talker()
+    talker = Talker(agent_node=ollama_node)
     env.add_roles([talker])
-    env.publish_message(Message.from_any('从纽约（NYC）到洛杉矶（LAX）的航班要飞多长时间'))
+    q1 = '从纽约（NYC）到洛杉矶（LAX）的航班要飞多长时间'
+    q2 = '介绍一下生化危机中的里昂'
+    env.publish_message(Message.from_any(q2))
     asyncio.run(env.run())
 
 
 def test_debate():
     env = Env(name='game', desc='play games with other')
-    debater1 = Debater(name='bot1', agent_node=llama_node)
-    debater2 = Debater(name='bot2', agent_node=llama_node)
+    debater1 = Debater(name='bot1', agent_node=ollama_node)
+    debater2 = Debater(name='bot2', agent_node=ollama_node)
     env.add_roles([debater1, debater2])
     env.publish_message(Message.from_any(
         f'现在你们正在进行一场辩论赛，主题为：科技发展是有益的，还是有弊的？{debater1}为正方 {debater2}为反方, 每个人字数限制在50以内',

@@ -37,3 +37,21 @@ class GetFlightInfo(Action):
         # 将出发地和目的地组合成键，并查找航班信息
         key = f'{departure}-{arrival}'.upper()
         return json.dumps(flights.get(key, {'error': 'Flight not found'}))
+
+
+class SearchResidentEvilInfoArgs(ActionArgs):
+    name: str = Field(description='name in resident evil')
+
+
+class SearchResidentEvilInfo(Action):
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+    name: str = "Search resident evil info"
+    desc: str = "Use this action search the resident evil relation info"
+    intermediate: bool = True
+    args: SearchResidentEvilInfoArgs = None
+
+    async def run(self, *args, **kwargs):
+        llm: LLMNode = kwargs.get('llm')
+        name = self.args.name
+        resp = await llm.achat([{'role': 'user', 'content': f'请提供生化危机中这个角色的详细信息{name}'}])
+        return resp

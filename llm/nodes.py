@@ -110,7 +110,7 @@ class OpenAINode(LLMNode):
         return full_reply
 
 
-class LlamaNode(LLMNode):
+class OllamaNode(LLMNode):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.ollama = Client(host=self.conf.BASE_URL)
@@ -134,4 +134,4 @@ class LlamaNode(LLMNode):
         return full_reply
 
 
-llama_node = LlamaNode(llm_name='llama', conf=LlamaConfig())
+ollama_node = OllamaNode(llm_name='llama', conf=LlamaConfig())

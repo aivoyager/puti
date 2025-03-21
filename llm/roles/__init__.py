@@ -4,6 +4,7 @@
 @Description:  
 """
 import json
+import re
 
 from llm.prompts import prompt_setting
 from llm.actions import Action
@@ -20,6 +21,7 @@ from llm.memory import Memory
 from utils.common import any_to_str
 from capture import Capture
 from llm.actions import ActionArgs,  IntermediateAction
+from llm.nodes import OllamaNode
 
 
 lgr = logger_factory.llm
@@ -215,7 +217,13 @@ class Role(BaseModel):
         #     previous_state=self.rc.state
         # )
         message = {'role': RoleType.USER.val, 'content': prompt}
-        think = json.loads(await self.agent_node.achat([self.sys_think_msg, message]))
+        think = await self.agent_node.achat([self.sys_think_msg, message])
+        if isinstance(self.agent_node, OllamaNode) and 'deepseek-r1' in self.agent_node.conf.MODEL:
+            pattern = r'\{"state":\s*\d+,\s*"arguments":\s*\{.*?\}\}'
+            think = re.search(pattern, think, re.DOTALL)
+            if think:
+                think = think.group().lstrip('```json').rstrip('```')
+        think = json.loads(think)
         choose_state = think.get('state')
         think_arguments = think.get('arguments')
         if int(choose_state) == -1:

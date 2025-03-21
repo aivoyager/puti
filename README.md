@@ -39,15 +39,16 @@ pip install -r requirements.txt
 ```
 
 ## Get Started
-### 😁chat: 
+### 😁chat:
+
 ```python
 from llm.roles.talker import Talker
-from llm.nodes import llama_node
+from llm.nodes import ollama_node
 
 msg = 'hello, what is u name'
 talker1 = Talker()  # default chat node is openai
 # change to llama3.1
-talker2 = Talker(agent_node=llama_node)
+talker2 = Talker(agent_node=ollama_node)
 msg1 = talker1.cp.invoke(talker1.run, msg)
 msg2 = talker2.cp.invoke(talker1.run, msg)
 print(msg.data)

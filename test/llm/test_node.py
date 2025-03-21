@@ -8,7 +8,7 @@ import asyncio
 from llm.nodes import LLMNode
 from conf.llm_config import OpenaiConfig
 from llm.nodes import OpenAINode
-from llm.nodes import LlamaNode
+from llm.nodes import OllamaNode
 from conf.llm_config import LlamaConfig
 
 
@@ -34,7 +34,7 @@ def test_action_node():
 
 def test_ollama():
     t = 'hello, world'
-    node = LlamaNode(llm_name='llama', conf=LlamaConfig())
+    node = OllamaNode(llm_name='llama', conf=LlamaConfig())
     res = asyncio.run(node.achat(t))
     print(res)
 
