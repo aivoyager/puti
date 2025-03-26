@@ -77,20 +77,21 @@ class LLMNode(BaseModel, ABC):
         return new_class
 
     @abstractmethod
-    async def achat(self, msg: List[Dict]) -> str:
+    async def achat(self, msg: List[Dict], *args, **kwargs) -> str:
         """ Async chat """
 
 
 class OpenAINode(LLMNode):
 
-    async def achat(self, msg: List[Dict]) -> str:
+    async def achat(self, msg: List[Dict], **kwargs) -> str:
         resp: AsyncStream[ChatCompletionChunk] = await self.acli.chat.completions.create(
             messages=msg,
             timeout=self.conf.LLM_API_TIMEOUT,
             stream=self.conf.STREAM,
             max_tokens=self.conf.MAX_TOKEN,
             temperature=self.conf.TEMPERATURE,
-            model=self.conf.MODEL
+            model=self.conf.MODEL,
+            **kwargs
         )
         collected_messages = []
         async for chunk in resp:

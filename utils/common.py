@@ -47,7 +47,7 @@ def check_module(vals: List[str]) -> bool:
         if val not in module_set:
             return False
     not_conf = module_set - set(vals)
-    lgr.warning(", ".join(map(str, not_conf)))
+    # lgr.warning(", ".join(map(str, not_conf)))
     return True
 
 

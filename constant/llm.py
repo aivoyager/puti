@@ -23,6 +23,11 @@ class MessageRouter(Base):
     ALL = ('<all>', 'message to all people')
 
 
+class ParamMap(Base):
+    """ val: origin ---> desc: destination fc type mapping"""
+    STRING = ('str', 'string')
+
+
 TOKEN_COSTS = {
     "gpt-3.5-turbo": {"prompt": 0.0015, "completion": 0.002},
     "gpt-3.5-turbo-0301": {"prompt": 0.0015, "completion": 0.002},

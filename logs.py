@@ -39,7 +39,8 @@ class LoggerFactory(object):
             level=logfile_level,
             enqueue=True,
             backtrace=True,
-            diagnose=True
+            diagnose=True,
+            colorize=True
         )
         cls.loggers[name_default] = _logger.bind(name=name_default)
 
@@ -50,7 +51,8 @@ class LoggerFactory(object):
             level=logfile_level,
             enqueue=True,
             backtrace=True,
-            diagnose=True
+            diagnose=True,
+            colorize=True
         )
         cls.loggers[name_client] = _logger.bind(name=name_client)
 
@@ -61,7 +63,8 @@ class LoggerFactory(object):
             level=logfile_level,
             enqueue=True,
             backtrace=True,
-            diagnose=True
+            diagnose=True,
+            colorize=True
         )
         cls.loggers[name_client] = _logger.bind(name=name_client)
 

@@ -21,7 +21,7 @@ class Base(Enum):
         return self.value[1]
 
     @classmethod
-    def elem_from_str(cls: Type[T], s: str) -> Enum:
+    def elem_from_str(cls: Type[T], s: str) -> 'Base':
         for item in cls:
             if item.val == s:
                 return item
