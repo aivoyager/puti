@@ -6,13 +6,9 @@
 import openai
 import langchain
 
-from langchain.agents import (AgentExecutor, create_structured_chat_agent, load_tools,
-                              initialize_agent, AgentType, Tool)
-from langchain.callbacks import AsyncIteratorCallbackHandler
-from langchain.schema import AgentAction, AgentFinish
+from langchain.agents import (create_structured_chat_agent, load_tools,
+                              initialize_agent, AgentType)
 from langchain.memory import ConversationBufferMemory
-from langchain_core.runnables import RunnableSequence
-from langchain_core.prompts import SystemMessagePromptTemplate
 from langchain_openai.llms import OpenAI
 from langchain.chains import LLMChain
 from langchain_openai.chat_models import ChatOpenAI
@@ -20,8 +16,10 @@ from httpx import Client
 from langchain.prompts import ChatPromptTemplate
 from langchain.prompts.chat import ChatMessagePromptTemplate
 from conf.config import conf
-from llm.prompts.setting import prompt_settings
+from llm.prompts import prompt_setting
 from langchain import hub
+
+
 
 langchain.debug = True
 
@@ -109,7 +107,7 @@ def create_model_chain(
         {'role': 'ai', 'content': 'I am Stitch, thank you! How about you?'}
     ]
     role_maps = {"ai": "assistant", "human": "user"}
-    input_text = prompt_settings.llm_model[model_name]
+    input_text = prompt_setting.llm_model[model_name]
     input_text = ChatMessagePromptTemplate.from_template(
         template=input_text,
         role=role_maps['human'],
@@ -129,6 +127,8 @@ def create_model_chain(
     chain = LLMChain(prompt=chat_prompt, llm=llm, memory=memory)
     # full_chain = {"input": lambda x: x["input"]} | chain
     return chain
+
+
 
 
 

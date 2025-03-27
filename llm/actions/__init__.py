@@ -29,7 +29,7 @@ class ActionArgs(BaseModel, ABC):
 class Action(BaseModel, ABC):
     model_config = ConfigDict(arbitrary_types_allowed=True, extra="allow")
 
-    name: str = Field(default='', description='Action name')
+    name: str = Field(..., description='Action name')
     desc: str = Field(default='', description='Description of action')
     intermediate: bool = Field(
         default=False,
@@ -86,6 +86,7 @@ class Action(BaseModel, ABC):
 class IntermediateAction(Action):
     """ For message field `cause by` """
 
+    name: str = 'intermediate action'
     role_name: str = Field(default='', description='bind to a role for intermediate action')
 
     def run(self, *args, **kwargs) -> Annotated[str, 'action result']:

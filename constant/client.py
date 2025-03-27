@@ -20,3 +20,8 @@ class TwikitSearchMethod(Base):
     TOP = ('Top', 'top search method')
     LATEST = ('Latest', 'latest search method')
     MEDIA = ('Media', 'media search method')
+
+
+class McpTransportMethod(Base):
+    STDIO = ('stdio', 'stdio transport')
+    SSE = ('sse', 'sse transport')

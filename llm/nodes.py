@@ -115,7 +115,7 @@ class OllamaNode(LLMNode):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.ollama = Client(host=self.conf.BASE_URL)
-        lgr.info(f'Llama node init from {self.conf.BASE_URL}')
+        lgr.info(f'Ollama node init from {self.conf.BASE_URL} ---> model: {self.conf.MODEL}')
 
     async def achat(self, msg: List[Dict], **kwargs) -> str:
         response = self.ollama.chat(

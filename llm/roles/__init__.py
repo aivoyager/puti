@@ -5,7 +5,13 @@
 """
 import json
 import re
+import sys
+import asyncio
+import importlib
+import pkgutil
+import inspect
 
+from llm import actions
 from llm.prompts import prompt_setting
 from llm.actions import Action
 from pydantic import BaseModel, Field, ConfigDict, PrivateAttr, model_validator, field_validator, SerializeAsAny
@@ -22,9 +28,25 @@ from utils.common import any_to_str
 from capture import Capture
 from llm.actions import ActionArgs,  IntermediateAction
 from llm.nodes import OllamaNode
+from mcp.client.sse import sse_client
+from mcp.client.stdio import stdio_client
+from mcp import ClientSession, StdioServerParameters
+from contextlib import AsyncExitStack
+from utils.path import root_dir
+from constant.client import McpTransportMethod
+from typing import Annotated, Dict, TypedDict, Any, Required, NotRequired, ClassVar, cast
+from llm.actions import ActionArgs
+from pydantic.fields import FieldInfo
 
 
 lgr = logger_factory.llm
+
+
+class ModelFields(TypedDict):
+    name: Required[FieldInfo]
+    desc: Required[FieldInfo]
+    intermediate: Required[FieldInfo]
+    args: NotRequired[ActionArgs]
 
 
 class Buffer(BaseModel):
@@ -300,3 +322,51 @@ class Role(BaseModel):
 
     def __repr__(self):
         return self.__str__()
+
+
+class McpRole(Role):
+
+    conn_type: McpTransportMethod = McpTransportMethod.STDIO
+    exit_stack: AsyncExitStack = Field(default_factory=lambda: AsyncExitStack(), validate_default=True)
+    session: Optional[ClientSession] = Field(default=None, description='Session used for communication.')
+    server_script: str = Field(default=str(root_dir() / 'mcpp' / 'server.py'), description='Server script')
+    action_map: Dict[str, Type[Action]] = Field(default={}, description='Action map')
+
+    async def _initialize_session(self):
+        server_params = StdioServerParameters(command=sys.executable, args=[self.server_script])
+        stdio_transport = await self.exit_stack.enter_async_context(stdio_client(server_params))
+        read, write = stdio_transport
+        self.session = await self.exit_stack.enter_async_context(ClientSession(read, write))
+        await self.session.initialize()
+
+    async def _initialize_action_map(self):
+        action_map = {}
+        for _, module_name, _ in pkgutil.iter_modules(actions.__path__):
+            if module_name == '__init__':
+                continue
+            module = importlib.import_module(f'llm.actions.{module_name}')
+            for name, obj in inspect.getmembers(module, inspect.isclass):
+                if issubclass(obj, Action) and obj is not Action:
+                    model_fields: ModelFields = cast(ModelFields, obj.model_fields)
+                    obj_name = model_fields['name'].default
+                    action_map[obj_name] = obj
+        self.action_map = action_map
+
+    async def _initialize_actions(self):
+        actions = await self.mcp_tool_to_actions()
+        self.set_actions(list(actions.values()))
+
+    def model_post_init(self, __context: Any, *args, **kwargs) -> None:
+        asyncio.run(self._initialize_session())
+        asyncio.run(self._initialize_action_map())
+        asyncio.run(self._initialize_actions())
+        lgr.debug(f'[{self.name}] mcp client initial successfully')
+
+    async def mcp_tool_to_actions(self) -> Dict[str, Type[Action]]:
+        resp = await self.session.list_tools()
+        rsp = {}
+        for tool in resp.tools:
+            if tool.name in self.action_map:
+                rsp[tool.name] = self.action_map[tool.name]
+        return rsp
+

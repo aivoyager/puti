@@ -10,6 +10,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import argparse
 import json
 
+from llm.actions.talk import Reply
 from llm.actions.get_flight_time import GetFlightInfo
 from inspect import Parameter, Signature
 from pydantic import BaseModel, Field, ConfigDict
@@ -17,6 +18,8 @@ from typing import Literal, List, Type, Any
 from llm.actions import Action
 from mcp.server.fastmcp import FastMCP
 from logs import logger_factory
+from constant.client import McpTransportMethod
+
 
 lgr = logger_factory.client
 
@@ -24,7 +27,7 @@ lgr = logger_factory.client
 class MCPServer(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True, extra="allow")
 
-    transport: Literal['stdio', 'sse'] = Field(default='stdio', validate_default=True, description='communication method')
+    transport: McpTransportMethod = Field(default=McpTransportMethod.STDIO, validate_default=True, description='communication method')
     server: FastMCP = Field(default_factory=lambda: FastMCP('puti'), validate_default=True)
 
     @staticmethod
@@ -48,7 +51,7 @@ class MCPServer(BaseModel):
         args = parameter['function'].get('parameters', {})
         required_params = parameter['function'].get('parameters', {}).get('required', [])
         parameters = []
-        for k, v in args.get('properties').items():
+        for k, v in args.get('properties', {}).items():
             param_type = v.get('type', '')
             default = Parameter.empty if k in required_params else None
             annotation = Any
@@ -100,10 +103,10 @@ class MCPServer(BaseModel):
 
     def run(self):
         lgr.info('MCPServer start')
-        self.server.run(transport=self.transport)
+        self.server.run(transport=self.transport.val)
 
 
 if __name__ == '__main__':
     mcp = MCPServer()
-    mcp.add_actions([GetFlightInfo])
+    mcp.add_actions([GetFlightInfo, Reply])
     mcp.run()
