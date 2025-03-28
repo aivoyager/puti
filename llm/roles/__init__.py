@@ -206,17 +206,7 @@ class Role(BaseModel):
         else:
             raise RuntimeError(f'Unexpected think type: {type(think)}')
 
-
-        # else:
-        #     self.rc.state = int(choose_state)
-        #     self.rc.todo = self.toolkit[self.rc.state]
-        #     if self.rc.todo.__annotations__.get('args'):
-        #         self.rc.todo.args = self.rc.todo.__annotations__['args'](**think_arguments)
-        #     lgr.debug(f"{self} will do {self.rc.todo}.")
-        return True
-
     async def _react(self) -> Optional[Message]:
-        messages = [self.sys_react_msg] + self.rc.memory.to_dict()
         for todo in self.rc.todos:
             resp = await todo[0].run(**todo[1])
             message = Message.from_any(resp, role=RoleType.TOOL)
