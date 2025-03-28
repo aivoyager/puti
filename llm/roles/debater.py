@@ -5,10 +5,10 @@
 """
 from llm.roles import Role, RoleType
 from typing import List, Literal, Set
-from llm.actions.talk import Reply
-from llm.actions import Action
-from llm.roles.talker import Talker
-from llm.actions.debate import Debate
+from llm.tools.talk import Reply
+from llm.tools import BaseTool
+from llm.roles.talker import PuTi
+from llm.tools.debate import Debate
 
 
 class Debater(Role):
@@ -24,6 +24,6 @@ class Debater(Role):
 
     def __init__(self, **kwargs) -> None:
         super().__init__(**kwargs)
-        self.set_actions([Debate, Reply])
+        self.set_tools([Debate, Reply])
         self.set_interested_actions({Debate})
 

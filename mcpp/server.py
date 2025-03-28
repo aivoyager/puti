@@ -10,12 +10,12 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import argparse
 import json
 
-from llm.actions.talk import Reply
-from llm.actions.get_flight_time import GetFlightInfo
+from llm.tools.talk import Reply
+from llm.tools.demo import GetFlightInfo
 from inspect import Parameter, Signature
 from pydantic import BaseModel, Field, ConfigDict
 from typing import Literal, List, Type, Any
-from llm.actions import Action
+from llm.tools import BaseTool
 from mcp.server.fastmcp import FastMCP
 from logs import logger_factory
 from constant.client import McpTransportMethod
@@ -31,7 +31,7 @@ class MCPServer(BaseModel):
     server: FastMCP = Field(default_factory=lambda: FastMCP('puti'), validate_default=True)
 
     @staticmethod
-    def _build_docstring(action: Action) -> str:
+    def _build_docstring(action: BaseTool) -> str:
         parameter = action.param
         docstring = action.desc
         args = parameter['function'].get('parameters', {})
@@ -46,7 +46,7 @@ class MCPServer(BaseModel):
         return docstring
 
     @staticmethod
-    def _build_signature(action: Action) -> Signature:
+    def _build_signature(action: BaseTool) -> Signature:
         parameter = action.param
         args = parameter['function'].get('parameters', {})
         required_params = parameter['function'].get('parameters', {}).get('required', [])
@@ -76,7 +76,7 @@ class MCPServer(BaseModel):
             parameters.append(param)
         return Signature(parameters=parameters)
 
-    def add_actions(self, actions: List[Type[Action]]):
+    def add_actions(self, actions: List[Type[BaseTool]]):
         for action in actions:
             obj = action()
 

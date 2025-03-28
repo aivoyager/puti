@@ -3,7 +3,7 @@
 @Time:  2025-03-26 15:36
 @Description:  
 """
-from llm.actions.get_flight_time import GetFlightInfo
+from llm.tools.demo import GetFlightInfo
 
 
 def test_to_parameter():

@@ -11,9 +11,9 @@ import importlib
 import pkgutil
 import inspect
 
-from llm import actions
+from ollama._types import Message as OMessage
 from llm.prompts import prompt_setting
-from llm.actions import Action
+from llm.tools import BaseTool
 from pydantic import BaseModel, Field, ConfigDict, PrivateAttr, model_validator, field_validator, SerializeAsAny
 from typing import Optional, List, Iterable, Literal, Set, Dict, Tuple, Type, Any, Union
 from constant.llm import RoleType
@@ -26,7 +26,7 @@ from llm.envs import Env
 from llm.memory import Memory
 from utils.common import any_to_str
 from capture import Capture
-from llm.actions import ActionArgs,  IntermediateAction
+from llm.tools import ToolArgs
 from llm.nodes import OllamaNode
 from mcp.client.sse import sse_client
 from mcp.client.stdio import stdio_client
@@ -35,8 +35,9 @@ from contextlib import AsyncExitStack
 from utils.path import root_dir
 from constant.client import McpTransportMethod
 from typing import Annotated, Dict, TypedDict, Any, Required, NotRequired, ClassVar, cast
-from llm.actions import ActionArgs
+from llm.tools import ToolArgs
 from pydantic.fields import FieldInfo
+from llm.tools import Toolkit
 
 
 lgr = logger_factory.llm
@@ -46,7 +47,7 @@ class ModelFields(TypedDict):
     name: Required[FieldInfo]
     desc: Required[FieldInfo]
     intermediate: Required[FieldInfo]
-    args: NotRequired[ActionArgs]
+    args: NotRequired[ToolArgs]
 
 
 class Buffer(BaseModel):
@@ -83,10 +84,9 @@ class RoleContext(BaseModel):
     memory: Memory = Field(default_factory=Memory)
     news: List[Message] = Field(default=None, description='New messages need to be handled')
     subscribe_sender: set[str] = Field(default={}, description='Subscribe role name for solution-subscription mechanism')
-    interested_action: set[str] = Field(default={}, description='Interested action')
     max_react_loop: int = Field(default=5, description='Max react loop number')
     state: int = Field(default=-1, description='State of the action')
-    todo: Action = Field(default=None, exclude=True, description='Action to do')
+    todos: List[Tuple] = Field(default=None, exclude=True, description='tools waited to call and arguments dict')
     action_taken: int = 0
 
 
@@ -96,29 +96,18 @@ class Role(BaseModel):
     name: str = Field(default='obstacles', description='role name')
     goal: str = ''
     skill: str = ''
-    think_extra_demands: str = ''
-    react_extra_demands: str = ''
     constraints: str = Field(
         default='utilize the same language as the user requirements for seamless communication',
         validate_default=True
     )
     address: set[str] = Field(default=set(), description='', validate_default=True)
 
-    actions: List[Action] = Field(default=[], validate_default=True, description='Action list can be performed')
+    toolkit: Toolkit = Field(default_factory=Toolkit, validate_default=True)
     states: List[str] = Field(default=[], validate_default=True, description='Action to state number map')
 
     identity: RoleType = Field(default=RoleType.USER, description='Role identity')
     agent_node: LLMNode = Field(default_factory=OpenAINode, description='LLM node')
     rc: RoleContext = Field(default_factory=RoleContext)
-    think_answer: Message = Field(
-        default=None,
-        description='Due to some llm tools called training， May get final answer from think.'
-    )
-
-    interested_actions: Set[Type[Action]] = Field(
-        default=set(),
-        description='user will receiver their interested actions'
-    )
 
     cp: SerializeAsAny[Capture] = Field(default_factory=Capture, validate_default=True, description='Capture exception')
 
@@ -131,23 +120,23 @@ class Role(BaseModel):
 
     @property
     def sys_think_msg(self) -> Optional[Dict[str, str]]:
-        extra_demands = f'Here are some extra demands on you: {self.think_extra_demands}.' if self.think_extra_demands else "You don't have extra demands."
-        return {'role': RoleType.SYSTEM.val, 'content': self.role_definition + extra_demands}
+        return {'role': RoleType.SYSTEM.val, 'content': self.role_definition}
 
     @property
     def sys_react_msg(self) -> Optional[Dict[str, str]]:
-        extra_demands = f'Here are some extra demands on you: {self.react_extra_demands}.' if self.react_extra_demands else "You don't have extra demands."
-        exp = f'When you get a message from {self.name}_intermediate, you need a summary of the output of your intermediate action to visualize a good output'
-        return {'role': RoleType.SYSTEM.val, 'content': self.role_definition + exp + extra_demands}
+        return {'role': RoleType.SYSTEM.val, 'content': self.role_definition}
 
     @property
     def role_definition(self) -> str:
         env = self._env_prompt
-        name_exp = f'You name is {self.name}.' if self.name else ''
-        skill_exp = f'You skill at {self.skill}.' if self.skill else ''
-        goal_exp = f'You goal is {self.goal}.' if self.goal else ''
-        constraints_exp = f'You constraints is {self.constraints}.' if self.constraints else ''
-        definition = env + name_exp + skill_exp + goal_exp + constraints_exp
+        name_exp = f'You are {self.name}, an all-capable AI assistant.'
+        skill_exp = f'skill at {self.skill},' if self.skill else ''
+        goal_exp = f'your goal is {self.goal}.' if self.goal else ''
+        tool_exp = ('You have some tools that you can use to help the user,'
+                    ' but ultimately you need to give a final reply prefix with END, like "END you final reply here", '
+                    'Let others know that your part is done.')
+        finish_exp = "If you think you've accomplished your goal, prefix your final reply with 'END you reply'."
+        definition = env + name_exp + skill_exp + goal_exp + tool_exp
         return definition
 
     @property
@@ -161,31 +150,12 @@ class Role(BaseModel):
 
     def _reset(self):
         self.states = []
-        self.actions = []
+        self.toolkit = []
 
-    def set_actions(self, actions: List[Union[Action, Type[Action]]]):
-        for action in actions:
-            act_obj = action()
-            intermediate_exp = '(intermediate action)' if act_obj.intermediate else ''
-            args_prompt = ''
-            for field_name, field_info in act_obj.model_fields.items():
-                args_model = field_info.annotation
-                if field_name == 'args' and issubclass(field_info.annotation, ActionArgs) and args_model is not ActionArgs:
-                    args = []
-                    for arg_name, arg_info in args_model.model_fields.items():
-                        field_type = args_model.__annotations__[arg_name].__name__
-                        is_required = arg_info.is_required()
-                        description = arg_info.description
-                        arg_prompt = f"     {arg_name}({field_type}): {description}"
-                        args.append(arg_prompt)
-                    args_prompt = '\n'.join(args) + '\n'
-            self.actions.append(act_obj)
-            states = f'{len(self.actions) - 1}. {act_obj.name}{intermediate_exp}: {act_obj.desc}\n'
-            if args_prompt:
-                states += args_prompt
-            self.states.append(states)
+    def set_tools(self, tools: List[Type[BaseTool]]):
+        self.toolkit.add_tools(tools)
 
-    def set_interested_actions(self, actions: Set[Type[Action]]):
+    def set_interested_actions(self, actions: Set[Type[BaseTool]]):
         for action in actions:
             self.interested_actions.add(action)
 
@@ -194,18 +164,12 @@ class Role(BaseModel):
         history = [] if ignore_history else self.rc.memory.get()
         new_list = []
         for n in news:
-            if n in history and isinstance(n.cause_by, IntermediateAction) and n.cause_by.role_name == self.name:
-                pass
-            else:
+            if n not in history:
                 self.rc.memory.add_one(n)
 
-            if isinstance(n.cause_by, IntermediateAction) and n.cause_by.role_name == self.name:
-                new_list.append(n)
-                continue
             if (n.sender in self.rc.subscribe_sender
                     or self.address & n.receiver
-                    or MessageRouter.ALL.val in n.receiver
-                    or n.cause_by in self.interested_actions):
+                    or MessageRouter.ALL.val in n.receiver):
                 if n not in history:
                     new_list.append(n)
         self.rc.news = new_list
@@ -216,78 +180,51 @@ class Role(BaseModel):
             lgr.debug(f'{self} perceive {new_texts}.')
         return True if len(self.rc.news) > 0 else False
 
-    async def _think(self) -> Optional[Union[bool, List[Dict]]]:
-        state_template = prompt_setting.COMMON_STATE_TEMPLATE
-        prompt = (
-            state_template
-            .replace('{history}', '\n'.join(map(str, self.rc.memory.get())))
-            .replace('{states}', ''.join(self.states))
-            .replace('{n_states}', str(len(self.states) - 1))
-            .replace('{previous_state}', str(self.rc.state))
-            .replace('{intermediate_name}', f'{self.name}_intermediate')
-        )
+    async def _think(self) -> Optional[Tuple[bool, str]]:
 
-        message = {'role': RoleType.USER.val, 'content': prompt}
-        think = await self.agent_node.achat([self.sys_think_msg, message])
-        if isinstance(self.agent_node, OllamaNode):
-            pattern = r'\{"state":\s*\d+,\s*"arguments":\s*\{.*?\}\}'
-            match = re.search(pattern, think, re.DOTALL)
-            if match:
-                think = match.group().lstrip('```json').rstrip('```')
-            elif re.search(r'\{"state":\s*\d+}', think, re.DOTALL):
-                think = re.search(r'\{"state":\s*\d+}', think, re.DOTALL).group().lstrip('```json').rstrip('```')
-            else:
-                raise RuntimeError(f'unable to parse {think}')
-        think = json.loads(think)
-        choose_state = think.get('state')
-        think_arguments = think.get('arguments')
-        # llama 3.1 8B will put final answer in this field
-        condition = think_arguments.get('message')
-        if condition:
-            lgr.debug(f'{self.name} get final answer through think: {think_arguments["message"]}')
-            self.think_answer = Message.from_any(think_arguments.get('message'), sender=self.name, reply_to=self.rc.memory.get()[-1].id, role=RoleType.ASSISTANT)
-            return True
-        if int(choose_state) == -1:
-            lgr.debug(f"{self} is idle.")
-            return False
+        message = [self.sys_think_msg] + Message.to_message_list(self.rc.memory.get())
+        think = await self.agent_node.achat(message, tools=self.toolkit.param_list)
+        if isinstance(think, List):  # call tool
+            todos = []
+            for call_tool in think:
+                todo = self.toolkit.tools.get(call_tool.function.name)
+                todo_args = call_tool.function.arguments if call_tool.function.arguments else {}
+                todos.append((todo, todo_args))
+
+                # add in memory
+                call_message = Message.from_any(
+                    msg=f'call tool {todo.name}; args {json.dumps(todo_args, ensure_ascii=False)}',
+                    role=RoleType.ASSISTANT
+                )
+                self.rc.memory.add_one(call_message)
+
+            self.rc.todos = todos
+            return True, ''
+        elif isinstance(think, str):  # think resp
+            if think.startswith('END '):
+                return False, think.lstrip('END ')
         else:
-            self.rc.state = int(choose_state)
-            self.rc.todo = self.actions[self.rc.state]
-            if self.rc.todo.__annotations__.get('args'):
-                self.rc.todo.args = self.rc.todo.__annotations__['args'](**think_arguments)
-            lgr.debug(f"{self} will do {self.rc.todo}.")
-            return True
+            raise RuntimeError(f'Unexpected think type: {type(think)}')
+
+
+        # else:
+        #     self.rc.state = int(choose_state)
+        #     self.rc.todo = self.toolkit[self.rc.state]
+        #     if self.rc.todo.__annotations__.get('args'):
+        #         self.rc.todo.args = self.rc.todo.__annotations__['args'](**think_arguments)
+        #     lgr.debug(f"{self} will do {self.rc.todo}.")
+        return True
 
     async def _react(self) -> Optional[Message]:
-        if not self.think_answer:
-            messages = [self.sys_react_msg] + self.rc.memory.to_dict(ample=True)
-            resp = await self.rc.todo.run(messages, llm=self.agent_node)
-            if self.rc.todo.intermediate:
-                resp_msg = Message(
-                    content=resp,
-                    role=self.identity,
-                    cause_by=IntermediateAction(role_name=self.name),
-                    sender=self.intermediate_sender,
-                    reply_to=self.rc.memory.get()[-1].id,
-                    receiver={self.name}
-                )
-            else:
-                resp_msg = Message(
-                    content=resp,
-                    role=self.identity,
-                    cause_by=self.rc.todo,
-                    sender=self.name,
-                    reply_to=self.rc.memory.get()[-1].id,
-                )
-        else:
-            resp_msg = self.think_answer
-        self.rc.memory.add_one(resp_msg)
-        self.rc.action_taken += 1
+        messages = [self.sys_react_msg] + self.rc.memory.to_dict()
+        for todo in self.rc.todos:
+            resp = await todo[0].run(**todo[1])
+            message = Message.from_any(resp, role=RoleType.TOOL)
+            self.rc.buffer.put_one_msg(message)
+            self.rc.action_taken += 1
         if self.rc.env:
-            self.rc.env.publish_message(resp_msg)
-        if self.rc.todo.intermediate:
-            self.rc.buffer.put_one_msg(resp_msg)
-        return resp_msg
+            self.rc.env.publish_message(resp)
+        return resp
 
     async def run(self, with_message: Optional[Union[str, Dict, Message]] = None, ignore_history: bool = False) -> Optional[Message]:
         if with_message:
@@ -300,9 +237,9 @@ class Role(BaseModel):
             perceive = await self._perceive()
             if not perceive:
                 break
-            todo = await self._think()
+            todo, reply = await self._think()
             if not todo:
-                break
+                return reply
             resp = await self._react()
         self.rc.state = -1
         self.rc.todo = None
@@ -330,7 +267,7 @@ class McpRole(Role):
     exit_stack: AsyncExitStack = Field(default_factory=lambda: AsyncExitStack(), validate_default=True)
     session: Optional[ClientSession] = Field(default=None, description='Session used for communication.')
     server_script: str = Field(default=str(root_dir() / 'mcpp' / 'server.py'), description='Server script')
-    action_map: Dict[str, Type[Action]] = Field(default={}, description='Action map')
+    action_map: Dict[str, Type[BaseTool]] = Field(default={}, description='Action map')
 
     async def _initialize_session(self):
         server_params = StdioServerParameters(command=sys.executable, args=[self.server_script])
@@ -339,22 +276,22 @@ class McpRole(Role):
         self.session = await self.exit_stack.enter_async_context(ClientSession(read, write))
         await self.session.initialize()
 
-    async def _initialize_action_map(self):
-        action_map = {}
-        for _, module_name, _ in pkgutil.iter_modules(actions.__path__):
-            if module_name == '__init__':
-                continue
-            module = importlib.import_module(f'llm.actions.{module_name}')
-            for name, obj in inspect.getmembers(module, inspect.isclass):
-                if issubclass(obj, Action) and obj is not Action:
-                    model_fields: ModelFields = cast(ModelFields, obj.model_fields)
-                    obj_name = model_fields['name'].default
-                    action_map[obj_name] = obj
-        self.action_map = action_map
+    # async def _initialize_tool_map(self):
+    #     action_map = {}
+    #     for _, module_name, _ in pkgutil.iter_modules(tools.__path__):
+    #         if module_name == '__init__':
+    #             continue
+    #         module = importlib.import_module(f'llm.tools.{module_name}')
+    #         for name, obj in inspect.getmembers(module, inspect.isclass):
+    #             if issubclass(obj, BaseTool) and obj is not BaseTool:
+    #                 model_fields: ModelFields = cast(ModelFields, obj.model_fields)
+    #                 obj_name = model_fields['name'].default
+    #                 action_map[obj_name] = obj
+    #     self.action_map = action_map
 
-    async def _initialize_actions(self):
+    async def _initialize_tools(self):
         actions = await self.mcp_tool_to_actions()
-        self.set_actions(list(actions.values()))
+        self.set_tools(list(actions.values()))
 
     def model_post_init(self, __context: Any, *args, **kwargs) -> None:
         asyncio.run(self._initialize_session())
@@ -362,7 +299,7 @@ class McpRole(Role):
         asyncio.run(self._initialize_actions())
         lgr.debug(f'[{self.name}] mcp client initial successfully')
 
-    async def mcp_tool_to_actions(self) -> Dict[str, Type[Action]]:
+    async def mcp_tool_to_actions(self) -> Dict[str, Type[BaseTool]]:
         resp = await self.session.list_tools()
         rsp = {}
         for tool in resp.tools:

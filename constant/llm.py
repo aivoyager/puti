@@ -17,6 +17,7 @@ class RoleType(Base):
     USER = ('user', 'message from user type')
     SYSTEM = ('system', 'message from system type')
     ASSISTANT = ('assistant', 'message from assistant type')
+    TOOL = ('tool', 'tool message type')
 
 
 class MessageRouter(Base):

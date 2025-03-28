@@ -6,8 +6,8 @@
 import asyncio
 
 from mcpp.server import MCPServer
-from llm.actions.talk import Reply
-from llm.actions.get_flight_time import GetFlightInfo
+from llm.tools.talk import Reply
+from llm.tools.demo import GetFlightInfo
 
 
 def test_mcp_server():

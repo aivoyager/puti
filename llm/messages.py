@@ -11,15 +11,14 @@ from datetime import datetime
 from uuid import uuid4
 from constant.llm import MessageRouter
 from utils.common import any_to_str, import_class
-from llm.actions import Action
-from llm.actions import UserRequirement
+from llm.tools import BaseTool
 
 
 class Message(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True, extra="allow")
 
     # if design in role will loop import
-    cause_by: Optional[Action] = Field(default=None, description='message initiator Action str', validate_default=True)
+    cause_by: Optional[BaseTool] = Field(default=None, description='message initiator Action str', validate_default=True)
     sender: str = Field(default='', validate_default=True, description='Sender role name')
     receiver: set['str'] = Field(default={MessageRouter.ALL.val}, validate_default=True, description='Receiver role name')
     reply_to: str = Field(default='', description='Message id reply to')
@@ -33,8 +32,6 @@ class Message(BaseModel):
     @field_validator('cause_by', mode='before')
     @classmethod
     def check_cause_by(cls, cause_by: Any):
-        if not cause_by:
-            return UserRequirement()
         return cause_by
 
     @classmethod
@@ -45,7 +42,7 @@ class Message(BaseModel):
                 id=uuid4(),
                 role=RoleType.elem_from_str(msg['role']),
                 content=msg["content"],
-                cause_by=Action()
+                cause_by=BaseTool()
             ) for msg in messages
         ]
 

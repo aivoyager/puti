@@ -3,13 +3,13 @@
 @Time:  2025-03-13 11:06
 @Description:  
 """
-from llm.actions import Action
+from llm.tools import BaseTool
 from pydantic import ConfigDict
 from llm.nodes import LLMNode, OpenAINode
 from llm.messages import Message
 
 
-class Debate(Action):
+class Debate(BaseTool):
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     name: str = 'Debate'

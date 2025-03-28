@@ -5,9 +5,9 @@
 """
 from llm.roles import Role, RoleType, McpRole
 from typing import List, Literal
-from llm.actions.talk import Reply
-from llm.actions import Action
-from llm.actions.get_flight_time import GetFlightInfoArgs, GetFlightInfo, SearchResidentEvilInfo
+from llm.tools.talk import Reply
+from llm.tools import BaseTool
+from llm.tools.demo import GetFlightInfoArgs, GetFlightInfo, SearchResidentEvilInfo
 
 
 class TourGuide(McpRole):

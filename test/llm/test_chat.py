@@ -7,7 +7,7 @@ import asyncio
 import sys
 
 from llm.envs import Env
-from llm.roles.talker import Talker
+from llm.roles.talker import PuTi
 from llm.messages import Message
 from llm.roles.debater import Debater
 from llm.nodes import OllamaNode, ollama_node
@@ -18,14 +18,14 @@ from conf.llm_config import LlamaConfig
 
 def test_chat():
     msg = 'hello, what is u name'
-    talker = Talker(agent_node=ollama_node)
+    talker = PuTi(agent_node=ollama_node)
     msg = talker.cp.invoke(talker.run, msg)
     print(msg.data)
 
 
 def test_env():
     env = Env()
-    talker = Talker(agent_node=ollama_node)
+    talker = PuTi(agent_node=ollama_node)
     env.add_roles([talker])
     env.publish_message(Message.from_any('hi hi'))
     asyncio.run(env.run())

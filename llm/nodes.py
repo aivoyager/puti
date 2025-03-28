@@ -4,11 +4,12 @@
 @Description:  
 """
 import ollama
-import os
 
+from ollama._types import Message
+from llm import tools
 from ollama import Client
 from pydantic import BaseModel, Field, ConfigDict, create_model, model_validator, PrivateAttr, SerializeAsAny, field_validator
-from typing import Optional, List, Iterable, Literal
+from typing import Optional, List, Iterable, Literal, Annotated, Dict, TypedDict, Any, Required, NotRequired, ClassVar, cast
 from constant.llm import RoleType
 from typing import Dict, Tuple, Type, Any, Union
 from conf.llm_config import LLMConfig, OpenaiConfig
@@ -23,6 +24,7 @@ from conf.llm_config import LlamaConfig
 
 
 lgr = logger_factory.llm
+
 
 
 class LLMNode(BaseModel, ABC):
@@ -117,7 +119,7 @@ class OllamaNode(LLMNode):
         self.ollama = Client(host=self.conf.BASE_URL)
         lgr.info(f'Ollama node init from {self.conf.BASE_URL} ---> model: {self.conf.MODEL}')
 
-    async def achat(self, msg: List[Dict], **kwargs) -> str:
+    async def achat(self, msg: List[Dict], *args, **kwargs) -> str or List[Message.ToolCall]:
         response = self.ollama.chat(
             model=self.conf.MODEL,
             messages=msg,
@@ -127,10 +129,13 @@ class OllamaNode(LLMNode):
         if self.conf.STREAM:
             collected_messages = []
             for chunk in response:
-                collected_messages.append(chunk.message.content)
-                print(chunk.message.content, end='')
+                if hasattr(chunk.message, 'tool_calls') and chunk.message.tool_calls:
+                    return chunk.message.tool_calls
+                else:
+                    collected_messages.append(chunk.message.content)
             full_reply = ''.join(collected_messages)
         else:
+            # TODO: fc none stream support
             full_reply = response.message.content
         return full_reply
 

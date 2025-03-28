@@ -5,22 +5,21 @@
 """
 import json
 
-from llm.actions import Action, ActionArgs
+from llm.tools import BaseTool, ToolArgs
 from pydantic import ConfigDict, Field
 from llm.nodes import LLMNode, OpenAINode
 from typing import Annotated
 
 
-class GetFlightInfoArgs(ActionArgs):
+class GetFlightInfoArgs(ToolArgs):
     departure: str = Field(description='The departure city (airport code)')
     arrival: str = Field(description='The arrival city (airport code)')
 
 
-class GetFlightInfo(Action):
+class GetFlightInfo(BaseTool):
     model_config = ConfigDict(arbitrary_types_allowed=True)
     name: str = "Get flight time"
     desc: str = 'Use this action get the flight times between two cities'
-    intermediate: bool = True
     args: GetFlightInfoArgs = None
 
     async def run(self, *args, **kwargs):
@@ -34,16 +33,15 @@ class GetFlightInfo(Action):
             'CDG-DXB': {'departure': '11:00 AM', 'arrival': '08:00 PM', 'duration': '6h 00m'},
             'DXB-CDG': {'departure': '03:00 AM', 'arrival': '07:30 AM', 'duration': '7h 30m'},
         }
-        # 将出发地和目的地组合成键，并查找航班信息
         key = f'{departure}-{arrival}'.upper()
         return json.dumps(flights.get(key, {'error': 'Flight not found'}))
 
 
-class SearchResidentEvilInfoArgs(ActionArgs):
+class SearchResidentEvilInfoArgs(ToolArgs):
     name: str = Field(description='name in resident evil')
 
 
-class SearchResidentEvilInfo(Action):
+class SearchResidentEvilInfo(BaseTool):
     model_config = ConfigDict(arbitrary_types_allowed=True)
     name: str = "Search resident evil info"
     desc: str = "Use this action search the resident evil relation info"

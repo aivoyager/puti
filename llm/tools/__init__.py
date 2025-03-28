@@ -3,18 +3,31 @@
 @Time: 21/01/25 11:16
 @Description:  
 """
-from typing import Annotated, Dict, TypedDict, Any, Required, NotRequired
+import os
+import sys
+import asyncio
+import importlib
+import pkgutil
+import inspect
 
+from typing import Annotated, Dict, TypedDict, Any, Required, NotRequired, List, Type, Set, cast
 from pydantic import BaseModel, Field, ConfigDict
 from llm.nodes import LLMNode, OpenAINode
 from abc import ABC, abstractmethod
 from constant.llm import ParamMap
+from logs import logger_factory
+from pydantic.fields import FieldInfo
 
 
-# class ParamRespFunction(TypedDict):
-#     name: Required[str]
-#     description: Required[str]
-#     parameters: NotRequired[Dict[str, Any]]
+lgr = logger_factory.llm
+
+
+class ModelFields(TypedDict):
+    """ using in fc data structure """
+    name: Required[FieldInfo]
+    desc: Required[FieldInfo]
+    intermediate: Required[FieldInfo]
+    args: NotRequired['ToolArgs']
 
 
 class ParamResp(TypedDict):
@@ -22,19 +35,16 @@ class ParamResp(TypedDict):
     function: Required[Dict]
 
 
-class ActionArgs(BaseModel, ABC):
+class ToolArgs(BaseModel, ABC):
     """ Action arguments """
 
 
-class Action(BaseModel, ABC):
+class BaseTool(BaseModel, ABC):
     model_config = ConfigDict(arbitrary_types_allowed=True, extra="allow")
 
-    name: str = Field(..., description='Action name')
-    desc: str = Field(default='', description='Description of action')
-    intermediate: bool = Field(
-        default=False,
-        description='Intermediate action, When called over will publish message to myself rather than broadcast')
-    args: ActionArgs = None
+    name: str = Field(..., description='Tool name')
+    desc: str = Field(default='', description='Description of tool')
+    args: ToolArgs = None
 
     __hash__ = object.__hash__
 
@@ -48,7 +58,7 @@ class Action(BaseModel, ABC):
             }
         }
 
-        args: ActionArgs = self.__class__.__annotations__.get('args')
+        args: ToolArgs = self.__class__.__annotations__.get('args')
         if args:
 
             required_fields = []
@@ -73,7 +83,7 @@ class Action(BaseModel, ABC):
         return ParamResp(**action)
 
     @abstractmethod
-    async def run(self, *args, **kwargs) -> Annotated[str, 'action result']:
+    async def run(self, *args, **kwargs) -> Annotated[str, 'tool result']:
         """ run action """
 
     def __str__(self):
@@ -83,20 +93,32 @@ class Action(BaseModel, ABC):
         return self.__str__()
 
 
-class IntermediateAction(Action):
-    """ For message field `cause by` """
+class Toolkit(BaseModel, ABC):
+    model_config = ConfigDict(arbitrary_types_allowed=True, extra="allow")
 
-    name: str = 'intermediate action'
-    role_name: str = Field(default='', description='bind to a role for intermediate action')
+    tools: Dict[str, 'BaseTool'] = Field(default={}, description='List of tools')
 
-    def run(self, *args, **kwargs) -> Annotated[str, 'action result']:
-        pass
+    def add_tool(self, tool: Type[BaseTool]) -> Dict[str, 'BaseTool']:
+        t = tool()
+        if t.name in self.tools:
+            lgr.warning(f'Tool {t.name} has been added in toolkit')
+            return {}
+        self.tools.update({t.name: t})
+        return {t.name: t}
+
+    def add_tools(self, tools: List[Type[BaseTool]]) -> List[Dict[str, 'BaseTool']]:
+        resp = []
+        for t in tools:
+            r = self.add_tool(t)
+            resp.append(r)
+        return resp
+
+    @property
+    def param_list(self):
+        resp = []
+        for tool_name, tool in self.tools.items():
+            resp.append(tool.param)
+        return resp
 
 
-class UserRequirement(Action):
-    """From user demands"""
-
-    name: str = 'user requirement'
-
-    def run(self, messages, llm=None, **kwargs):
-        """ nothing """
+toolkit = Toolkit()
