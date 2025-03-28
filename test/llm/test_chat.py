@@ -17,10 +17,10 @@ from conf.llm_config import LlamaConfig
 
 
 def test_chat():
-    msg = 'hello, what is u name'
+    msg = 'what is calculus'
     talker = PuTi(agent_node=ollama_node)
     msg = talker.cp.invoke(talker.run, msg)
-    print(msg.data)
+    print(f'answer:{msg.data}')
 
 
 def test_env():

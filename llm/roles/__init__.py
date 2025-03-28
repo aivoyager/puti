@@ -96,10 +96,7 @@ class Role(BaseModel):
     name: str = Field(default='obstacles', description='role name')
     goal: str = ''
     skill: str = ''
-    constraints: str = Field(
-        default='utilize the same language as the user requirements for seamless communication',
-        validate_default=True
-    )
+
     address: set[str] = Field(default=set(), description='', validate_default=True)
 
     toolkit: Toolkit = Field(default_factory=Toolkit, validate_default=True)
@@ -129,14 +126,17 @@ class Role(BaseModel):
     @property
     def role_definition(self) -> str:
         env = self._env_prompt
+
         name_exp = f'You are {self.name}, an all-capable AI assistant.'
         skill_exp = f'skill at {self.skill},' if self.skill else ''
         goal_exp = f'your goal is {self.goal}.' if self.goal else ''
-        tool_exp = ('You have some tools that you can use to help the user,'
+        constraints_exp = 'You constraint is utilize the same language for seamless communication'
+        tool_exp = ('You have some tools that you can use to help the user, '
+                    'fully understand the tool functions and their arguments before using them,'
                     ' but ultimately you need to give a final reply prefix with END, like "END you final reply here", '
                     'Let others know that your part is done.')
         finish_exp = "If you think you've accomplished your goal, prefix your final reply with 'END you reply'."
-        definition = env + name_exp + skill_exp + goal_exp + tool_exp
+        definition = env + name_exp + skill_exp + goal_exp + constraints_exp + tool_exp
         return definition
 
     @property
