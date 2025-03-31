@@ -17,8 +17,6 @@ from llm.tools import BaseTool
 class Message(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True, extra="allow")
 
-    # if design in role will loop import
-    cause_by: Optional[BaseTool] = Field(default=None, description='message initiator Action str', validate_default=True)
     sender: str = Field(default='', validate_default=True, description='Sender role name')
     receiver: set['str'] = Field(default={MessageRouter.ALL.val}, validate_default=True, description='Receiver role name')
     reply_to: str = Field(default='', description='Message id reply to')
@@ -28,11 +26,6 @@ class Message(BaseModel):
     role: RoleType = Field(default=RoleType.USER, validate_default=True)
     attachment_urls: List[str] = Field(default=[], validate_default=True, description='URLs of attachments for multi modal')
     created_time: datetime = Field(default=datetime.now(), validate_default=True)
-
-    @field_validator('cause_by', mode='before')
-    @classmethod
-    def check_cause_by(cls, cause_by: Any):
-        return cause_by
 
     @classmethod
     def from_messages(cls, messages: List[dict]) -> List["Message"]:

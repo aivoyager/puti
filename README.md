@@ -39,20 +39,30 @@ pip install -r requirements.txt
 ```
 
 ## Get Started
-### 😁chat:
+### 😁 chat:
 
 ```python
-from llm.roles.talker import Talker
+from llm.roles.talker import PuTi
 from llm.nodes import ollama_node
 
-msg = 'hello, what is u name'
-talker1 = Talker()  # default chat node is openai
-# change to llama3.1
-talker2 = Talker(agent_node=ollama_node)
-msg1 = talker1.cp.invoke(talker1.run, msg)
-msg2 = talker2.cp.invoke(talker1.run, msg)
-print(msg.data)
+msg = 'what is calculus'
+talker = PuTi(agent_node=ollama_node)
+msg = talker.cp.invoke(talker.run, msg)
 ```
+### 🧰 chat with mcp
+```python
+from llm.envs import Env
+from llm.roles.talker import PuTiMCP
+from llm.messages import Message
+
+env = Env()
+talker = PuTiMCP()
+env.add_roles([talker])
+msg = 'How long is the flight from New York(NYC) to Los Angeles(LAX)'
+env.publish_message(Message.from_any(msg))
+asyncio.run(env.run())
+```
+
 ### 🗣️️ debate
 ```python
 from llm.envs import Env
@@ -69,26 +79,29 @@ env.publish_message(Message.from_any(
 ))
 env.cp.invoke(env.run)
 ```
-### 🔑 configuration
+### 🔑 configuration file
 ```yaml
-# conf/config.yaml
-client:
-  - twitter:
-      BEARER_TOKEN: "You twikit bearer token"
+# storage in conf/config.yaml
 llm:
-  - openai:
-      MODEL: "gpt-4o-mini"
+    - openai:
+        MODEL: "gpt-4o-mini"
+        BASE_URL: "your base url"
+        API_KEY: "your api key"
+        MAX_TOKEN: 4096
+    - llama:
+        BASE_URL: "Your ollama server"  # ollama
+        MODEL: "llama3.1:latest"
+        STREAM: true
 ```
 
 ```python
 # Access openai config
-from conf import OpenaiConfig
+from conf.llm_config import OpenaiConfig
 
+# then you can check your configuration at here
 openai_conf = OpenaiConfig()
 ```
 🛠 Build project with own agent
 
-```python
-import puti
-```
+coming soon
 

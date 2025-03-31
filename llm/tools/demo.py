@@ -22,9 +22,7 @@ class GetFlightInfo(BaseTool):
     desc: str = 'Use this action get the flight times between two cities'
     args: GetFlightInfoArgs = None
 
-    async def run(self, *args, **kwargs):
-        departure = self.args.departure
-        arrival = self.args.arrival
+    async def run(self, departure, arrival):
         flights = {
             'NYC-LAX': {'departure': '08:00 AM', 'arrival': '11:30 AM', 'duration': '5h 30m'},
             'LAX-NYC': {'departure': '02:00 PM', 'arrival': '10:30 PM', 'duration': '5h 30m'},

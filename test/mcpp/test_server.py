@@ -12,5 +12,5 @@ from llm.tools.demo import GetFlightInfo
 
 def test_mcp_server():
     mcp = MCPServer()
-    mcp.add_actions([GetFlightInfo])
+    mcp.add_tools([GetFlightInfo])
     mcp.run()

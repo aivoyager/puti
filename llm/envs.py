@@ -17,14 +17,15 @@ from capture import Capture
 if TYPE_CHECKING:
     from llm.roles import Role
 import asyncio
+from llm.messages import Message
 
 lgr = logger_factory.llm
 
 
 class Env(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid4()), validate_default=True, description='Unique code of messages')
-    name: str = Field(default='', description='Env name')
-    desc: str = Field(default='', description='Description of env')
+    name: str = Field(default='public area', description='Env name')
+    desc: str = Field(default='maybe there are other agents out there', description='Description of env')
     messages: List[Dict] = None
     # TODO: children envs and parent env
     children_envs: List['Env'] = None
@@ -35,8 +36,8 @@ class Env(BaseModel):
     cp: SerializeAsAny[Capture] = Field(default_factory=Capture, validate_default=True, description='Capture exception')
 
     @property
-    def prompt(self):
-        prompt = f'You in a environment called {self.name}, {self.desc}.'
+    def env_prompt(self):
+        prompt = f'You are in {self.name}({self.desc}) now.'
         return prompt
 
     def add_roles(self, roles: Iterable['Role']):
@@ -50,12 +51,12 @@ class Env(BaseModel):
         lgr.debug(f'Publishing message: {msg}')
         has_receiver = False
         for role, addr in self.members_addr.items():
-            if ((MessageRouter.ALL.val in msg.receiver or msg.receiver & role.address or msg.cause_by in role.interested_actions)
-                    and msg.sender != role.name and msg.sender != role.intermediate_sender):
+            if ((MessageRouter.ALL.val in msg.receiver or msg.receiver & role.address)
+                    and msg.sender != role.name):
                 role.rc.buffer.put_one_msg(msg)
                 has_receiver = True
-        # if not has_receiver:
-        #     lgr.warning(f'No receiver for message: {msg}')
+        if not has_receiver:
+            lgr.warning(f'No receiver for message: {msg}')
         self.history.append(msg)
 
     async def run(self):

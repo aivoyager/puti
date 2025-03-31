@@ -7,7 +7,7 @@ import asyncio
 import sys
 
 from llm.envs import Env
-from llm.roles.talker import PuTi
+from llm.roles.talker import PuTi, PuTiMCP
 from llm.messages import Message
 from llm.roles.debater import Debater
 from llm.nodes import OllamaNode, ollama_node
@@ -30,6 +30,18 @@ def test_env():
     env.publish_message(Message.from_any('hi hi'))
     asyncio.run(env.run())
     print('')
+
+
+def test_mcp_env():
+    env = Env()
+    talker = PuTiMCP(agent_node=ollama_node)
+    env.add_roles([talker])
+    msg = 'hi hi'
+    msg = 'How long is the flight from New York(NYC) to Los Angeles(LAX)'
+    env.publish_message(Message.from_any(msg))
+    # asyncio.run(env.run())
+    env.cp.invoke(env.run)
+    print('ok')
 
 
 def test_debate():

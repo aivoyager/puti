@@ -10,7 +10,7 @@ import importlib
 import pkgutil
 import inspect
 
-from typing import Annotated, Dict, TypedDict, Any, Required, NotRequired, List, Type, Set, cast
+from typing import Annotated, Dict, TypedDict, Any, Required, NotRequired, List, Type, Set, cast, Optional
 from pydantic import BaseModel, Field, ConfigDict
 from llm.nodes import LLMNode, OpenAINode
 from abc import ABC, abstractmethod
@@ -97,6 +97,23 @@ class Toolkit(BaseModel, ABC):
     model_config = ConfigDict(arbitrary_types_allowed=True, extra="allow")
 
     tools: Dict[str, 'BaseTool'] = Field(default={}, description='List of tools')
+
+    def intersection_with(self, other: Set[str], inplace: bool = False):
+        toolkit_tools = set(self.tools.keys())
+        intersection = other.intersection(toolkit_tools)
+        remove_tools = toolkit_tools.difference(intersection)
+        if inplace:
+            for tool_name in list(remove_tools):
+                self.remove_tool(tool_name)
+        else:
+            return Toolkit(tools={tool_name: self.tools.get(tool_name) for tool_name in list(intersection)})
+
+    def remove_tool(self, tool_name: str):
+        if tool_name in self.tools:
+            self.tools.pop(tool_name)
+            lgr.debug(f'{tool_name} has been removed from toolkit')
+        else:
+            lgr.warning('Removal did not take effect, {} not found in toolkit'.format(tool_name))
 
     def add_tool(self, tool: Type[BaseTool]) -> Dict[str, 'BaseTool']:
         t = tool()

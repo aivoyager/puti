@@ -10,6 +10,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import argparse
 import json
 
+from llm.tools.debate import Debate
 from llm.tools.talk import Reply
 from llm.tools.demo import GetFlightInfo
 from inspect import Parameter, Signature
@@ -31,9 +32,9 @@ class MCPServer(BaseModel):
     server: FastMCP = Field(default_factory=lambda: FastMCP('puti'), validate_default=True)
 
     @staticmethod
-    def _build_docstring(action: BaseTool) -> str:
-        parameter = action.param
-        docstring = action.desc
+    def _build_docstring(tool: BaseTool) -> str:
+        parameter = tool.param
+        docstring = tool.desc
         args = parameter['function'].get('parameters', {})
         required_params = parameter['function'].get('parameters', {}).get('required', [])
         if args:
@@ -46,8 +47,8 @@ class MCPServer(BaseModel):
         return docstring
 
     @staticmethod
-    def _build_signature(action: BaseTool) -> Signature:
-        parameter = action.param
+    def _build_signature(tool: BaseTool) -> Signature:
+        parameter = tool.param
         args = parameter['function'].get('parameters', {})
         required_params = parameter['function'].get('parameters', {}).get('required', [])
         parameters = []
@@ -76,20 +77,20 @@ class MCPServer(BaseModel):
             parameters.append(param)
         return Signature(parameters=parameters)
 
-    def add_actions(self, actions: List[Type[BaseTool]]):
-        for action in actions:
-            obj = action()
+    def add_tools(self, tools: List[Type[BaseTool]]):
+        for tool in tools:
+            obj = tool()
 
-            async def action_dynamic(**kwargs):
-                lgr.debug(f'perform action: {action.name}')
-                resp = await action.run(**kwargs)
+            async def tool_dynamic(**kwargs):
+                lgr.debug(f'perform action: {tool.name}')
+                resp = await tool.run(**kwargs)
                 lgr.debug(f'action response: {resp}')
                 return json.dumps(resp, ensure_ascii=False)
 
-            action_dynamic.__name__ = obj.name
-            action_dynamic.__doc__ = self._build_docstring(obj)
-            action_dynamic.__signature__ = self._build_signature(obj)
-            action_dynamic.__parameter_schema__ = {
+            tool_dynamic.__name__ = obj.name
+            tool_dynamic.__doc__ = self._build_docstring(obj)
+            tool_dynamic.__signature__ = self._build_signature(obj)
+            tool_dynamic.__parameter_schema__ = {
                 k: {
                     'description': v.get('description', ''),
                     'type': v.get('type', 'any'),
@@ -98,8 +99,8 @@ class MCPServer(BaseModel):
                 for k, v in obj.param['function'].get('parameters', {}).get('properties', {}).items()
             }
 
-            self.server.tool()(action_dynamic)
-            lgr.info(f'add action [{obj.name}] to mpc')
+            self.server.tool()(tool_dynamic)
+            lgr.info(f'add tool [{obj.name}] to mpc')
 
     def run(self):
         lgr.info('MCPServer start')
@@ -108,5 +109,5 @@ class MCPServer(BaseModel):
 
 if __name__ == '__main__':
     mcp = MCPServer()
-    mcp.add_actions([GetFlightInfo, Reply])
+    mcp.add_tools([GetFlightInfo, Reply, Debate])
     mcp.run()
