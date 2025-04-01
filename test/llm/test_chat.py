@@ -46,13 +46,16 @@ def test_mcp_env():
 
 def test_debate():
     env = Env(name='game', desc='play games with other')
-    debater1 = Debater(name='bot1', agent_node=ollama_node)
-    debater2 = Debater(name='bot2', agent_node=ollama_node)
+    debater1 = Debater(name='alex', agent_node=ollama_node)
+    debater2 = Debater(name='rock', agent_node=ollama_node)
     env.add_roles([debater1, debater2])
+
     env.publish_message(Message.from_any(
-        f'现在你们正在进行一场辩论赛，主题为：科技发展是有益的，还是有弊的？{debater1}为正方 {debater2}为反方, 每个人字数限制在50以内',
-        # f'Now you are having a debate on the topic: Is the development of science and technology beneficial or harmful? {debater1} is the positive side and {debater2} is the negative side',
-        receiver=debater1.address
+        # f'现在你们正在进行一场辩论赛，主题为：科技发展是有益的，还是有弊的？{debater1}为正方 {debater2}为反方, 每个人字数限制在50以内',
+        f'Now you are having a debate on the topic: Is the development of science and technology beneficial or harmful? '
+        f'{debater1} is the positive side and {debater2} is the negative side',
+        receiver=debater1.address,
+        sender='user'
     ))
     env.cp.invoke(env.run)
 

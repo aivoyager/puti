@@ -12,6 +12,7 @@ import pkgutil
 import inspect
 import threading
 
+from functools import partial
 from ollama._types import Message as OMessage
 from llm.prompts import prompt_setting
 from llm import tools
@@ -131,22 +132,14 @@ class Role(BaseModel):
         tool_exp = (
             'You have some tools that you can use to help the user, '
             'fully understand the tool functions and their arguments before using them,'
-            ' tools give you only the intermediate product, '
+            'make sure the types and values of the arguments you provided to the tool functions are correct, '
+            'tools give you only the intermediate product, '
             'ultimately you need to give a clearly final reply prefix with END, like "END you final reply here", '
             'Let others know that your part is done.'
-            # ''
-            # ' If you do not think any of tools ara right for you,'
-            # "reply to the user's conversation with 'END ' prefix in your reply, don't give any idea of"
-            # " your process as to whether or not to use the tool or function call. "
         )
         finish_exp = "If you think you've accomplished your goal, prefix your final reply with 'END you reply'."
-        definition = name_exp + skill_exp + goal_exp + constraints_exp + tool_exp
+        definition = name_exp + skill_exp + goal_exp + constraints_exp + tool_exp + finish_exp
         return definition
-
-    @property
-    def intermediate_sender(self):
-        """Make sure that sender will not be subscribed by others"""
-        return f'{self.name}_intermediate'
 
     def publish_message(self):
         if self.answer:
@@ -213,7 +206,8 @@ class Role(BaseModel):
     async def _react(self) -> Optional[Message]:
         message = Message.from_any('no tools taken yet')
         for todo in self.rc.todos:
-            resp = await todo[0].run(**todo[1])
+            run = partial(todo[0].run, llm=self.agent_node)
+            resp = await run(**todo[1])
             message = Message.from_any(resp, role=RoleType.TOOL)
             self.rc.buffer.put_one_msg(message)
             self.rc.action_taken += 1

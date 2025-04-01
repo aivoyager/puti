@@ -27,6 +27,10 @@ class MessageRouter(Base):
 class ParamMap(Base):
     """ val: origin ---> desc: destination fc type mapping"""
     STRING = ('str', 'string')
+    ARRAY = ('List', 'array')
+    ARRAY2 = ('list', 'array')
+    DICT = ('Dict', 'object')
+    DICT2 = ('dict', 'object')
 
 
 TOKEN_COSTS = {

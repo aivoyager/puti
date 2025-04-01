@@ -4,17 +4,35 @@
 @Description:  
 """
 from llm.tools import BaseTool
-from pydantic import ConfigDict
-from llm.nodes import LLMNode, OpenAINode
-from llm.messages import Message
+from pydantic import ConfigDict, Field
+from llm.tools import ToolArgs
+from typing import Dict, List, Annotated
+
+
+class DebateArgs(ToolArgs):
+    opinion: str = Field(description="Content of speech")
+    # history_memory: List[
+    #     Annotated[
+    #         Dict[
+    #             Annotated[str, 'user name'],
+    #             Annotated[str, 'actual content']
+    #         ],
+    #         ("Dialog, A dictionary contains only a pair of key and value that represent a user's speech."
+    #          " key is the user name, and value is the content of the speech")
+    #     ]
+    # ] = Field(
+    #     description='Chat logs of actual conversations based on your memory in json format'
+    # )
 
 
 class Debate(BaseTool):
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     name: str = 'Debate'
-    desc: str = 'Use this action in debating.'
+    desc: str = 'Use this tool to make your point in an argument.'
+    args: DebateArgs = None
 
-    async def run(self, messages, llm: LLMNode = None, *args, **kwargs):
-        reply = await llm.achat(messages)
-        return reply
+    async def run(self, opinion, llm):
+        return opinion
+
+

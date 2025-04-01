@@ -3,27 +3,18 @@
 @Time:  2025-03-13 11:05
 @Description:  
 """
-from llm.roles import Role, RoleType
-from typing import List, Literal, Set
 from llm.tools.talk import Reply
-from llm.tools import BaseTool
-from llm.roles.talker import PuTi
+from llm.roles.talker import PuTi, McpRole
 from llm.tools.debate import Debate
+from llm.envs import Env
+from llm.roles.talker import PuTi, PuTiMCP
+from llm.messages import Message
+from llm.nodes import OllamaNode, ollama_node
 
 
-class Debater(Role):
+class Debater(McpRole):
     name: str = '乔治'
-    sex: Literal['male', 'female'] = 'male'
-    goal: str = "debate with someone else, trying to convince them according to turn-based speaking rules"
-    think_extra_demands: str = ("You need to choose state right now, Here the rules."
-                                "Speeches are made in the order of the alternating order of the debate, judging if its need you to speak from where you stand, "
-                                "If NOT（wait for the other party to speak） then return -1 and do not think about anything else,"
-                                "If YES then select the state number of other action")
-    react_extra_demands: str = "Speeches are made in the order of the alternating order of the debate, You need to stand up for your own point of view to refute the other side's point of view"
-    identity: RoleType = RoleType.USER
+    goal: str = ('Counter with appropriate points and end your speech at the appropriate time'
+                 ' according to the debate speaking round system. ')
 
-    def __init__(self, **kwargs) -> None:
-        super().__init__(**kwargs)
-        self.set_tools([Debate, Reply])
-        self.set_interested_actions({Debate})
 

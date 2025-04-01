@@ -7,9 +7,10 @@ import traceback
 import json
 import random
 import platform
-
 import importlib
 
+from pydantic import BaseModel, Field
+from typing import List, Dict, Any, get_origin, get_args
 from typing import Dict, Iterable, Callable, List, Tuple, Any, Union, Optional
 from collections import defaultdict
 from constant.base import Modules
@@ -197,4 +198,92 @@ def import_class(class_name: str, module_name: str) -> type:
     return a_class
 
 
+def unwrap_annotated(field_type: Any) -> (Any, str, List[Any]):
+    """ 递归解析 Annotated，返回 (基础类型, 描述, 限制条件) """
+    if get_origin(field_type) is Annotated:
+        base_type, *meta = get_args(field_type)
+        description = meta[0] if isinstance(meta[0], str) else ""
+        constraints = meta[1:] if len(meta) > 1 else []
+        base_type, nested_desc, nested_constraints = unwrap_annotated(base_type) if get_origin(base_type) else (base_type, description, constraints)
+        return base_type, nested_desc or description, nested_constraints
+    return field_type, "", []
 
+
+def parse_type(field_type: Any, field_desc: str = "", constraints: List[Any] = None) -> Dict[str, Any]:
+    """
+    递归解析字段类型，转换为 Function Calling 兼容的 JSON Schema 结构
+    """
+    field_type, annotated_desc, field_constraints = unwrap_annotated(field_type)  # 解析 Annotated，获取描述信息
+    field_desc = annotated_desc or field_desc  # 优先使用 Annotated 的描述
+    constraints = constraints or field_constraints  # 额外限制条件
+
+    origin = get_origin(field_type)  # 获取泛型的原始类型 (List, Dict 等)
+    args = get_args(field_type)  # 获取泛型参数 (例如 List[int] -> int)
+
+    schema = {}
+
+    if origin is list and args:
+        schema = {
+            "type": "array",
+            "description": field_desc,
+            "items": parse_type(args[0])
+        }
+
+    elif origin is dict and len(args) == 2:
+        key_type, value_type = args
+        key_base, key_desc, _ = unwrap_annotated(key_type)
+        value_base, value_desc, _ = unwrap_annotated(value_type)
+
+        # 确保键是 `string`
+        if key_base is str:
+            schema = {
+                "type": "object",
+                "description": field_desc,
+                "properties": {
+                    "key": {"type": "string", "description": key_desc or "Dictionary key"},
+                    "value": parse_type(value_type, value_desc or "Dictionary value")
+                },
+                "required": ["key", "value"]
+            }
+        else:
+            schema = {
+                "type": "object",
+                "description": field_desc,
+                "additionalProperties": parse_type(value_type, value_desc or "Dictionary value")
+            }
+
+    elif isinstance(field_type, type) and issubclass(field_type, BaseModel):
+        schema = pydantic_to_function_call_schema(field_type)
+
+    elif field_type in (str, int, bool, float):
+        type_mapping = {str: "string", int: "integer", bool: "boolean", float: "number"}
+        schema = {
+            "type": type_mapping[field_type],
+            "description": field_desc
+        }
+
+    if constraints:
+        for constraint in constraints:
+            if isinstance(constraint, list):  # 处理枚举
+                schema["enum"] = constraint
+
+    return schema
+
+
+def pydantic_to_function_call_schema(model_cls: Type[BaseModel]):
+    """
+    将 Pydantic 模型类转换为 Function Calling 兼容的 JSON 结构
+    """
+    schema = {
+        "type": "object",
+        "properties": {},
+        "required": []
+    }
+
+    for field_name, field_info in model_cls.__annotations__.items():
+        pydantic_field = model_cls.__fields__.get(field_name)
+        field_desc = pydantic_field.description if pydantic_field else "No description provided"
+        schema["properties"][field_name] = parse_type(field_info, field_desc)
+        schema["required"].append(field_name)
+
+    return schema

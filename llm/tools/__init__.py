@@ -10,6 +10,7 @@ import importlib
 import pkgutil
 import inspect
 
+from utils.common import pydantic_to_function_call_schema
 from typing import Annotated, Dict, TypedDict, Any, Required, NotRequired, List, Type, Set, cast, Optional
 from pydantic import BaseModel, Field, ConfigDict
 from llm.nodes import LLMNode, OpenAINode
@@ -58,29 +59,11 @@ class BaseTool(BaseModel, ABC):
             }
         }
 
-        args: ToolArgs = self.__class__.__annotations__.get('args')
+        args: Type[ToolArgs] = self.__class__.__annotations__.get('args')
         if args:
-
-            required_fields = []
-            properties_obj = {}
-            for arg_name, arg_info in args.model_fields.items():
-                field_type = args.__annotations__[arg_name].__name__
-                field_type = ParamMap.elem_from_str(field_type).dsp
-                is_required = arg_info.is_required()
-                description = arg_info.description
-
-                if is_required:
-                    required_fields.append(arg_name)
-
-                properties_obj.update({arg_name: {'type': field_type, 'description': description}})
-
-            parameter = {
-                    'type': 'object',
-                    'properties': properties_obj,
-                    'required': required_fields
-                }
-            action['function']['parameters'] = parameter
-        return ParamResp(**action)
+            fc_json = pydantic_to_function_call_schema(args)
+            action['function']['parameters'] = fc_json
+            return ParamResp(**action)
 
     @abstractmethod
     async def run(self, *args, **kwargs) -> Annotated[str, 'tool result']:
