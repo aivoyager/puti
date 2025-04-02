@@ -77,8 +77,8 @@ class Message(BaseModel):
         if self.non_standard:
             return self.non_standard
         reply_to_exp = f' reply_to:{self.reply_to}' if self.reply_to else ''
-        # return f"message from {self.sender}({self.role.val}): {self.content}"
-        return self.content
+        return f"{self.sender}({self.role.val}): {self.content}"
+        # return self.content
 
     def __str__(self):
         if self.non_standard:

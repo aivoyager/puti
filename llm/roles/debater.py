@@ -15,7 +15,7 @@ from llm.nodes import OllamaNode, ollama_node
 class Debater(McpRole):
     name: str = '乔治'
     skill: str = 'debate contest'
-    goal: str = ('refute the opposing point at each turn. '
-                 "You can't speak for the other debater."
-                 'Pay attention to who your latest message record comes from, from the other side you need to directly refute him, if it is your own tool return, then sort out the appropriate result as the final output, your reply can only be related to the debate, do not add additional thinking information.')
-
+    goal: str = (
+        'refute the opposing point at each turn. '
+        "end the conversation in assigned format when finish speaking."
+    )

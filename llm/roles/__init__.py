@@ -131,9 +131,10 @@ class Role(BaseModel):
         name_exp = f'You name is {self.name}, an helpful AI assistant,'
         skill_exp = f'skill at {self.skill},' if self.skill else ''
         goal_exp = f'your goal is {self.goal}.' if self.goal else ''
-        constraints_exp = ('You constraint is utilize the same language for seamless communication,'
+        constraints_exp = ('You constraint is utilize the same language for seamless communication'
                            ' and always give a clearly final reply prefix with END keyword'
-                           ' like "END you final reply here".')
+                           ' like "END you final reply here", do not give out extra information,'
+                           ' you reply always started with "END ".')
         tool_exp = (
             'You have some tools that you can use to help the user or meet user needs, '
             'fully understand the tool functions and their arguments before using them,'
@@ -154,6 +155,7 @@ class Role(BaseModel):
     def publish_message(self):
         if self.answer and self.rc.env:
             self.rc.env.publish_message(self.answer)
+            self.rc.memory.add_one(self.answer)  # this one won't be perceived
             self.answer = None
 
     def _reset(self):
@@ -191,6 +193,7 @@ class Role(BaseModel):
         think: Union[ChatCompletionMessage, str] = await self.agent_node.chat(message, tools=self.toolkit.param_list)
         lgr.debug(f'{self} think {think}')
         if isinstance(think, ChatCompletionMessage) and think.tool_calls:  # call tool
+            think.tool_calls = think.tool_calls[:1]
             todos = []
             for call_tool in think.tool_calls:
                 todo = self.toolkit.tools.get(call_tool.function.name)
@@ -206,8 +209,11 @@ class Role(BaseModel):
 
             self.rc.todos = todos
             return True, ''
-        elif isinstance(think, ChatCompletionMessage) and think.content:  # think resp
-            content = think.content
+        elif (isinstance(think, ChatCompletionMessage) and think.content) or isinstance(think, str):  # think resp
+            if isinstance(think, str):
+                content = think
+            else:
+                content = think.content
             if content.startswith('END ') or content.endswith('END'):
                 self.answer = Message.from_any(content.lstrip('END ').rstrip('END').rstrip(' END'),
                                                role=RoleType.ASSISTANT,
@@ -236,7 +242,7 @@ class Role(BaseModel):
                     'call_id': todo[2],
                     'output': str(e)
                 })
-                # message = Message(content=str(e), sender=self.name, role=RoleType.TOOL, tool_call_id=todo[2])
+                message = Message(content=str(e), sender=self.name, role=RoleType.TOOL, tool_call_id=todo[2])
             else:
                 message = Message.from_any(resp, role=RoleType.TOOL, sender=self.name, tool_call_id=todo[2])
             finally:
