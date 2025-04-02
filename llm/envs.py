@@ -76,3 +76,10 @@ class Env(BaseModel):
             if not member.is_idle:
                 return False
         return True
+
+    @classmethod
+    def model_rebuild(cls, **kwargs):
+        from llm.roles import Role  # noqa: F401
+        super().model_rebuild(**kwargs)
+
+

@@ -28,13 +28,13 @@ def test_action_node():
 
     llm_conf = OpenaiConfig()
     openai_node = OpenAINode(llm_name='openai', conf=llm_conf)
-    resp = asyncio.run(openai_node.achat(messages))
+    resp = asyncio.run(openai_node.chat(messages))
     print('')
 
 
 def test_ollama():
     t = 'hello, world'
     node = OllamaNode(llm_name='llama', conf=LlamaConfig())
-    res = asyncio.run(node.achat(t))
+    res = asyncio.run(node.chat(t))
     print(res)
 

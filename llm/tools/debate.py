@@ -28,7 +28,7 @@ class DebateArgs(ToolArgs):
 class Debate(BaseTool):
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
-    name: str = 'Debate'
+    name: str = 'debate'
     desc: str = 'Use this tool to make your point in an argument.'
     args: DebateArgs = None
 

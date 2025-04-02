@@ -10,7 +10,7 @@ import importlib
 import pkgutil
 import inspect
 
-from utils.common import pydantic_to_function_call_schema
+from utils.common import tool_args_to_fc_schema
 from typing import Annotated, Dict, TypedDict, Any, Required, NotRequired, List, Type, Set, cast, Optional
 from pydantic import BaseModel, Field, ConfigDict
 from llm.nodes import LLMNode, OpenAINode
@@ -43,7 +43,7 @@ class ToolArgs(BaseModel, ABC):
 class BaseTool(BaseModel, ABC):
     model_config = ConfigDict(arbitrary_types_allowed=True, extra="allow")
 
-    name: str = Field(..., description='Tool name')
+    name: str = Field(..., description='Tool name，The names need to be hump nomenclature')
     desc: str = Field(default='', description='Description of tool')
     args: ToolArgs = None
 
@@ -61,7 +61,7 @@ class BaseTool(BaseModel, ABC):
 
         args: Type[ToolArgs] = self.__class__.__annotations__.get('args')
         if args:
-            fc_json = pydantic_to_function_call_schema(args)
+            fc_json = tool_args_to_fc_schema(args)
             action['function']['parameters'] = fc_json
             return ParamResp(**action)
 

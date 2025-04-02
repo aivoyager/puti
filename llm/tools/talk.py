@@ -16,7 +16,7 @@ class TalkArgs(ToolArgs):
 class Reply(BaseTool):
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
-    name: str = 'Reply'
+    name: str = 'reply'
     desc: str = 'Use this tool to reply others.'
     args: TalkArgs = None
 

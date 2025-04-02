@@ -109,5 +109,5 @@ class MCPServer(BaseModel):
 
 if __name__ == '__main__':
     mcp = MCPServer()
-    mcp.add_tools([GetFlightInfo, Reply, Debate])
+    mcp.add_tools([GetFlightInfo, Debate])
     mcp.run()

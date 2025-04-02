@@ -84,7 +84,7 @@ def get_weather(city):
 def test_function_calling():
     node = OllamaNode(llm_name='llama', conf=LlamaConfig())
     msg = [{"role": "user", "content": "What's the weather like in Beijing?"}]
-    resp = asyncio.run(node.achat(msg, tools=tools))
+    resp = asyncio.run(node.chat(msg, tools=tools))
     print('')
 
 

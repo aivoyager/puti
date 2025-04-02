@@ -18,11 +18,11 @@ class GetFlightInfoArgs(ToolArgs):
 
 class GetFlightInfo(BaseTool):
     model_config = ConfigDict(arbitrary_types_allowed=True)
-    name: str = "Get flight time"
+    name: str = "get_flight_time"
     desc: str = 'Use this action get the flight times between two cities'
     args: GetFlightInfoArgs = None
 
-    async def run(self, departure, arrival):
+    async def run(self, departure, arrival, *args, **kwargs):
         flights = {
             'NYC-LAX': {'departure': '08:00 AM', 'arrival': '11:30 AM', 'duration': '5h 30m'},
             'LAX-NYC': {'departure': '02:00 PM', 'arrival': '10:30 PM', 'duration': '5h 30m'},
@@ -41,7 +41,7 @@ class SearchResidentEvilInfoArgs(ToolArgs):
 
 class SearchResidentEvilInfo(BaseTool):
     model_config = ConfigDict(arbitrary_types_allowed=True)
-    name: str = "Search resident evil info"
+    name: str = "search_resident_evil_info"
     desc: str = "Use this action search the resident evil relation info"
     intermediate: bool = True
     args: SearchResidentEvilInfoArgs = None
@@ -49,5 +49,5 @@ class SearchResidentEvilInfo(BaseTool):
     async def run(self, *args, **kwargs):
         llm: LLMNode = kwargs.get('llm')
         name = self.args.name
-        resp = await llm.achat([{'role': 'user', 'content': f'请提供生化危机中这个角色的详细信息{name}'}])
+        resp = await llm.chat([{'role': 'user', 'content': f'请提供生化危机中这个角色的详细信息{name}'}])
         return resp

@@ -121,7 +121,7 @@ class SQLiteManagerWithPool:
             self.pool.release_connection(conn)
 
 
-class SQLiteModelHandlerWithPool:
+class   SQLiteModelHandlerWithPool:
     """SQLite table model handler using connection pool."""
 
     def __init__(self, db_manager: SQLiteManagerWithPool, model: Type[BaseModel]):

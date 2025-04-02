@@ -9,6 +9,7 @@ import random
 import platform
 import importlib
 
+from pydantic.fields import FieldInfo
 from pydantic import BaseModel, Field
 from typing import List, Dict, Any, get_origin, get_args
 from typing import Dict, Iterable, Callable, List, Tuple, Any, Union, Optional
@@ -253,7 +254,7 @@ def parse_type(field_type: Any, field_desc: str = "", constraints: List[Any] = N
             }
 
     elif isinstance(field_type, type) and issubclass(field_type, BaseModel):
-        schema = pydantic_to_function_call_schema(field_type)
+        schema = tool_args_to_fc_schema(field_type)
 
     elif field_type in (str, int, bool, float):
         type_mapping = {str: "string", int: "integer", bool: "boolean", float: "number"}
@@ -270,9 +271,9 @@ def parse_type(field_type: Any, field_desc: str = "", constraints: List[Any] = N
     return schema
 
 
-def pydantic_to_function_call_schema(model_cls: Type[BaseModel]):
+def tool_args_to_fc_schema(model_cls: Type['BaseModel']):
     """
-    将 Pydantic 模型类转换为 Function Calling 兼容的 JSON 结构
+    将 ToolArgs 模型类转换为 Function Calling 兼容的 JSON 结构
     """
     schema = {
         "type": "object",
@@ -281,8 +282,8 @@ def pydantic_to_function_call_schema(model_cls: Type[BaseModel]):
     }
 
     for field_name, field_info in model_cls.__annotations__.items():
-        pydantic_field = model_cls.__fields__.get(field_name)
-        field_desc = pydantic_field.description if pydantic_field else "No description provided"
+        pydf: FieldInfo = model_cls.__fields__.get(field_name)
+        field_desc = pydf.description if pydf else "No description provided"
         schema["properties"][field_name] = parse_type(field_info, field_desc)
         schema["required"].append(field_name)
 

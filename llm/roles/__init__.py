@@ -41,6 +41,7 @@ from typing import Annotated, Dict, TypedDict, Any, Required, NotRequired, Class
 from llm.tools import ToolArgs
 from pydantic.fields import FieldInfo
 from llm.tools import Toolkit
+from openai.types.chat.chat_completion_message import ChatCompletionMessage
 
 
 lgr = logger_factory.llm
@@ -106,6 +107,8 @@ class Role(BaseModel):
     rc: RoleContext = Field(default_factory=RoleContext)
     answer: Optional[Message] = Field(default=None, description='assistant answer')
 
+    tool_calls_one_round: List[str] = Field(default=[], description='tool calls one round contains tool call id')
+
     cp: SerializeAsAny[Capture] = Field(default_factory=Capture, validate_default=True, description='Capture exception')
 
     __hash__ = object.__hash__
@@ -125,24 +128,31 @@ class Role(BaseModel):
 
     @property
     def role_definition(self) -> str:
-        name_exp = f'You are {self.name}, an helpful AI assistant.'
+        name_exp = f'You name is {self.name}, an helpful AI assistant,'
         skill_exp = f'skill at {self.skill},' if self.skill else ''
         goal_exp = f'your goal is {self.goal}.' if self.goal else ''
-        constraints_exp = 'You constraint is utilize the same language for seamless communication.'
+        constraints_exp = ('You constraint is utilize the same language for seamless communication,'
+                           ' and always give a clearly final reply prefix with END keyword'
+                           ' like "END you final reply here".')
         tool_exp = (
-            'You have some tools that you can use to help the user, '
+            'You have some tools that you can use to help the user or meet user needs, '
             'fully understand the tool functions and their arguments before using them,'
-            'make sure the types and values of the arguments you provided to the tool functions are correct, '
+            'make sure the types and values of the arguments you provided to the tool functions are correct'
+            'and always provide parameters that must be worn, '
             'tools give you only the intermediate product, '
-            'ultimately you need to give a clearly final reply prefix with END, like "END you final reply here", '
-            'Let others know that your part is done.'
+            'no matter whether use tool or not,'
+            'ultimately you need to give a clearly final reply prefix with END like "END you final reply here",'
+            'let others know that your part is done.'
+            'If there is an error in calling the tool, you need to fix it yourself.'
         )
-        finish_exp = "If you think you've accomplished your goal, prefix your final reply with 'END you reply'."
-        definition = name_exp + skill_exp + goal_exp + constraints_exp + tool_exp + finish_exp
+        finish_exp = ("Based on user requirements and your prior knowledge to jude "
+                      "if you've accomplished your goal, prefix your final reply with 'END you reply'.")
+        # definition = name_exp + skill_exp + goal_exp + constraints_exp + tool_exp
+        definition = name_exp + skill_exp + goal_exp + constraints_exp
         return definition
 
     def publish_message(self):
-        if self.answer:
+        if self.answer and self.rc.env:
             self.rc.env.publish_message(self.answer)
             self.answer = None
 
@@ -176,42 +186,63 @@ class Role(BaseModel):
     async def _think(self) -> Optional[Tuple[bool, str]]:
 
         message = [self.sys_think_msg] + Message.to_message_list(self.rc.memory.get())
-        think = await self.agent_node.achat(message, tools=self.toolkit.param_list)
+        if self.name == 'rock':
+            print('')
+        think: Union[ChatCompletionMessage, str] = await self.agent_node.chat(message, tools=self.toolkit.param_list)
         lgr.debug(f'{self} think {think}')
-        if isinstance(think, List):  # call tool
+        if isinstance(think, ChatCompletionMessage) and think.tool_calls:  # call tool
             todos = []
-            for call_tool in think:
+            for call_tool in think.tool_calls:
                 todo = self.toolkit.tools.get(call_tool.function.name)
                 todo_args = call_tool.function.arguments if call_tool.function.arguments else {}
-                todos.append((todo, todo_args))
+                todo_args = json.loads(todo_args) if isinstance(todo_args, str) else todo_args
+                tool_call_id = call_tool.id
+                self.tool_calls_one_round.append(tool_call_id)
+                todos.append((todo, todo_args, tool_call_id))
 
-                # add in memory
-                call_message = Message.from_any(
-                    msg=f'call tool {todo.name}; args {json.dumps(todo_args, ensure_ascii=False)}',
-                    role=RoleType.ASSISTANT
-                )
-                self.rc.memory.add_one(call_message)
+            # TODO: multiple tools call for openai support
+            call_message = Message(non_standard=think)
+            self.rc.memory.add_one(call_message)
 
             self.rc.todos = todos
             return True, ''
-        elif isinstance(think, str):  # think resp
-            if think.startswith('END '):
-                self.answer = Message.from_any(think.lstrip('END '),
+        elif isinstance(think, ChatCompletionMessage) and think.content:  # think resp
+            content = think.content
+            if content.startswith('END ') or content.endswith('END'):
+                self.answer = Message.from_any(content.lstrip('END ').rstrip('END').rstrip(' END'),
                                                role=RoleType.ASSISTANT,
                                                sender=self.name)
-                return False, think.lstrip('END ')
+                return False, content.lstrip('END ').rstrip('END').rstrip(' END')
+            else:
+                err = 'Unexpected think final resp without END prefix'
+                lgr.warning(err)
+                return False, content
+                # raise RuntimeError(err)
         else:
-            raise RuntimeError(f'Unexpected think type: {type(think)}')
+            err = f'Unexpected chat response: {type(think)}'
+            lgr.error(err)
+            raise RuntimeError(err)
 
     async def _react(self) -> Optional[Message]:
         message = Message.from_any('no tools taken yet')
         for todo in self.rc.todos:
             run = partial(todo[0].run, llm=self.agent_node)
-            resp = await run(**todo[1])
-            message = Message.from_any(resp, role=RoleType.TOOL)
-            self.rc.buffer.put_one_msg(message)
-            self.rc.action_taken += 1
-            self.answer = message
+            try:
+                resp = await run(**todo[1])
+                resp = json.dumps(resp, ensure_ascii=False) if not isinstance(resp, str) else resp
+            except Exception as e:
+                message = Message(non_standard_dic={
+                    'type': 'function_call_output',
+                    'call_id': todo[2],
+                    'output': str(e)
+                })
+                # message = Message(content=str(e), sender=self.name, role=RoleType.TOOL, tool_call_id=todo[2])
+            else:
+                message = Message.from_any(resp, role=RoleType.TOOL, sender=self.name, tool_call_id=todo[2])
+            finally:
+                self.rc.buffer.put_one_msg(message)
+                self.rc.action_taken += 1
+                self.answer = message
         return message
 
     async def run(self, with_message: Optional[Union[str, Dict, Message]] = None, ignore_history: bool = False) -> Optional[Message]:
@@ -240,7 +271,7 @@ class Role(BaseModel):
         if self.rc.env and self.rc.env.desc:
             other_roles = self.rc.env.members.difference({self})
             roles_exp = f' with roles {", ".join(map(str, other_roles))}' if other_roles else ''
-            env_desc = f'You in a environment called {self.rc.env.name}({self.rc.env.desc}){roles_exp}.'
+            env_desc = f'You in a environment called {self.rc.env.name}({self.rc.env.desc}){roles_exp}. '
             prompt += env_desc
         return prompt
 

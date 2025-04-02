@@ -4,7 +4,7 @@
 @Description:  
 """
 from pydantic import BaseModel, Field, ConfigDict, create_model, model_validator, PrivateAttr, SerializeAsAny, field_validator
-from typing import Optional, List, Iterable, Literal
+from typing import Optional, List, Iterable, Literal, Union
 from llm.messages import Message
 from llm.roles import RoleType
 
@@ -12,7 +12,7 @@ from llm.roles import RoleType
 class Memory(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
-    storage: List[SerializeAsAny['Message']] = []
+    storage: List[SerializeAsAny[Message]] = []
 
     def to_dict(self, ample: bool = False):
         """  """

@@ -3,7 +3,7 @@
 @Time:  2025-04-01 14:22
 @Description:  
 """
-from utils.common import pydantic_to_function_call_schema
+from utils.common import tool_args_to_fc_schema
 from pydantic import BaseModel, Field
 from typing import List, Dict, Any, Annotated
 from llm.tools.debate import DebateArgs
@@ -28,6 +28,6 @@ def test_pydantic_to_fc_calling():
 
     # e = ExampleArgs()
     # d = DebateArgs()
-    fc_json = pydantic_to_function_call_schema(ExampleArgs)
-    fc_json2 = pydantic_to_function_call_schema(DebateArgs)
+    fc_json = tool_args_to_fc_schema(ExampleArgs)
+    fc_json2 = tool_args_to_fc_schema(DebateArgs)
     print(fc_json)
