@@ -24,7 +24,7 @@ from logs import logger_factory
 from constant.llm import TOKEN_COSTS, MessageRouter
 from asyncio import Queue, QueueEmpty
 from llm.nodes import LLMNode, OpenAINode
-from llm.messages import Message
+from llm.messages import Message, ToolMessage, AssistantMessage, UserMessage
 from llm.envs import Env
 from llm.memory import Memory
 from utils.common import any_to_str
@@ -131,10 +131,12 @@ class Role(BaseModel):
         name_exp = f'You name is {self.name}, an helpful AI assistant,'
         skill_exp = f'skill at {self.skill},' if self.skill else ''
         goal_exp = f'your goal is {self.goal}.' if self.goal else ''
-        constraints_exp = ('You constraint is utilize the same language for seamless communication'
-                           ' and always give a clearly final reply prefix with END keyword'
-                           ' like "END you final reply here", do not give out extra information,'
-                           ' you reply always started with "END ".')
+        constraints_exp = (
+            'You constraint is utilize the same language for seamless communication'
+            ' and always give a clearly in final reply with format json format {"FINAL_ANSWER": Your final answer here}'
+            ' do not give out extra information.'
+            ' Pay attention to historical information to distinguish and make decision.'
+       )
         tool_exp = (
             'You have some tools that you can use to help the user or meet user needs, '
             'fully understand the tool functions and their arguments before using them,'
@@ -191,7 +193,8 @@ class Role(BaseModel):
         if self.name == 'rock':
             print('')
         think: Union[ChatCompletionMessage, str] = await self.agent_node.chat(message, tools=self.toolkit.param_list)
-        lgr.debug(f'{self} think {think}')
+
+        # llm call tools
         if isinstance(think, ChatCompletionMessage) and think.tool_calls:  # call tool
             think.tool_calls = think.tool_calls[:1]
             todos = []
@@ -209,21 +212,31 @@ class Role(BaseModel):
 
             self.rc.todos = todos
             return True, ''
+
+        # from openai、ollama, different data structure.
+        # llm reply directly
         elif (isinstance(think, ChatCompletionMessage) and think.content) or isinstance(think, str):  # think resp
-            if isinstance(think, str):
-                content = think
-            else:
-                content = think.content
-            if content.startswith('END ') or content.endswith('END'):
-                self.answer = Message.from_any(content.lstrip('END ').rstrip('END').rstrip(' END'),
-                                               role=RoleType.ASSISTANT,
-                                               sender=self.name)
-                return False, content.lstrip('END ').rstrip('END').rstrip(' END')
-            else:
-                err = 'Unexpected think final resp without END prefix'
-                lgr.warning(err)
+            try:
+                if isinstance(think, str):
+                    content = json.loads(think)
+                else:
+                    content = json.loads(think.content)
+                content = content.get('FINAL_ANSWER')
+            except json.JSONDecodeError:
+                fix_msg = 'Your returned an invalid json data'
+                raise 'our returned json data'
+
+            if content:
+                self.answer = UserMessage(content=content, sender=RoleType.USER.val)
                 return False, content
-                # raise RuntimeError(err)
+            else:
+                # TODO: self-repair
+                err = 'Your returned json data does not have a "FINAL ANSWER" key. Please check'
+                lgr.warning(err)
+                self.answer = UserMessage(content=content, sender=RoleType.USER.val)
+                return False, content
+
+        # unexpected think format
         else:
             err = f'Unexpected chat response: {type(think)}'
             lgr.error(err)

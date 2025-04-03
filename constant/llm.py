@@ -24,15 +24,6 @@ class MessageRouter(Base):
     ALL = ('<all>', 'message to all people')
 
 
-class ParamMap(Base):
-    """ val: origin ---> desc: destination fc type mapping"""
-    STRING = ('str', 'string')
-    ARRAY = ('List', 'array')
-    ARRAY2 = ('list', 'array')
-    DICT = ('Dict', 'object')
-    DICT2 = ('dict', 'object')
-
-
 TOKEN_COSTS = {
     "gpt-3.5-turbo": {"prompt": 0.0015, "completion": 0.002},
     "gpt-3.5-turbo-0301": {"prompt": 0.0015, "completion": 0.002},

@@ -93,5 +93,24 @@ class Message(BaseModel):
 
 class SystemMessage(Message):
 
-    def __init__(self, content: str):
-        super(SystemMessage, self).__init__(content=content, role=RoleType.SYSTEM)
+    def __init__(self, content: str, **kwargs):
+        super(SystemMessage, self).__init__(content=content, role=RoleType.SYSTEM, **kwargs)
+
+
+class AssistantMessage(Message):
+
+    def __init__(self, content: str, **kwargs):
+        super(AssistantMessage, self).__init__(content=content, role=RoleType.ASSISTANT, **kwargs)
+
+
+class UserMessage(Message):
+
+    def __init__(self, content: str, **kwargs):
+        super(UserMessage, self).__init__(content=content, role=RoleType.USER, **kwargs)
+
+
+class ToolMessage(Message):
+
+    def __init__(self, content: str, **kwargs):
+        super(ToolMessage, self).__init__(content=content, role=RoleType.TOOL, **kwargs)
+

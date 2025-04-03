@@ -15,7 +15,4 @@ from llm.nodes import OllamaNode, ollama_node
 class Debater(McpRole):
     name: str = '乔治'
     skill: str = 'debate contest'
-    goal: str = (
-        'refute the opposing point at each turn. '
-        "end the conversation in assigned format when finish speaking."
-    )
+
