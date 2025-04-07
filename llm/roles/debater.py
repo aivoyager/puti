@@ -14,5 +14,7 @@ from llm.nodes import OllamaNode, ollama_node
 
 class Debater(McpRole):
     name: str = '乔治'
-    skill: str = 'debate contest'
+    skill: str = ("debate contest. "
+                  "As a debater, You can't make the same argument every round and stand your ground "
+                  "and give your argument process")
 

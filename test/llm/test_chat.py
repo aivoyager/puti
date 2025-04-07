@@ -46,8 +46,8 @@ def test_mcp_env():
 
 def test_debate():
     env = Env(name='game', desc='play games with other')
-    debater1 = Debater(name='alex', goal='make a positive point in a round of debate')
-    debater2 = Debater(name='rock', goal='make a negative point in a round of debate')
+    debater1 = Debater(name='alex', goal='make a positive point every round of debate. Your opponent is rock')
+    debater2 = Debater(name='rock', goal='make a negative point every round of debate. Your opponent is alex')
     env.add_roles([debater1, debater2])
     # message = (f'Now you are having a debate on the topic: '
     #            f'Is the development of science and technology beneficial or harmful? {debater1} is the positive side and {debater2} is the negative side')

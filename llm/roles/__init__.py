@@ -134,7 +134,7 @@ class Role(BaseModel):
         constraints_exp = (
             'You constraint is utilize the same language for seamless communication'
             ' and always give a clearly in final reply with format json format {"FINAL_ANSWER": Your final answer here}'
-            ' do not give out extra information.'
+            ' do not give ANY other information except this json.'
             ' Pay attention to historical information to distinguish and make decision.'
        )
         tool_exp = (
@@ -155,6 +155,8 @@ class Role(BaseModel):
         return definition
 
     def publish_message(self):
+        if not self.answer:
+            return
         if self.answer and self.rc.env:
             self.rc.env.publish_message(self.answer)
             self.rc.memory.add_one(self.answer)  # this one won't be perceived
@@ -188,11 +190,30 @@ class Role(BaseModel):
         return True if len(self.rc.news) > 0 else False
 
     async def _think(self) -> Optional[Tuple[bool, str]]:
-
         message = [self.sys_think_msg] + Message.to_message_list(self.rc.memory.get())
+        last_msg = message[-1]
+        message_pure = []
+
+        if isinstance(last_msg, dict):
+            my_prefix = f'{self.name}({self.identity.val}):'
+            my_tool_prefix = f'{self.name}({RoleType.TOOL.val}):'
+            if not last_msg['content'].startswith(my_prefix) and not last_msg['content'].startswith(my_tool_prefix):
+                for msg in message:
+                    if not isinstance(msg, dict):
+                        if not isinstance(msg, ChatCompletionMessage):
+                            message_pure.append(msg)
+                            continue
+                    else:
+                        if not msg['content'].startswith(my_tool_prefix):
+                            message_pure.append(msg)
+                            continue
+        message_pure = message if not message_pure else message_pure
+
         if self.name == 'rock':
             print('')
-        think: Union[ChatCompletionMessage, str] = await self.agent_node.chat(message, tools=self.toolkit.param_list)
+        if self.name == 'alex':
+            print('')
+        think: Union[ChatCompletionMessage, str] = await self.agent_node.chat(message_pure, tools=self.toolkit.param_list)
 
         # llm call tools
         if isinstance(think, ChatCompletionMessage) and think.tool_calls:  # call tool
@@ -223,11 +244,14 @@ class Role(BaseModel):
                     content = json.loads(think.content)
                 content = content.get('FINAL_ANSWER')
             except json.JSONDecodeError:
-                fix_msg = 'Your returned an invalid json data'
-                raise 'our returned json data'
+                # send to self, no publish, no action
+                fix_msg = f'Your returned an unexpected invalid json data, fix it please ---> {think}'
+                err = UserMessage(content=fix_msg, sender=RoleType.USER.val)
+                self.rc.buffer.put_one_msg(err)
+                return False, ''
 
             if content:
-                self.answer = UserMessage(content=content, sender=RoleType.USER.val)
+                self.answer = AssistantMessage(content=content, sender=self.name)
                 return False, content
             else:
                 # TODO: self-repair
