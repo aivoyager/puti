@@ -52,7 +52,7 @@ def test_debate():
     # message = (f'Now you are having a debate on the topic: '
     #            f'Is the development of science and technology beneficial or harmful? {debater1} is the positive side and {debater2} is the negative side')
     message = Message.from_any(
-        f'现在你们正在进行一场辩论赛，主题为：科技发展是有益的，还是有弊的？每个人字数限制在50以内',
+        f'现在你们正在进行一场辩论赛，主题为：科技发展是有益的，还是有弊的？',
         # message,
         receiver=debater1.address,
         sender='user'
@@ -60,6 +60,7 @@ def test_debate():
     debater2.rc.memory.add_one(message)
     env.publish_message(message)
     env.cp.invoke(env.run)
+    print(env.history)
 
 
 def test_state_choose():

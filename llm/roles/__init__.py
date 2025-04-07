@@ -168,6 +168,12 @@ class Role(BaseModel):
     def set_tools(self, tools: List[Type[BaseTool]]):
         self.toolkit.add_tools(tools)
 
+    def _correction(self, fix_msg: str):
+        lgr.debug("Self-Correction: %s", fix_msg)
+        err = UserMessage(content=fix_msg, sender=RoleType.USER.val)
+        self.rc.buffer.put_one_msg(err)
+        return False, ''
+
     async def _perceive(self, ignore_history: bool = False) -> bool:
         news = self.rc.buffer.pop_all()
         history = [] if ignore_history else self.rc.memory.get()
@@ -209,10 +215,6 @@ class Role(BaseModel):
                             continue
         message_pure = message if not message_pure else message_pure
 
-        if self.name == 'rock':
-            print('')
-        if self.name == 'alex':
-            print('')
         think: Union[ChatCompletionMessage, str] = await self.agent_node.chat(message_pure, tools=self.toolkit.param_list)
 
         # llm call tools
@@ -245,20 +247,17 @@ class Role(BaseModel):
                 content = content.get('FINAL_ANSWER')
             except json.JSONDecodeError:
                 # send to self, no publish, no action
-                fix_msg = f'Your returned an unexpected invalid json data, fix it please ---> {think}'
-                err = UserMessage(content=fix_msg, sender=RoleType.USER.val)
-                self.rc.buffer.put_one_msg(err)
-                return False, ''
+                fix_msg = (f'Your returned an unexpected invalid json data, fix it please, '
+                           f'make sure the repaired results include the full process and results rather than summary'
+                           f'  ---> {think}')
+                return self._correction(fix_msg)
 
             if content:
                 self.answer = AssistantMessage(content=content, sender=self.name)
                 return False, content
             else:
-                # TODO: self-repair
-                err = 'Your returned json data does not have a "FINAL ANSWER" key. Please check'
-                lgr.warning(err)
-                self.answer = UserMessage(content=content, sender=RoleType.USER.val)
-                return False, content
+                fix_msg = 'Your returned json data does not have a "FINAL ANSWER" key. Please check'
+                return self._correction(fix_msg)
 
         # unexpected think format
         else:
