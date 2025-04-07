@@ -9,10 +9,39 @@ import re
 import csv
 
 from logs import logger_factory
-from client.twitter import TwikitClient
-from constant import VA
+from client.twitter.twitter_client import TwikitClient
+from utils.path import root_dir
 
 lgr = logger_factory.client
+
+
+def test_get_someone_tweet():
+    t = TwikitClient()
+    print('ok')
+    user_id = '902926941413453824'  # cz, get by lunar
+    count = 1
+
+    with open(str(root_dir() / 'data' / 'cz.txt'), "a") as f:
+        tweets = asyncio.run(t._cli.get_user_tweets(user_id, tweet_type='Tweets', count=200))
+        count = 1
+
+        def save_recursion(twe):
+            global count
+            for i in twe:
+                txt = i.__dict__['text']
+                ii = re.sub(r'https://t\.co/\S+', '', txt)
+                ii += '\n'
+                f.write(f'{count} ===> {ii}')
+                count += 1
+
+            if twe.next_cursor:
+                tweet_next = asyncio.run(
+                    t._cli.get_user_tweets(user_id, count=200, cursor=twe.next_cursor, tweet_type='Tweets'))
+                if tweet_next:
+                    save_recursion(tweet_next)
+
+        save_recursion(tweets)
+    print('ok')
 
 
 def test_post_tweet():
@@ -33,7 +62,7 @@ def test_post_tweet():
     rs4 = asyncio.run(t._cli.get_user_following('1815381118813876224'))  # 25073877
 
     try:
-        with open(str(VA.ROOT_DIR.val / 'data' / 'trump.txt'), "a") as f:
+        with open(str(root_dir() / 'data' / 'trump.txt'), "a") as f:
             tweets = asyncio.run(t._cli.get_user_tweets('25073877', tweet_type='Tweets', count=200))
             count = 1
 
@@ -56,8 +85,7 @@ def test_post_tweet():
     except Exception as e:
         lgr.error(e)
 
-
-    with open(str(VA.ROOT_DIR.val / 'data' / 'trump.txt'), "a") as f:
+    with open(str(root_dir() / 'data' / 'trump.txt'), "a") as f:
         count = 1
         for tweet in rs:
             txt = tweet.__dict__['text']
@@ -65,7 +93,7 @@ def test_post_tweet():
             tt += '\n'
             f.write(f'{count} ===> {tt}')
             count += 1
-    with open(str(VA.ROOT_DIR.val / 'data' / 'trump.csv'), "a", newline='') as f:
+    with open(str(root_dir() / 'data' / 'trump.csv'), "a", newline='') as f:
         writer = csv.writer(f)
         for tweet in rs:
             txt = tweet.__dict__['text']

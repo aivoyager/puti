@@ -1,7 +1,7 @@
 """
 @Author: obstacle
 @Time: 10/01/25 17:43
-@Description:  
+@Description:
 """
 import os
 
@@ -17,6 +17,8 @@ from utils.common import (check_module,
                           get_extra_config_path,
                           get_extra_config_dict,
                           get_mainly_config_dict)
+from utils.path import root_dir
+from constant.client import Client
 
 __all__ = ['Config', 'conf']
 
@@ -29,8 +31,8 @@ DEFAULT_CONF_PATHS: List[Path] = [
 # If configure here, sub model field be automatically loaded when the subclass conf is created
 # key: {module}_{sub_name}_{FIELD in sub model}
 EXTRA_CONF_PATHS: List[Tuple[str, Path]] = [
-    # ('client_twitter_cookies', VoyagerAlpha.ROOT_DIR.val / 'conf' / 'cookie_twitter.json'),
-    # ('client_twitter_cookies', VA.ROOT_DIR.val / 'conf' / 'cookie_twitter2.json'),
+    # ('client_twitter_cookies',  Path('/Users/wangshuang/PycharmProjects/data/cookie_twitter.json'))
+    ('client_twitter_cookies',  Path('/Users/wangshuang/PycharmProjects/data/cookie_twitter2.json'))
 ]
 
 
@@ -75,7 +77,7 @@ class Config(BaseModel):
         sub = cc.module.get(module, {})
 
         module_sub = kwargs.get(module, '')
-        if module_sub == Modules.CLIENT.val:
+        if module_sub == Client.TWITTER.val:
             mainly_conf = get_mainly_config_dict(configs=sub['mainly'], module_sub=module_sub)
             sub_conf = get_extra_config_dict(configs=sub['extra'], module=module, module_sub=module_sub)
             sub_conf.update(mainly_conf)

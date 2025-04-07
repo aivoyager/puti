@@ -19,7 +19,7 @@ class DBM(BaseModel):
 
     pool: SQLiteConnectionPool = Field(None, description='conn pool', validate_default=False)
     pool_size: int = Field(default=PuTi.POOL_SIZE.val)
-    db_path: Path = Field(default=PuTi.ROOT_DIR.val / 'puti' / 'db' / 'alpha.db')
+    db_path: Path = Field(default=PuTi.ROOT_DIR.val / 'db' / 'puti.db')
     dbh: SQLiteModelHandlerWithPool = Field(None, description='database handler', validate_default=False)
     dbm: SQLiteManagerWithPool = Field(None, description='database manager', validate_default=False)
 

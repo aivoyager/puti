@@ -6,7 +6,6 @@
 import ollama
 
 from ollama._types import Message
-from llm import tools
 from ollama import Client
 from pydantic import BaseModel, Field, ConfigDict, create_model, model_validator, PrivateAttr, SerializeAsAny, field_validator
 from typing import Optional, List, Iterable, Literal, Annotated, Dict, TypedDict, Any, Required, NotRequired, ClassVar, cast
