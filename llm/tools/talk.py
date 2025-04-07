@@ -20,5 +20,5 @@ class Reply(BaseTool):
     desc: str = 'Use this tool to reply others.'
     args: TalkArgs = None
 
-    async def run(self, text):
+    async def run(self, text, *args, **kwargs):
         return text

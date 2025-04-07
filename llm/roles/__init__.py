@@ -169,6 +169,7 @@ class Role(BaseModel):
         self.toolkit.add_tools(tools)
 
     def _correction(self, fix_msg: str):
+        """ self-correction mechanism """
         lgr.debug("Self-Correction: %s", fix_msg)
         err = UserMessage(content=fix_msg, sender=RoleType.USER.val)
         self.rc.buffer.put_one_msg(err)
@@ -200,6 +201,7 @@ class Role(BaseModel):
         last_msg = message[-1]
         message_pure = []
 
+        # only show tool call intermediate info when fc, history info won't process it
         if isinstance(last_msg, dict):
             my_prefix = f'{self.name}({self.identity.val}):'
             my_tool_prefix = f'{self.name}({RoleType.TOOL.val}):'
@@ -217,8 +219,8 @@ class Role(BaseModel):
 
         think: Union[ChatCompletionMessage, str] = await self.agent_node.chat(message_pure, tools=self.toolkit.param_list)
 
-        # llm call tools
-        if isinstance(think, ChatCompletionMessage) and think.tool_calls:  # call tool
+        # openai fc
+        if isinstance(think, ChatCompletionMessage) and think.tool_calls:
             think.tool_calls = think.tool_calls[:1]
             todos = []
             for call_tool in think.tool_calls:
@@ -226,13 +228,25 @@ class Role(BaseModel):
                 todo_args = call_tool.function.arguments if call_tool.function.arguments else {}
                 todo_args = json.loads(todo_args) if isinstance(todo_args, str) else todo_args
                 tool_call_id = call_tool.id
-                self.tool_calls_one_round.append(tool_call_id)
+                self.tool_calls_one_round.append(tool_call_id)  # a queue storage multiple calls and counter i
                 todos.append((todo, todo_args, tool_call_id))
 
             # TODO: multiple tools call for openai support
             call_message = Message(non_standard=think)
             self.rc.memory.add_one(call_message)
+            self.rc.todos = todos
+            return True, ''
+        # ollama fc
+        elif isinstance(think, OMessage) and think.tool_calls and all(isinstance(i, OMessage.ToolCall) for i in think.tool_calls):
+            tool_calls: List[OMessage.ToolCall] = think.tool_calls[:1]
+            todos = []
+            for fc in tool_calls:
+                todo = self.toolkit.tools.get(fc.function.name)
+                todo_args = fc.function.arguments if fc.function.arguments else {}
+                todos.append((todo, todo_args, -1))
 
+            call_message = Message(non_standard=think)
+            self.rc.memory.add_one(call_message)
             self.rc.todos = todos
             return True, ''
 

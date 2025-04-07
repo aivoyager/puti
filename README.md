@@ -56,7 +56,7 @@ from llm.roles.talker import PuTiMCP
 from llm.messages import Message
 
 env = Env()
-talker = PuTiMCP()
+talker = PuTiMCP()  # inherit from PuTiMCP, then call tools from mcp server
 env.add_roles([talker])
 msg = 'How long is the flight from New York(NYC) to Los Angeles(LAX)'
 env.publish_message(Message.from_any(msg))
@@ -70,14 +70,18 @@ from llm.messages import Message
 from llm.roles.debater import Debater
 
 env = Env(name='game', desc='play games with other')
-debater1 = Debater(name='bot1')
-debater2 = Debater(name='bot2')
+debater1 = Debater(name='alex', goal='make a positive point every round of debate. Your opponent is rock')
+debater2 = Debater(name='rock', goal='make a negative point every round of debate. Your opponent is alex')
 env.add_roles([debater1, debater2])
-env.publish_message(Message.from_any(
-    f'现在你们正在进行一场辩论赛，主题为：科技发展是有益的，还是有弊的？{debater1}为正方 {debater2}为反方',
-    receiver=debater1.address
-))
-env.cp.invoke(env.run)
+message = Message.from_any(
+    f'现在你们正在进行一场辩论赛，主题为：科技发展是有益的，还是有弊的？',
+    receiver=debater1.address,
+    sender='user'
+)
+debater2.rc.memory.add_one(message)
+env.publish_message(message)
+env.cp.invoke(env.run)  # run
+print(env.history)
 ```
 ### 🔑 configuration file
 ```yaml

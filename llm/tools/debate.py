@@ -32,7 +32,7 @@ class Debate(BaseTool):
     desc: str = 'Use this tool to make your point in an argument.'
     args: DebateArgs = None
 
-    async def run(self, opinion, llm):
+    async def run(self, opinion, *args, **kwargs):
         return opinion
 
 

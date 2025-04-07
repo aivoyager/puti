@@ -148,23 +148,25 @@ class OllamaNode(LLMNode):
         self.ollama = Client(host=self.conf.BASE_URL)
         lgr.info(f'Ollama node init from {self.conf.BASE_URL} ---> model: {self.conf.MODEL}')
 
-    async def chat(self, msg: List[Dict], *args, **kwargs) -> str or List[Message.ToolCall]:
+    async def chat(self, msg: List[Dict], *args, **kwargs) -> Union[str, List[Message]]:
+        # same as gpt, although there are no errors in streaming chat while fc. default non-stream fc
+        stream = self.conf.STREAM
+        if kwargs.get('tools'):
+            stream = False
         response = self.ollama.chat(
             model=self.conf.MODEL,
             messages=msg,
-            stream=self.conf.STREAM,
+            stream=stream,
             **kwargs
         )
-        if self.conf.STREAM:
+        if stream:
             collected_messages = []
             for chunk in response:
-                if hasattr(chunk.message, 'tool_calls') and chunk.message.tool_calls:
-                    return chunk.message.tool_calls
-                else:
-                    collected_messages.append(chunk.message.content)
+                collected_messages.append(chunk.message.content)
             full_reply = ''.join(collected_messages)
         else:
-            # TODO: fc none stream support
+            if response.message.tool_calls:
+                return response.message
             full_reply = response.message.content
         return full_reply
 

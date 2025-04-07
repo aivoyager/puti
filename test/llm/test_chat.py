@@ -17,8 +17,9 @@ from conf.llm_config import LlamaConfig
 
 
 def test_chat():
+    # TODO: llama fc
     msg = 'hi hi'
-    talker = PuTi()
+    talker = PuTi(agent_node=ollama_node)
     msg = talker.cp.invoke(talker.run, msg)
     print(f'answer:{msg.data}')
 
@@ -49,8 +50,6 @@ def test_debate():
     debater1 = Debater(name='alex', goal='make a positive point every round of debate. Your opponent is rock')
     debater2 = Debater(name='rock', goal='make a negative point every round of debate. Your opponent is alex')
     env.add_roles([debater1, debater2])
-    # message = (f'Now you are having a debate on the topic: '
-    #            f'Is the development of science and technology beneficial or harmful? {debater1} is the positive side and {debater2} is the negative side')
     message = Message.from_any(
         f'现在你们正在进行一场辩论赛，主题为：科技发展是有益的，还是有弊的？',
         # message,

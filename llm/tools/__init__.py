@@ -74,6 +74,18 @@ class BaseTool(BaseModel, ABC):
     def __repr__(self):
         return self.__str__()
 
+    def __init_subclass__(cls):
+        """ subclass `run` method must contain *args and **kwargs """
+        super().__init_subclass__()
+        run_method = cls.__dict__.get('run', None)
+        if run_method is None:
+            return
+        sig = inspect.signature(run_method)
+        has_args = any(p.kind == inspect.Parameter.VAR_POSITIONAL for p in sig.parameters.values())
+        has_kwargs = any(p.kind == inspect.Parameter.VAR_KEYWORD for p in sig.parameters.values())
+        if not (has_args and has_kwargs):
+            raise TypeError(f"{cls.__name__}.run must accept *args and **kwargs")
+
 
 class Toolkit(BaseModel, ABC):
     model_config = ConfigDict(arbitrary_types_allowed=True, extra="allow")

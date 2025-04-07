@@ -21,6 +21,7 @@ lgr = logger_factory.default
 
 
 class Capture(BaseModel):
+    """ exception capture """
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     exe: Exception = None
