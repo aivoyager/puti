@@ -17,9 +17,9 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from fastapi import FastAPI, Request
 from contextlib import asynccontextmanager
 from logs import logger_factory
-from client.twitter import TwikitClient
-from constant import VA
 from logs_uvicore import get_uvicorn_log_config
+from utils.path import root_dir
+from client.twitter.twitter_client import TwikitClient
 
 lgr = logger_factory.default
 
@@ -60,7 +60,7 @@ def start_server(*services):
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     lgr.info('Application started')
-    start_server(redis, amqp, celery)
+    # start_server(redis, amqp, celery)
     twitter_client = TwikitClient()
     app.state.twitter_client = twitter_client
     #
@@ -77,9 +77,11 @@ app = FastAPI(lifespan=lifespan)
 
 @app.get('/client_request')
 async def client_request(request: Request):
-    # print(request.app.state.twitter_client)
+    print(request.app.state.twitter_client)
     # return request.app.state.twitter_client
     return 'ok'
+
+
 
 
 @click.command()
@@ -92,7 +94,7 @@ def run_server(host, port, reload):
         host=host,
         port=port,
         reload=reload,
-        log_config=get_uvicorn_log_config(str(VA.ROOT_DIR.val / 'logs' / 'uvicorn'), 'DEBUG')
+        log_config=get_uvicorn_log_config(str(root_dir() / 'logs' / 'uvicorn'), 'DEBUG')
     )
 
 

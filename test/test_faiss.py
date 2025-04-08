@@ -8,5 +8,9 @@ from utils.path import root_dir
 
 
 def test_faiss_index():
-    f = FaissIndex()
+    f = FaissIndex(
+        from_file=root_dir() / 'data' / 'cz2.json',
+        to_file=root_dir() / 'data' / 'cz2.index',
+    )
+    info = f.search('赵长鹏是谁')
     print('ok')

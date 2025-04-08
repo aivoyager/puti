@@ -14,5 +14,5 @@ def root_dir():
             break
         else:
             package_root = Path.cwd()
-    logger.info(f'Package root set to {str(package_root)}')
+    # logger.info(f'Package root set to {str(package_root)}')
     return package_root

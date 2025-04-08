@@ -8,7 +8,11 @@ import json
 import random
 import platform
 import importlib
+import requests
 
+from utils.singleton import singleton
+from requests.adapters import HTTPAdapter
+from urllib3 import Retry
 from pydantic.fields import FieldInfo
 from pydantic import BaseModel, Field
 from typing import List, Dict, Any, get_origin, get_args
@@ -288,3 +292,43 @@ def tool_args_to_fc_schema(model_cls: Type['BaseModel']):
         schema["required"].append(field_name)
 
     return schema
+
+
+@singleton
+def build_http():
+    retry_strategy = Retry(
+        total=3,
+        backoff_factor=1
+    )
+    adapter = HTTPAdapter(max_retries=retry_strategy)
+    http = requests.Session()
+    http.mount("https://", adapter)
+    http.mount("http://", adapter)
+    return http
+
+
+def request_url(url, method, *, error_display='', raise_err=False, **kwargs):
+    http = build_http()
+    try:
+        if method == 'GET':
+            resp = http.get(url, **kwargs)
+        elif method == 'POST':
+            resp = http.post(url, **kwargs)
+        else:
+            raise ValueError('method must be GET or POST')
+    except Exception as e:
+        lgr.error(f'{error_display} - traceback: {traceback.format_exc()}')
+        if raise_err:
+            raise e
+        return Box({})
+    else:
+        if resp.status_code != 200:
+            lgr.error(f'{error_display} - {resp.content}')
+            if raise_err:
+                raise Exception(error_display)
+        elif 'error' in resp.json():
+            lgr.error(f'{error_display} - {resp.content}')
+            if raise_err:
+                raise Exception(error_display)
+        else:
+            return Box(resp.json())

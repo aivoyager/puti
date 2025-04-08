@@ -19,6 +19,8 @@ class LLMConfig(Config):
     MODEL: Optional[Union[str, ChatModel]] = None
     BASE_URL: Optional[str] = None
 
+    EMBEDDING_MODEL: Optional[str] = None
+
     # All fields need default value
     MAX_TOKEN: Optional[int] = None
     TEMPERATURE: Optional[float] = None
@@ -40,6 +42,8 @@ class LLMConfig(Config):
 
 
 class OpenaiConfig(LLMConfig):
+
+    FAISS_SEARCH_TOP_K: Optional[int] = None
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)

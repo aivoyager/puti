@@ -37,3 +37,23 @@ class TwitterConfig(Config):
         for i in field:
             if not getattr(self, i):
                 setattr(self, i, conf.get(i, None))
+
+
+class LunarConfig(Config):
+    HOST: Optional[str] = None
+    API_KEY: Optional[str] = None
+    HEADERS: Optional[dict] = None
+    ENDPOINT: Optional[str] = None
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        field = self.__annotations__.keys()
+        conf = self._subconfig_init(module=Modules.CLIENT.val, client=Client.LUNAR.val)
+        for i in field:
+            if not getattr(self, i):
+                setattr(self, i, conf.get(i, None))
+        self._init_headers()
+
+    def _init_headers(self):
+        if not self.HEADERS:
+            self.HEADERS = {'Authorization': 'Bearer {}'.format(self.API_KEY)}

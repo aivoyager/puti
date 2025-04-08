@@ -45,6 +45,7 @@ class FileModel(BaseModel):
             lgr.error(err)
             raise ValueError(err)
         if not file_path.exists():
+            lgr.warning(f"File {file_path} does not exist.")
             return {}
         methods = {name: func for name, func in inspect.getmembers(self, predicate=inspect.ismethod) if has_decorator(func, 'read_wrapper')}
         read_func = methods.get(f'_read_{file_type}')

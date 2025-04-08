@@ -32,7 +32,7 @@ DEFAULT_CONF_PATHS: List[Path] = [
 # key: {module}_{sub_name}_{FIELD in sub model}
 EXTRA_CONF_PATHS: List[Tuple[str, Path]] = [
     # ('client_twitter_cookies',  Path('/Users/wangshuang/PycharmProjects/data/cookie_twitter.json'))
-    ('client_twitter_cookies',  Path('/Users/wangshuang/PycharmProjects/data/cookie_twitter2.json'))
+    ('client_twitter_cookies',  Path('/Users/wangshuang/PycharmProjects/data/cookie_twiter2.json'))
 ]
 
 
@@ -82,7 +82,7 @@ class Config(BaseModel):
             sub_conf = get_extra_config_dict(configs=sub['extra'], module=module, module_sub=module_sub)
             sub_conf.update(mainly_conf)
         else:
-            sub_conf = get_mainly_config_dict(configs=sub, module_sub=module_sub)
+            sub_conf = get_mainly_config_dict(configs=sub['mainly'], module_sub=module_sub)
         return sub_conf
 
     @field_validator('cc', mode='before')

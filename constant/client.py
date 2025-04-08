@@ -14,6 +14,7 @@ class LoginMethod(Base):
 class Client(Base):
     TWITTER = ('twitter', 'twitter client')
     WECHAT = ('wechat', 'wechat client')
+    LUNAR = ('lunar', 'lunar client')
 
 
 class TwikitSearchMethod(Base):
