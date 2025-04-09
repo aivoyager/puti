@@ -36,9 +36,13 @@ class Capture(BaseModel):
 
         try:
             if iscoroutinefunction(func):
-                if asyncio.get_event_loop().is_running():
-                    rs = func(*args, **kwargs)
-                else:
+                try:
+                    asyncio.get_event_loop()
+                    if asyncio.get_event_loop().is_running():
+                        rs = func(*args, **kwargs)
+                    else:
+                        rs = asyncio.run(func(*args, **kwargs))
+                except RuntimeError:
                     rs = asyncio.run(func(*args, **kwargs))
             else:
                 rs = func(*args, **kwargs)
