@@ -82,7 +82,9 @@ class Config(BaseModel):
             sub_conf = get_extra_config_dict(configs=sub['extra'], module=module, module_sub=module_sub)
             sub_conf.update(mainly_conf)
         else:
-            sub_conf = get_mainly_config_dict(configs=sub['mainly'], module_sub=module_sub)
+            if isinstance(sub, Dict):
+                sub = sub['mainly']
+            sub_conf = get_mainly_config_dict(configs=sub, module_sub=module_sub)
         return sub_conf
 
     @field_validator('cc', mode='before')

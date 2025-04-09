@@ -12,6 +12,8 @@ from llm.messages import Message
 from llm.roles.debater import Debater
 from llm.nodes import OllamaNode, ollama_node, openai_node
 from conf.llm_config import LlamaConfig
+from llm.roles.cz import CZ
+from llm.nodes import OpenAINode
 
 # sys.stdout.reconfigure(line_buffering=True)
 
@@ -72,4 +74,9 @@ def test_state_choose():
     resp = asyncio.run(node.chat(prompt))
     print()
 
+
+def test_cz():
+    cz = CZ(agent_node=OpenAINode())
+    resp = cz.cp.invoke(cz.run, 'generate a cz tweet')
+    print(resp)
 

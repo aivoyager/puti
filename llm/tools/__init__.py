@@ -62,7 +62,7 @@ class BaseTool(BaseModel, ABC):
         if args:
             fc_json = tool_args_to_fc_schema(args)
             action['function']['parameters'] = fc_json
-            return ParamResp(**action)
+        return ParamResp(**action)
 
     @abstractmethod
     async def run(self, *args, **kwargs) -> Annotated[str, 'tool result']:

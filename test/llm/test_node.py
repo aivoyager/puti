@@ -33,8 +33,25 @@ def test_action_node():
 
 
 def test_ollama():
-    t = 'hello, world'
-    node = OllamaNode(llm_name='llama', conf=LlamaConfig())
-    res = asyncio.run(node.chat(t))
+    conversation = [
+        {
+            'role': 'system',
+            'content': 'You play a role in the blockchain area called "赵长鹏". '
+                       'Reply with his accent, speak in his habit, '
+                       'He goes by the Twitter name CZ �� BNB or cz_binance and is commonly known as cz.'
+                        'Your are a helpful assistant, named cz or changpeng zhao or 赵长鹏.'
+        },
+        {
+            'role': 'user',
+            'content': 'post a tweet. Follow these points'
+                       "1. Your tweets must not include time-related information"
+                       "2. Don't @ others, mention others"
+                       "3. Your tweet don't include media, so try to be as complete as possible"
+                       "4. Don't ReTweet(RT) other tweet"
+        }
+    ]
+    node = OllamaNode(llm_name='cz', conf=LlamaConfig())
+    print('res')
+    res = asyncio.run(node.chat(conversation))
     print(res)
 

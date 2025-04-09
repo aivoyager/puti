@@ -14,12 +14,13 @@ import threading
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, Depends
 from contextlib import asynccontextmanager
 from logs import logger_factory
 from logs_uvicore import get_uvicorn_log_config
 from utils.path import root_dir
 from client.twitter.twitter_client import TwikitClient
+from api.chat import chat_router
 
 lgr = logger_factory.default
 
@@ -59,42 +60,51 @@ def start_server(*services):
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    lgr.info('Application started')
+    lgr.debug('application started')
     # start_server(redis, amqp, celery)
-    twitter_client = TwikitClient()
-    app.state.twitter_client = twitter_client
-    #
-    # await twitter_client.save_my_tweet()
-    lgr.info('Init twitter client successfully in lifespan')
+
+    # Don't init twitter client if there is no need, which may blocked your account
+    # twitter_client = TwikitClient()
+    # app.state.twitter_client = twitter_client
+    # lgr.info('Init twitter client successfully in lifespan')
 
     yield
-    print('clean up')
+    # print('clean up')
+    lgr.debug('clean up')
     # del twitter_client
 
 
-app = FastAPI(lifespan=lifespan)
+app = FastAPI(
+    lifespan=lifespan,
+    title='puti',
+    description='Puti API for readers',
+    version='1.0.0',
+    docs_url='/docs',
+    redoc_url='/redoc',
+    openapi_url='/openapi.json',
+)
+app.include_router(chat_router, prefix='/chat', tags=['chat'])
 
 
 @app.get('/client_request')
 async def client_request(request: Request):
-    print(request.app.state.twitter_client)
-    # return request.app.state.twitter_client
+    # print(request.app.state.twitter_client)
     return 'ok'
-
-
 
 
 @click.command()
 @click.option("--host", default="127.0.0.1", help="Host to bind the server to")
 @click.option("--port", default=8000, help="Port to run the server on")
 @click.option("--reload", is_flag=True, help="Enable auto-reload during development")
-def run_server(host, port, reload):
+@click.option('--loop', default='asyncio')
+def run_server(host, port, reload, loop):
     uvicorn.run(
         app,
         host=host,
         port=port,
         reload=reload,
-        log_config=get_uvicorn_log_config(str(root_dir() / 'logs' / 'uvicorn'), 'DEBUG')
+        log_config=get_uvicorn_log_config(str(root_dir() / 'logs' / 'uvicorn'), 'DEBUG'),
+        loop=loop
     )
 
 

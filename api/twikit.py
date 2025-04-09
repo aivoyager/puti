@@ -14,5 +14,6 @@ twikit_router = APIRouter()
 def get_tweets_by_name(data: GetTweetsByNameRequest, req: Request):
     twikit_client = req.app.state.twikit_client
 
-    req.app.
+    # req.app.
 
+    pass
