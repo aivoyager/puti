@@ -93,7 +93,7 @@ async def client_request(request: Request):
 
 
 @click.command()
-@click.option("--host", default="127.0.0.1", help="Host to bind the server to")
+@click.option("--host", default="0.0.0.0", help="Host to bind the server to")
 @click.option("--port", default=8000, help="Port to run the server on")
 @click.option("--reload", is_flag=True, help="Enable auto-reload during development")
 @click.option('--loop', default='asyncio')
