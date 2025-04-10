@@ -12,4 +12,4 @@ RUN pip install --no-cache-dir -r requirements.txt -i https://pypi.tuna.tsinghua
 
 EXPOSE 8000
 
-CMD ["sh","./docker_run.sh"]
+CMD ["python","-u", "main.py"]
