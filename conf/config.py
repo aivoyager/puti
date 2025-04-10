@@ -4,6 +4,7 @@
 @Description:
 """
 import os
+import platform
 
 from box import Box
 from pydantic import BaseModel, ConfigDict, SerializeAsAny, Field, field_validator
@@ -22,9 +23,15 @@ from constant.client import Client
 
 __all__ = ['Config', 'conf']
 
+system_name = platform.system()
+conf_path = Path('/Users/wangshuang/PycharmProjects/data/config2.yaml')
+
+if system_name.upper() == 'LINUX':
+    conf_path = root_dir() / 'conf' / 'config2.yaml'
+
 # Later priority is higher, storing your secret key in somewhere else
 DEFAULT_CONF_PATHS: List[Path] = [
-    Path('/Users/wangshuang/PycharmProjects/data/config2.yaml'),
+    conf_path,
 ]
 
 # Definition rule
@@ -32,7 +39,7 @@ DEFAULT_CONF_PATHS: List[Path] = [
 # key: {module}_{sub_name}_{FIELD in sub model}
 EXTRA_CONF_PATHS: List[Tuple[str, Path]] = [
     # ('client_twitter_cookies',  Path('/Users/wangshuang/PycharmProjects/data/cookie_twitter.json'))
-    ('client_twitter_cookies',  Path('/Users/wangshuang/PycharmProjects/data/cookie_twiter2.json'))
+    # ('client_twitter_cookies',  Path('/Users/wangshuang/PycharmProjects/data/cookie_twiter2.json'))
 ]
 
 
