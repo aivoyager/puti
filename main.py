@@ -74,7 +74,7 @@ async def lifespan(app: FastAPI):
     # del twitter_client
 
 
-app = FastAPI(
+sub_app = FastAPI(
     lifespan=lifespan,
     title='puti',
     description='Puti API for readers',
@@ -83,10 +83,12 @@ app = FastAPI(
     redoc_url='/redoc',
     openapi_url='/openapi.json',
 )
-app.include_router(chat_router, prefix='/chat', tags=['chat'])
+app = FastAPI()
+app.mount('/ai/puti', sub_app)
+sub_app.include_router(chat_router, prefix='/chat', tags=['chat'])
 
 
-@app.get('/client_request')
+@sub_app.get('/client_request')
 async def client_request(request: Request):
     # print(request.app.state.twitter_client)
     return 'ok'
