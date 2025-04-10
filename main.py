@@ -103,7 +103,7 @@ def run_server(host, port, reload, loop):
         host=host,
         port=port,
         reload=reload,
-        log_config=get_uvicorn_log_config(str(root_dir() / 'logs' / 'uvicorn'), 'DEBUG'),
+        # log_config=get_uvicorn_log_config(str(root_dir() / 'logs' / 'uvicorn'), 'DEBUG'),
         loop=loop
     )
 
