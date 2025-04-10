@@ -1,0 +1,58 @@
+version: '3.8'
+
+services:
+  api:
+    image: hub.nihao.com/helloworlddev/{{REPO_NAME}}:{{REPO_TAG}}
+    networks:
+      - develop
+    environment:
+      TYPE: "WEB"
+    deploy:
+      # traefik为一个现代的反向代理和负载均衡器（部署了traefik的服务器）
+      # 服务的部署模式。replicated 模式意味着该服务将以指定的副本数进行复制部署。其他模式包括 global，它会在每个节点上运行一个实例。
+      mode: replicated
+      # 启动三个 api 服务的实例，以确保高可用性和负载均衡。
+      replicas: 3
+      # Traefik反向代理
+      labels:
+        traefik.enable: 'true'
+        # Traefik 路由器关联的服务名称
+        traefik.http.routers.ai-puti-stack.service: ai-puti-stack
+        # 设置 Traefik 路由器的入口点（inner或者outer）
+        traefik.http.routers.ai-puti-stack.entrypoints: outer
+        # 定义了访问该服务的路径规则。只有 URL 路径以 /newpump/aux 或 /nihao/aux 开头的请求才会被路由到该服务
+        traefik.http.routers.ai-puti-stack.rule: Host(`api.game.com`) && PathPrefix(`/ai/puti`)
+        # 告诉 Traefik 该服务的负载均衡器应该将请求转发到容器内的 3001 端口。
+        traefik.http.services.ai-puti-stack.loadbalancer.server.port: '8000'
+      placement:
+        constraints:
+          # 服务将仅在角色为 worker 的节点上运行，不会在 manager 节点上运行。
+          - "node.role==worker"
+      update_config:
+        # 每次更新时只会更新一个副本，确保不会中断整个服务。
+        parallelism: 1
+        # 更新每个副本之间的延迟时间，避免一次性过多副本更新，造成系统过载
+        delay: 5s
+        # 先启动新的副本，确保系统不宕机
+        order: start-first
+        # 如果更新失败，回滚到上一个版本
+        failure_action: rollback
+      rollback_config:
+        # 每次回滚时只回滚一个副本
+        parallelism: 1
+        # 先启动新的副本，再删除旧的副本
+        order: start-first
+      # 服务崩溃时的重启策略
+      restart_policy:
+        # 如果服务因失败退出（非正常退出），则会自动重启
+        condition: on-failure
+    logging:
+      # fluentd 作为日志驱动，fluentd 是一个开源数据收集工具，广泛用于聚合和转发日志数据。
+      driver: fluentd
+      options:
+        tag: "{{REPO_NAME}}.WEB"
+
+# 网络是外部网络
+networks:
+  develop:
+    external: true

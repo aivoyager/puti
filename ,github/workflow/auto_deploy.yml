@@ -1,0 +1,74 @@
+name: Auto Build and Deploy to Production
+# 触发该工作流的条件。这里是 Git 标签 发生变更时触发，当 Git 标签匹配模式 prod.v* 时，工作流会被触发。例如 prod.v1.0, prod.v2.1 等
+on:
+  push:
+    tags:
+      - 'prod.v*'
+
+# 定义了一个名为 build_deploy 的工作，它将在一个名为 GameWorkStation 的 自托管 runner 上运行。
+# 自托管 runner 是由你在自己服务器上配置的 Runner（比 GitHub 提供的虚拟环境要更具控制性）。environment: PROD 表示工作将部署到生产环境
+jobs:
+  build_deploy:
+    runs-on: [self-hosted,qy-build]
+    environment: 
+      name: PROD
+    steps:
+      # 使用 GitHub Action V4版本
+      - name: Checkout code 
+        uses: actions/checkout@v4
+      # 从 GitHub 环境变量中提取仓库名称和当前标签（Git 标签），并将它们作为环境变量保存到 GITHUB_ENV。
+      #	•	GITHUB_REPOSITORY 是 GitHub 仓库的完整路径（例如 username/repo-name），这段脚本提取出仓库名称部分（例如 repo-name）并保存到 REPO_NAME 环境变量。
+      #	•	GITHUB_REF 是当前 Git 参考，通常是 refs/tags/prod.v*，这个脚本从中提取出标签部分，保存为 CURRENT_TAG 环境变量。
+      - name: Extract repo and tag name
+        run: |
+          REPO_NAME="${GITHUB_REPOSITORY##*/}"
+          echo "REPO_NAME=$REPO_NAME" >> $GITHUB_ENV
+          echo "CURRENT_TAG=${GITHUB_REF#refs/*/}" >> $GITHUB_ENV
+      # 读取 Docker Compose 文件 (docker/docker-compose.yml) 并将其内容转换为 base64 编码的字符串。
+      # 然后将这个编码后的字符串存储到环境变量 DOCKER_COMPOSE 中。这样做是为了能够将 Compose 文件安全地传递到下一个步骤或部署目标。
+      - name: Read compose file set as env var
+        run: |
+          echo "DOCKER_COMPOSE=$(cat ./docker-compose.yml | base64 -w 0)" >> $GITHUB_ENV
+      # 登录到 GitHub Container Registry（ghcr.io），这样你就可以推送 Docker 镜像到 GitHub 的容器注册表。
+      # 登录凭据通过 GitHub Action 中的 secrets.GHCR_TOKEN 获取（通常需要在 GitHub 仓库的设置中创建一个 Token）。
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}  # 触发工作流github用户名
+          password: ${{ secrets.GHCR_TOKEN }}  # 名为 GHCR_TOKEN 的token 组织设置的
+      # 使用 Docker 构建并推送 Docker 镜像到 GitHub 容器注册表。
+      #	•	context: .：指定构建上下文为当前工作目录。
+      #	•	file: ./docker/Dockerfile：指定 Dockerfile 的位置。
+      #	•	push: true：构建完成后将镜像推送到容器注册表。
+      #	•	tags：为镜像指定两个标签，一个是根据当前标签（CURRENT_TAG）构建，另一个是 latest。
+      - name: Build and Push Docker image
+        uses: docker/build-push-action@v5  # 官方操作
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          # | 表示多个标签
+          tags: |
+            ghcr.io/helloworlddev/${{ env.REPO_NAME }}:${{ env.CURRENT_TAG }}
+            ghcr.io/helloworlddev/${{ env.REPO_NAME }}:latest
+      # 通过 SSH 连接到生产服务器，并执行一系列操作：
+      #	1.	获取 Docker Compose 文件：将先前保存的 base64 编码的 Docker Compose 文件解码并写入到文件中。
+      #	2.	替换占位符：使用 sed 命令替换 Docker Compose 文件中的占位符 {{REPO_TAG}} 和 {{REPO_NAME}}，用当前的标签和仓库名称替换它们。
+      #	3.	部署到生产环境：使用 docker stack deploy 命令通过 Docker Swarm 将应用部署到生产环境。docker stack deploy 是用于在 Swarm 集群中部署和管理服务的命令。
+      #	4.	清理临时文件：删除生成的临时 Docker Compose 文件。
+      - name: Deploy to Server via SSH
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ vars.PROD_SWARM_ADMIN_NODE }}
+          username: worker
+          key: ${{ secrets.PROD_SSH_KEY }}
+          port: 22
+          script: |
+            DOCKER_COMPOSE_FILE="${{ env.REPO_NAME }}-docker-compose.yml"
+            echo "${{ env.DOCKER_COMPOSE}}" | base64 -d > $DOCKER_COMPOSE_FILE
+            sed -i 's/{{REPO_TAG}}/${{ env.CURRENT_TAG }}/g' $DOCKER_COMPOSE_FILE
+            sed -i 's/{{REPO_NAME}}/${{ env.REPO_NAME }}/g' $DOCKER_COMPOSE_FILE
+
+            docker stack deploy -c $DOCKER_COMPOSE_FILE ${{ env.REPO_NAME }}
+            rm -f $DOCKER_COMPOSE_FILE
