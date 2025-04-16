@@ -83,7 +83,8 @@ def test_data_convert_step2():
 
 def test_data_convert_step2_length_strict():
     """ 长度限制 """
-    with open(str(root_dir() / 'data' / 'cz_media.json'), 'r', encoding='utf-8') as f:
+    with open(str(root_dir() / 'data' / ''
+                                        '.json'), 'r', encoding='utf-8') as f:
         data = json.load(f)
     converted = [{"id": idx + 1, "text": item["response"]} for idx, item in enumerate(data) if len(item["response"]) > 50]
     with open(str(root_dir() / 'data' / 'cz_media2_length_strict.json'), 'w', encoding='utf-8') as f:
