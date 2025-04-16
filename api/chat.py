@@ -13,19 +13,7 @@ chat_router = APIRouter()
 
 
 @chat_router.post('/generate_cz_tweet')
-def generate_cz_tweet(responses={
-    200: {
-        "description": "Tweet generation successful",
-        "content": {
-            "application/json": {
-                "example": {
-                    "message": "Tweet generated successfully",
-                    "tweet": "RT @BinanceWallet: 🚀 Enjoy zero trading fees on all swaps in #Binance Wallet for the next 6 months! Start trading now! 🔥"
-                }
-            }
-        }
-    }
-}):
+def generate_cz_tweet():
     cz = CZ()
     resp = cz.cp.invoke(cz.run, 'generate a cz tweet')
     return resp

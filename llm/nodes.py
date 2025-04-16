@@ -147,7 +147,7 @@ class OllamaNode(LLMNode):
         self.ollama = Client(host=self.conf.BASE_URL)
         lgr.debug(f'Ollama node init from {self.conf.BASE_URL} ---> model: {self.conf.MODEL}')
 
-    async def chat(self, msg: List[Dict], *args, **kwargs) -> Union[str, List[Message]]:
+    async def chat(self, msg: Union[List[Dict], str], *args, **kwargs) -> Union[str, List[Message]]:
         # same as gpt, although there are no errors in streaming chat while fc. default non-stream fc
         stream = self.conf.STREAM
         if kwargs.get('tools'):
