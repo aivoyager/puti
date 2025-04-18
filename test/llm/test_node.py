@@ -10,7 +10,7 @@ import openai
 import time
 
 from llm.nodes import LLMNode
-from conf.llm_config import OpenaiConfig
+from conf.llm_config import OpenaiConfig, LlamaConfig
 from llm.nodes import OpenAINode
 from llm.nodes import OllamaNode
 from conf.llm_config import LlamaConfig
@@ -66,13 +66,17 @@ def test_llm_create():
 
 def test_action_node():
     messages = [
-        {"role": "system", "content": "You are an AI assistant."},
-        {"role": "user", "content": "What is the capital of France?"}
+        {"role": "system", "content": 'You play a role in the blockchain area called "赵长鹏" （cz or changpeng zhao）.'
+                                      ' Reply with his accent（learn from recent tweeting styles by search result).'},
+        {"role": "user", "content": "Come up a tweet related to topic:'所有平台都在做 Meme Launchpad', which tweet characters must between 100 and 250. Just give the tweet, nothing extra.Easier to understand(English).Express some of my own opinions on this topic.Make sure you fully understand the relevant concepts of this topic and ensure the logic and rationality of the tweets you post about this topic. Be more diverse and don't always use fixed catchphrases.Your cognition is limited. For some unfamiliar fields, reply to tweets like a normal person. Sometimes casually, sometimes seriously. Don't act too much like an expert.Analyze cz's recent 30 tweet style (Retweets are not counted)."}
+        # {"role": "user", "content": "给我cz的最近3条推文"}
     ]
     # messages = Message.from_messages(messages)
 
-    llm_conf = OpenaiConfig()
-    openai_node = OpenAINode(llm_name='openai', conf=llm_conf)
+    # llm_conf = OpenaiConfig()
+    llm_conf = LlamaConfig()
+    # openai_node = OpenAINode(llm_name='openai', conf=llm_conf)
+    openai_node = OllamaNode(llm_name='ollama', conf=llm_conf)
     resp = asyncio.run(openai_node.chat(messages))
     print('')
 
