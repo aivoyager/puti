@@ -9,12 +9,15 @@ from datetime import date
 import openai
 import time
 
+from logs import logger_factory
 from llm.nodes import LLMNode
 from conf.llm_config import OpenaiConfig, LlamaConfig
 from llm.nodes import OpenAINode
 from llm.nodes import OllamaNode
 from conf.llm_config import LlamaConfig
 from utils.path import root_dir
+
+lgr = logger_factory.default
 
 
 def test_file_upload():
@@ -58,9 +61,20 @@ def test_file_upload():
 
 
 def test_llm_create():
-    llm_conf = OpenaiConfig()
+    # llm_conf = OpenaiConfig()
     # llm = LLM(llm_name='openai')
-    llm2 = LLMNode(llm_name='openai')
+    llm2 = OpenAINode(llm_name='openai')
+    resp = asyncio.run(llm2.chat([{'role': "user", 'content': 'hello'}]))
+    print('')
+
+
+def test_message_token_cost():
+    from utils.llm_cost import count_gpt_message_tokens
+    llm2 = OpenAINode(llm_name='openai')
+    lgr.debug('test_message_token_cost')
+    resp = asyncio.run(llm2.chat([{'role': "user", 'content': 'hello'}]))
+    prompt_token = count_gpt_message_tokens([{'role': "user", 'content': 'hello'}], model=llm2.conf.MODEL)
+
     print('')
 
 

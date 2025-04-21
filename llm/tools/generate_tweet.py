@@ -3,31 +3,76 @@
 @Time:  2025-04-09 16:35
 @Description:  
 """
+import json
 import re
 import asyncio
 
+from utils.path import root_dir
 from abc import ABC
 from llm.tools import BaseTool, ToolArgs
 from pydantic import ConfigDict, Field
 from llm.nodes import OllamaNode, LLMNode
-from conf.llm_config import LlamaConfig
+from conf.llm_config import LlamaConfig, OpenaiConfig
+from llm.nodes import OpenAINode
 from logs import logger_factory
+from constant.llm import RoleType
+from llm.messages import Message, SystemMessage, UserMessage
 
 lgr = logger_factory.llm
+model = 'gemini-2.5-pro-preview-03-25'
 
 
 class GenerateCzArgs(ToolArgs):
-    topic: str = Field(description='Whether the generated tweets need to be related to a hot topic.')
+    topic: str = Field(default='', description="It is necessary to determine whether the user's intention is to want a tweet about a specific topic. "
+                                   "If so, then pass in this parameter as the corresponding topic; otherwise, don't pass this parameter."
+                       )
 
 
-class GenerateCzTweet(BaseTool, ABC):
+class GenerateTweet(BaseTool, ABC):
     model_config = ConfigDict(arbitrary_types_allowed=True, extra="allow")
 
-    name: str = 'generate_cz_tweet'
-    desc: str = 'Use this tool to generate a cz tweet can be posted on twitter.'
-    topic: GenerateCzArgs = None
+    name: str = 'generate_tweet'
+    desc: str = 'Use this tool to generate/post a tweet can be posted on twitter/x.'
+    args: GenerateCzArgs = None
 
     async def run(self, topic='', *args, **kwargs):
+        conf = OpenaiConfig(MODEL=model)
+        gemini = OpenAINode(conf=conf)
+        topic_exp = f' related to topic: "{topic}"'
+        topic_constraint = (f'Express some of my own opinions on this topic, '
+                            f'Make sure you fully understand the relevant concepts of this topic, '
+                            f'Ensure the logic and rationality of the tweets you post about this topic.')
+        if not topic:
+            topic_exp = ''
+            topic_constraint = ''
+        sys = """
+You play a role in the blockchain area called "赵长鹏" （cz or changpeng zhao）. Reply with his accent（learn from recent tweeting styles by search result).
+"""
+        prompt = f"""
+Come up a tweet{topic_exp}, which tweet characters must between 100 and 250. Just give the tweet, nothing extra.
+Easier to understand(English).{topic_constraint}. Be more diverse and don't always use fixed catchphrases.
+Your cognition is limited. For some unfamiliar fields, reply to tweets like a normal person. Sometimes casually, sometimes seriously. 
+Don't act too much like an expert.Analyze cz's recent 30 tweet style (Retweets are not counted) from your search results. Return tweets and think process
+in following json format, 
+        """
+        json_format = '{"generated_tweet": Your generated tweet result, "think_process": Your think process result}.'
+        prompt += json_format
+
+        with open(root_dir() / 'data' / 'tweet_chunk.txt', 'r') as f:
+            his_tweets = f.read()
+        history_tweets_prompt = f'\nThe following are some historical tweets of cz that are separated by the === symbol as style references\n{his_tweets}'
+        prompt += history_tweets_prompt
+
+        message = [
+            SystemMessage(sys).to_message_dict(),
+            UserMessage(prompt).to_message_dict(),
+        ]
+        resp = await gemini.chat(message)
+        plain_resp = resp.lstrip('```json').rstrip('```').strip()
+        json_resp = json.loads(plain_resp)
+        return json_resp
+
+    async def run_r1_14b(self, topic='', *args, **kwargs):
         llm: LLMNode = kwargs.get('llm')
         prompt = """
 Below are instructions that describe the task, along with input that provides more context.

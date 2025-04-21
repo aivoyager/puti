@@ -27,7 +27,7 @@ from llm.nodes import LLMNode, OpenAINode
 from llm.messages import Message, ToolMessage, AssistantMessage, UserMessage
 from llm.envs import Env
 from llm.memory import Memory
-from utils.common import any_to_str
+from utils.common import any_to_str, is_valid_json
 from capture import Capture
 from llm.tools import ToolArgs
 from llm.nodes import OllamaNode
@@ -267,8 +267,14 @@ class Role(BaseModel):
                 return self._correction(fix_msg)
 
             if content:
+                json_match = re.search(r'({.*})', message_pure[-1]['content'], re.DOTALL)
+                think_process = ''
+                if json_match:
+                    match_group = json_match.group()
+                    if is_valid_json(match_group):
+                        think_process = json.loads(match_group).get('think_process', '')
                 self.answer = AssistantMessage(content=content, sender=self.name)
-                return False, content
+                return False, json.dumps({'final_answer': content, 'think_process': think_process})
             else:
                 fix_msg = 'Your returned json data does not have a "FINAL ANSWER" key. Please check'
                 return self._correction(fix_msg)

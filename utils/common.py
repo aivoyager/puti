@@ -209,7 +209,8 @@ def unwrap_annotated(field_type: Any) -> (Any, str, List[Any]):
         base_type, *meta = get_args(field_type)
         description = meta[0] if isinstance(meta[0], str) else ""
         constraints = meta[1:] if len(meta) > 1 else []
-        base_type, nested_desc, nested_constraints = unwrap_annotated(base_type) if get_origin(base_type) else (base_type, description, constraints)
+        base_type, nested_desc, nested_constraints = unwrap_annotated(base_type) if get_origin(base_type) else (
+        base_type, description, constraints)
         return base_type, nested_desc or description, nested_constraints
     return field_type, "", []
 
@@ -289,7 +290,8 @@ def tool_args_to_fc_schema(model_cls: Type['BaseModel']):
         pydf: FieldInfo = model_cls.__fields__.get(field_name)
         field_desc = pydf.description if pydf else "No description provided"
         schema["properties"][field_name] = parse_type(field_info, field_desc)
-        schema["required"].append(field_name)
+        if pydf.is_required():
+            schema["required"].append(field_name)
 
     return schema
 
@@ -332,3 +334,11 @@ def request_url(url, method, *, error_display='', raise_err=False, **kwargs):
                 raise Exception(error_display)
         else:
             return Box(resp.json())
+
+
+def is_valid_json(s: str) -> bool:
+    try:
+        json.loads(s)
+        return True
+    except json.JSONDecodeError:
+        return False

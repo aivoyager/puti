@@ -4,6 +4,7 @@
 @Description:  
 """
 import asyncio
+import json
 import traceback
 
 from twikit.errors import Unauthorized
@@ -12,7 +13,7 @@ from inspect import iscoroutinefunction
 from typing import Union, Dict
 from pydantic import BaseModel, ConfigDict
 from logs import logger_factory
-from utils.common import get_structured_exception
+from utils.common import get_structured_exception, is_valid_json
 from core.resp import Response
 from constant.base import Resp
 
@@ -64,7 +65,8 @@ class Capture(BaseModel):
             structured_e = self._e_handled(e)
             return Response.default(code=Resp.CP_ERR.val, msg=Resp.CP_ERR.dsp, data=structured_e)
         else:
-            return Response.default(data=rs)
+            data = json.loads(rs) if is_valid_json(rs) else rs
+            return Response.default(data=data)
 
     def _e_handled(self, e: Exception) -> Union[str, Dict[str, str]]:
         desc = traceback.format_exc()

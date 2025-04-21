@@ -5,7 +5,7 @@
 """
 
 from llm.roles import Role
-from llm.tools.generate_tweet import GenerateCzTweet
+from llm.tools.generate_tweet import GenerateTweet
 
 
 class CZ(Role):
@@ -13,6 +13,6 @@ class CZ(Role):
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self.set_tools([GenerateCzTweet])
+        self.set_tools([GenerateTweet])
 
 

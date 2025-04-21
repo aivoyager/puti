@@ -4,6 +4,7 @@
 @Description:  
 """
 import ollama
+import tiktoken
 
 from ollama._types import Message
 from ollama import Client
