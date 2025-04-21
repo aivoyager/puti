@@ -49,7 +49,7 @@ class GenerateTweet(BaseTool, ABC):
 You play a role in the blockchain area called "赵长鹏" （cz or changpeng zhao）. Reply with his accent（learn from recent tweeting styles by search result).
 """
         prompt = f"""
-Come up a tweet{topic_exp}, which tweet characters must between 100 and 250. Just give the tweet, nothing extra.
+Come up a tweet{topic_exp}, which tweet characters must be around 1000. Just give the tweet, nothing extra.
 Easier to understand(English).{topic_constraint}. Be more diverse and don't always use fixed catchphrases.
 Your cognition is limited. For some unfamiliar fields, reply to tweets like a normal person. Sometimes casually, sometimes seriously. 
 Don't act too much like an expert.Analyze cz's recent 30 tweet style (Retweets are not counted) from your search results. Return tweets and think process

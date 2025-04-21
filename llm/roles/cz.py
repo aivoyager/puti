@@ -4,15 +4,9 @@
 @Description:  
 """
 
-from llm.roles import Role
+from llm.roles import McpRole
 from llm.tools.generate_tweet import GenerateTweet
 
 
-class CZ(Role):
+class CZ(McpRole):
     name: str = 'cz or 赵长鹏 or changpeng zhao'
-
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-        self.set_tools([GenerateTweet])
-
-

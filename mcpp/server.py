@@ -11,7 +11,7 @@ import argparse
 import json
 
 from llm.tools.debate import Debate
-from llm.tools.talk import Reply
+from llm.tools.generate_tweet import GenerateTweet
 from llm.tools.demo import GetFlightInfo
 from inspect import Parameter, Signature
 from pydantic import BaseModel, Field, ConfigDict
@@ -109,5 +109,5 @@ class MCPServer(BaseModel):
 
 if __name__ == '__main__':
     mcp = MCPServer()
-    mcp.add_tools([GetFlightInfo, Debate])
+    mcp.add_tools([GenerateTweet])
     mcp.run()
