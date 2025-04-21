@@ -46,4 +46,4 @@ dist/
 secrets.json
 
 data/
-
+!data/tweet_chunk.txt
