@@ -124,6 +124,7 @@ class OpenAINode(LLMNode):
                 print(chunk_message, end='')
                 collected_messages.append(chunk_message)
             full_reply = ''.join(collected_messages)
+            lgr.debug(full_reply)
             return full_reply
         else:
             resp: ChatCompletion = self.cli.chat.completions.create(
@@ -139,6 +140,7 @@ class OpenAINode(LLMNode):
                 return resp.choices[0].message
             else:
                 full_reply = resp.choices[0].message
+            lgr.debug(full_reply)
             return full_reply
 
 
