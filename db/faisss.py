@@ -24,8 +24,8 @@ class FaissIndex(BaseModel):
 
     node: LLMNode = Field(default_factory=OpenAINode, validate_default=True)
     index: IndexIDMap = Field(default=None)
-    from_file: Path = Field(default=root_dir() / 'data' / 'test.json', validate_default=True)
-    to_file: Path = Field(default=root_dir() / 'db' / 'test.index', validate_default=True)
+    from_file: Path = Field(default=root_dir() / 'data' / 'cz_filtered.json', validate_default=True, description='create db.index from current file if to_file not existed')
+    to_file: Path = Field(default=root_dir() / 'db' / 'cz_filtered.index', validate_default=True, description='destination file')
     conf: LLMConfig = Field(default_factory=OpenaiConfig, validate_default=True)
 
     def get_embeddings(self, texts) -> np.array:
@@ -54,7 +54,7 @@ class FaissIndex(BaseModel):
                 data = json.load(f)
 
             texts = [item['text'] for item in data]
-            ids = [int(item['id']) for item in data]  # FAISS 要求 ID 是 int64
+            ids = [int(item['id']) for item in data]
 
             vectors = self.get_embeddings(texts)
 
