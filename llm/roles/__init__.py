@@ -12,6 +12,7 @@ import pkgutil
 import inspect
 import threading
 
+from db.faisss import FaissIndex
 from functools import partial
 from ollama._types import Message as OMessage
 from llm.prompts import prompt_setting
@@ -110,6 +111,12 @@ class Role(BaseModel):
     tool_calls_one_round: List[str] = Field(default=[], description='tool calls one round contains tool call id')
 
     cp: SerializeAsAny[Capture] = Field(default_factory=Capture, validate_default=True, description='Capture exception')
+    faiss_db: SerializeAsAny[FaissIndex] = Field(
+        default_factory=lambda: FaissIndex(
+            from_file=str(root_dir() / 'data' / 'cz_filtered.json'),
+            to_file=str(root_dir() / 'db' / 'cz_filtered.index')
+        ),
+        validate_default=True, description='faiss vector database')
 
     __hash__ = object.__hash__
 

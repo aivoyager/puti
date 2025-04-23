@@ -46,7 +46,10 @@ class FaissIndex(BaseModel):
         embeddings = self.get_embeddings(query)
         distance, indices = self.index.search(embeddings, self.conf.FAISS_SEARCH_TOP_K)
         origin = self.get_origin_by_ids(indices)
-        return distance, origin
+        # drop duplicates
+        unique_texts, unique_indices = np.unique(origin, return_index=True)
+        dis_drop_dup = distance[:, unique_indices]
+        return dis_drop_dup, unique_texts
 
     def model_post_init(self, __context: Any) -> None:
         if not self.to_file.exists():
