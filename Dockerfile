@@ -4,7 +4,7 @@ WORKDIR /puti
 COPY . /puti
 
 RUN apt-get update && \
-    apt-get install -y vim lsof curl && \
+    apt-get install -y vim lsof curl swig && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 

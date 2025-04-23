@@ -21,10 +21,10 @@ uvicorn==0.34.0
 websocket_client==1.8.0
 mypy==1.15.0
 ollama==0.4.7
-# faiss-cpu
-pandas==2.1.1
-colorama
-twikit
-python-box
-openai
-mcp
+pandas==2.2.3
+colorama==0.4.6
+twikit==2.3.3
+python-box==7.3.2
+openai==1.65.4
+mcp==1.6.0
+faiss-cpu==1.10.0
