@@ -100,10 +100,10 @@ class MCPServer(BaseModel):
             }
 
             self.server.tool()(tool_dynamic)
-            lgr.info(f'add tool [{obj.name}] to mpc')
+            lgr.info(f'add tool `{obj.name}` to mpc')
 
     def run(self):
-        lgr.info('MCPServer start')
+        lgr.info('mcp server started...')
         self.server.run(transport=self.transport.val)
 
 

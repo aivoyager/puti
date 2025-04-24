@@ -144,6 +144,19 @@ def test_generate_cot():
         print('')
 
 
+def test_openai_node_cost():
+    """测试OpenAINode的cost计算功能，覆盖常用模型和典型输入输出场景"""
+    llm2 = OpenAINode(llm_name='openai')
+    messages = [
+        {'role': "user", 'content': '哈哈哈哈哈哈'},
+    ]
+    resp = asyncio.run(llm2.chat(messages))
+    cost = getattr(llm2, 'cost', None)
+    # print(f"cost: {cost}")
+    assert cost is not None and cost.total_cost > 0, "cost计算应大于0"
+    # 可根据需要添加不同模型、不同输入的测试
+
+
 
 
 

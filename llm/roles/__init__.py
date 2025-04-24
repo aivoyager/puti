@@ -118,12 +118,13 @@ class Role(BaseModel):
         ),
         validate_default=True, description='faiss vector database')
 
-    __hash__ = object.__hash__
+    __hash__ = object.__hash__  # make sure hashable can be regarded as dict key
 
     @model_validator(mode='after')
     def check_address(self):
         if not self.address:
             self.address = {f'{any_to_str(self)}.{self.name}'}
+        return self  # return self for avoiding warning
 
     @property
     def sys_think_msg(self) -> Optional[Dict[str, str]]:
@@ -199,7 +200,7 @@ class Role(BaseModel):
         if len(self.rc.news) == 0:
             lgr.debug(f'{self} no new messages, waiting.')
         else:
-            new_texts = [f'{m.role.val}: {m.content[:20]}...' for m in self.rc.news]
+            new_texts = [f'{m.role.val}: {m.content[:40]}...' for m in self.rc.news]
             lgr.debug(f'{self} perceive {new_texts}.')
         return True if len(self.rc.news) > 0 else False
 
@@ -410,4 +411,4 @@ class McpRole(Role):
             await self._initialize_session()
             await self._initialize_tools()
             self.initialized = True
-            lgr.debug(f'[{self.name}] mcp client initial successfully')
+            lgr.debug(f'`{self.name}` mcp role initial successfully')

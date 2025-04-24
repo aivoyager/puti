@@ -54,17 +54,6 @@ async def analyze_topic(text: str, node: OllamaNode) -> str:
     )
     return extract_think_content(response)
 
-async def analyze_topic2(text: str, node: OllamaNode) -> str:
-    """使用LLM分析文本提取核心主题"""
-    response = await node.chat(
-        msg=[
-            {"role": "system", "content": "你是一个专业的内容分析师，请分析以下文本并1个核心主题, 只给出核心主题即可"},
-            {"role": "user", "content": text}
-        ],
-        # temperature=0.5
-    )
-    return extract_think_content(response)
-
 def extract_think_content(text):
     import re
     # 使用正则表达式匹配并去除 <think> 和 </think> 标签
@@ -80,18 +69,6 @@ async def generate_prompts(theme: str, node: OllamaNode) -> list:
     response = await node.chat(
         messages=[
             {"role": "system", "content": "请根据以下主题生成3条风格完全不同的推文指令。要求：1条提问式，1条感叹式，1条双语混合式。每条指令必须包含主题关键词，且风格差异明显。返回格式：指令1###指令2###指令3"},
-            {"role": "user", "content": f"主题：{theme}"}
-        ],
-        # temperature=0.7
-    )
-    return extract_think_content(response)
-
-async def generate_prompts2(theme: str, node: OllamaNode) -> list:
-    """LLM生成3种不同风格的推文指令"""
-    import re
-    response = await node.chat(
-        messages=[
-            {"role": "system", "content": "请根据以下主题生成一条推文指令。风格为：提问式或感叹式或双语混合式。指令必须包含主题关键词。返回格式：指令"},
             {"role": "user", "content": f"主题：{theme}"}
         ],
         # temperature=0.7
@@ -126,12 +103,12 @@ async def test_check_and_fix_questions():
         is_reasonable = await is_question_reasonable(text, question, node)
         if not is_reasonable:
             # 重新生成question
-            theme = await analyze_topic2(text, node)
+            theme = await analyze_topic(text, node)
             template = random.choice(PROMPT_TEMPLATES)
-            new_question = template.format(theme=theme)
+            q = random.choice(random.choice(theme.split('\n')).split('/'))
+            new_question = template.format(theme=q)
             item['question'] = new_question
             changed = True
-            print(f'q: {new_question} ||| text: {text}')
     if changed:
         with open(filter_json_path, 'w', encoding='utf-8') as f:
             json.dump(data, f, ensure_ascii=False, indent=2)
@@ -149,5 +126,5 @@ async def is_question_reasonable(text: str, question: str, node: OllamaNode) -> 
     ]
     resp = await node.chat(msg=check_prompt)
     resp = extract_think_content(resp)
-    return False if '不合理' in resp else True
+    return '合理' in resp
 

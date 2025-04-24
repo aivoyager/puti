@@ -15,7 +15,7 @@ from typing import Dict, Tuple, Type, Any, Union
 from conf.llm_config import LLMConfig, OpenaiConfig
 from openai import AsyncOpenAI, OpenAI
 from abc import ABC, abstractmethod
-from llm.cost import Cost
+from llm.cost import CostManager
 from logs import logger_factory
 from openai import AsyncStream
 from openai.types.chat import ChatCompletionChunk
@@ -37,7 +37,7 @@ class LLMNode(BaseModel, ABC):
     system_prompt: List[dict] = [{'role': RoleType.SYSTEM.val, 'content': 'You are a helpful assistant.'}]
     acli: Optional[Union[AsyncOpenAI, Client]] = Field(None, description='Cli connect with llm.', exclude=True)
     cli: Optional[Union[OpenAI]] = Field(None, description='Cli connect with llm.', exclude=True)
-    cost: Optional[Cost] = None
+    cost: Optional[CostManager] = None
 
     def model_post_init(self, __context):
         if self.llm_name == 'openai':
@@ -47,6 +47,8 @@ class LLMNode(BaseModel, ABC):
                 self.acli = AsyncOpenAI(base_url=self.conf.BASE_URL, api_key=self.conf.API_KEY)
             if not self.cli:
                 self.cli = OpenAI(base_url=self.conf.BASE_URL, api_key=self.conf.API_KEY)
+        if not self.cost:
+            self.cost = CostManager()
 
     def create_model_class(cls, class_name: str, mapping: Dict[str, Tuple[Type, Any]]):
         """基于pydantic v2的模型动态生成，用来检验结果类型正确性"""
@@ -95,7 +97,6 @@ class OpenAINode(LLMNode):
         stream = self.conf.STREAM
         if kwargs.get('tools'):
             stream = False
-
         if stream:
             resp: AsyncStream[ChatCompletionChunk] = await self.acli.chat.completions.create(
                 messages=msg,
@@ -108,23 +109,12 @@ class OpenAINode(LLMNode):
             )
             collected_messages = []
             async for chunk in resp:
-                # TODO: Tool call in async seem have some issue, like lack params given
-                # if chunk.choices[0].delta.tool_calls:
-                #     return chunk.choices[0].delta.tool_calls
                 chunk_message = chunk.choices[0].delta.content or '' if chunk.choices else ''
-                finish_reason = (chunk.choices[0].finish_reason if chunk.choices and hasattr(chunk.choices[0], 'finish_reason') else None)
-                chunk_has_usage = hasattr(chunk, 'usage') and chunk.usage
-                # TODO: get chunk usage
-                if finish_reason:
-                    if chunk_has_usage:
-                        usage = chunk.usage
-                    elif hasattr(chunk.choices[0], 'usage'):
-                        usage = CompletionUsage(**chunk.choices[0].usage)
-                    print('\n')
                 print(chunk_message, end='')
                 collected_messages.append(chunk_message)
             full_reply = ''.join(collected_messages)
-            lgr.debug(full_reply)
+            self.cost.handle_chat_cost(msg, full_reply, self.conf.MODEL)
+            lgr.info(f"cost: {self.cost.total_cost}")
             return full_reply
         else:
             resp: ChatCompletion = self.cli.chat.completions.create(
@@ -137,10 +127,14 @@ class OpenAINode(LLMNode):
                 **kwargs
             )
             if resp.choices[0].message.tool_calls:
+                completion_text = resp.choices[0].message.content if hasattr(resp.choices[0].message, 'content') else ''
+                self.cost.handle_chat_cost(msg, completion_text, self.conf.MODEL)
+                lgr.info(f"cost: {self.cost.total_cost}")
                 return resp.choices[0].message
             else:
-                full_reply = resp.choices[0].message
-            lgr.debug(full_reply)
+                full_reply = resp.choices[0].message.content if hasattr(resp.choices[0].message, 'content') else ''
+                self.cost.handle_chat_cost(msg, full_reply, self.conf.MODEL)
+                lgr.info(f"cost: {self.cost.total_cost}")
             return full_reply
 
 
@@ -148,10 +142,9 @@ class OllamaNode(LLMNode):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.ollama = Client(host=self.conf.BASE_URL)
-        lgr.debug(f'Ollama node init from {self.conf.BASE_URL} ---> model: {self.conf.MODEL}')
+        lgr.debug(f'ollama node: {self.conf.BASE_URL} model: {self.conf.MODEL}')
 
     async def chat(self, msg: Union[List[Dict], str], *args, **kwargs) -> Union[str, List[Message]]:
-        # same as gpt, although there are no errors in streaming chat while fc. default non-stream fc
         stream = self.conf.STREAM
         if kwargs.get('tools'):
             stream = False
@@ -166,10 +159,12 @@ class OllamaNode(LLMNode):
             for chunk in response:
                 collected_messages.append(chunk.message.content)
             full_reply = ''.join(collected_messages)
+            lgr.debug('ollama has not cost yet')
         else:
             if response.message.tool_calls:
                 return response.message
             full_reply = response.message.content
+            lgr.debug('ollama has not cost yet')
         return full_reply
 
 

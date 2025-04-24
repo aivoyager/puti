@@ -105,7 +105,7 @@ class Toolkit(BaseModel, ABC):
     def remove_tool(self, tool_name: str):
         if tool_name in self.tools:
             self.tools.pop(tool_name)
-            lgr.debug(f'{tool_name} has been removed from toolkit')
+            # lgr.debug(f'{tool_name} has been removed from toolkit')
         else:
             lgr.warning('Removal did not take effect, {} not found in toolkit'.format(tool_name))
 
