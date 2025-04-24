@@ -9,6 +9,8 @@ from datetime import date
 import openai
 import time
 
+import pytest
+
 from logs import logger_factory
 from llm.nodes import LLMNode
 from conf.llm_config import OpenaiConfig, LlamaConfig
@@ -82,7 +84,8 @@ def test_action_node():
     messages = [
         {"role": "system", "content": 'You play a role in the blockchain area called "赵长鹏" （cz or changpeng zhao）.'
                                       ' Reply with his accent（learn from recent tweeting styles by search result).'},
-        {"role": "user", "content": "Come up a tweet related to topic:'所有平台都在做 Meme Launchpad', which tweet characters must between 100 and 250. Just give the tweet, nothing extra.Easier to understand(English).Express some of my own opinions on this topic.Make sure you fully understand the relevant concepts of this topic and ensure the logic and rationality of the tweets you post about this topic. Be more diverse and don't always use fixed catchphrases.Your cognition is limited. For some unfamiliar fields, reply to tweets like a normal person. Sometimes casually, sometimes seriously. Don't act too much like an expert.Analyze cz's recent 30 tweet style (Retweets are not counted)."}
+        {"role": "user",
+         "content": "Come up a tweet related to topic:'所有平台都在做 Meme Launchpad', which tweet characters must between 100 and 250. Just give the tweet, nothing extra.Easier to understand(English).Express some of my own opinions on this topic.Make sure you fully understand the relevant concepts of this topic and ensure the logic and rationality of the tweets you post about this topic. Be more diverse and don't always use fixed catchphrases.Your cognition is limited. For some unfamiliar fields, reply to tweets like a normal person. Sometimes casually, sometimes seriously. Don't act too much like an expert.Analyze cz's recent 30 tweet style (Retweets are not counted)."}
         # {"role": "user", "content": "给我cz的最近3条推文"}
     ]
     # messages = Message.from_messages(messages)
@@ -110,7 +113,7 @@ def test_ollama():
                 'content': 'You play a role in the blockchain area called "赵长鹏" （cz or changpeng zhao）. '
                            'Reply with his accent, speak in his habit.'
                            'He goes by the Twitter name CZ �� BNB or cz_binance and is commonly known as cz.'
-                            'Now post a tweet. Follow these points'
+                           'Now post a tweet. Follow these points'
                            "1. Don't @ others, mention others. Don't ReTweet(RT) other tweet."
                            "2. Your tweet don't include media, so try to be as complete as possible."
                            f"3. If tweet published has any time factor, today is {str(date.today())}, check the language for legitimacy and logic."
@@ -123,7 +126,7 @@ def test_ollama():
         resp.append(cleaned)
     with open('./text1.txt', 'w', encoding='utf-8') as f:
         for i in range(len(resp)):
-            f.write(f'{i+1} ---> {resp[i]}\n')
+            f.write(f'{i + 1} ---> {resp[i]}\n')
     print(res)
 
 
@@ -157,6 +160,21 @@ def test_openai_node_cost():
     # 可根据需要添加不同模型、不同输入的测试
 
 
+async def test_async_singleton_behavior():
+    node1 = OpenAINode()
+    node2 = await asyncio.get_event_loop().run_in_executor(None, OpenAINode)
+    assert id(node1) == id(node2)
 
 
+def test_ollama_singleton():
+    ollama1 = OllamaNode()
+    ollama2 = OllamaNode()
+    assert id(ollama1) == id(ollama2)
 
+
+async def test_concurrent_instances():
+    async def create_instance():
+        return OpenAINode()
+
+    results = await asyncio.gather(*[create_instance() for _ in range(5)])
+    assert all(r is results[0] for r in results)

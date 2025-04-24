@@ -200,7 +200,7 @@ class Role(BaseModel):
         if len(self.rc.news) == 0:
             lgr.debug(f'{self} no new messages, waiting.')
         else:
-            new_texts = [f'{m.role.val}: {m.content[:40]}...' for m in self.rc.news]
+            new_texts = [f'{m.role.val}: {m.content[:60]}...' for m in self.rc.news]
             lgr.debug(f'{self} perceive {new_texts}.')
         return True if len(self.rc.news) > 0 else False
 

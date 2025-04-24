@@ -24,6 +24,7 @@ from openai.types import CompletionUsage
 from conf.llm_config import LlamaConfig
 from openai.types.chat.chat_completion_chunk import ChoiceDeltaToolCall
 from openai.types.chat.chat_completion_message import ChatCompletionMessage
+from utils.singleton import singleton
 
 
 lgr = logger_factory.llm
@@ -36,7 +37,7 @@ class LLMNode(BaseModel, ABC):
     conf: LLMConfig = Field(default_factory=OpenaiConfig, validate_default=True)
     system_prompt: List[dict] = [{'role': RoleType.SYSTEM.val, 'content': 'You are a helpful assistant.'}]
     acli: Optional[Union[AsyncOpenAI, Client]] = Field(None, description='Cli connect with llm.', exclude=True)
-    cli: Optional[Union[OpenAI]] = Field(None, description='Cli connect with llm.', exclude=True)
+    cli: Optional[Union[OpenAI, Client]] = Field(None, description='Cli connect with llm.', exclude=True)
     cost: Optional[CostManager] = None
 
     def model_post_init(self, __context):
@@ -91,6 +92,7 @@ class LLMNode(BaseModel, ABC):
         """ Async chat """
 
 
+@singleton
 class OpenAINode(LLMNode):
 
     async def chat(self, msg: List[Dict], **kwargs) -> Union[str, ChatCompletionMessage]:
@@ -138,17 +140,18 @@ class OpenAINode(LLMNode):
             return full_reply
 
 
+@singleton
 class OllamaNode(LLMNode):
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-        self.ollama = Client(host=self.conf.BASE_URL)
-        lgr.debug(f'ollama node: {self.conf.BASE_URL} model: {self.conf.MODEL}')
+
+    def model_post_init(self, __context):
+        self.cli = Client(host=self.conf.BASE_URL)
+        lgr.info(f"ollama node init from {self.conf.BASE_URL} model: {self.conf.MODEL}")
 
     async def chat(self, msg: Union[List[Dict], str], *args, **kwargs) -> Union[str, List[Message]]:
         stream = self.conf.STREAM
         if kwargs.get('tools'):
             stream = False
-        response = self.ollama.chat(
+        response = self.cli.chat(
             model=self.conf.MODEL,
             messages=msg,
             stream=stream,
@@ -166,7 +169,3 @@ class OllamaNode(LLMNode):
             full_reply = response.message.content
             lgr.debug('ollama has not cost yet')
         return full_reply
-
-
-ollama_node = OllamaNode(llm_name='llama', conf=LlamaConfig())
-openai_node = OpenAINode(llm_name='openai', conf=OpenaiConfig())
