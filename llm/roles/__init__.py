@@ -411,4 +411,3 @@ class McpRole(Role):
             await self._initialize_session()
             await self._initialize_tools()
             self.initialized = True
-            lgr.debug(f'`{self.name}` mcp role initial successfully')
