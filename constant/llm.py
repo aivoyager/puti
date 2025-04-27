@@ -63,6 +63,7 @@ TOKEN_COSTS = {
     "gemini-1.5-flash": {"prompt": 0.000075, "completion": 0.0003},
     "gemini-1.5-pro": {"prompt": 0.0035, "completion": 0.0105},
     "gemini-1.0-pro": {"prompt": 0.0005, "completion": 0.0015},
+    'gemini-2.5-pro-preview-03-25': {'prompt': 0.00125, "completion": 0.010},
     "moonshot-v1-8k": {"prompt": 0.012, "completion": 0.012},  # prompt + completion tokens=0.012￥/k-tokens
     "moonshot-v1-32k": {"prompt": 0.024, "completion": 0.024},
     "moonshot-v1-128k": {"prompt": 0.06, "completion": 0.06},
