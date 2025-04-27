@@ -6,6 +6,7 @@
 import tiktoken
 
 from typing import List
+from openai.types.chat import ChatCompletionMessage
 from pydantic import BaseModel
 from constant.llm import TOKEN_COSTS
 
@@ -38,8 +39,8 @@ class CostManager(BaseModel):
             encoding = tiktoken.get_encoding("cl100k_base")
         tokens_per_message = 3  # 每条消息额外消耗3个token role content delimiter
         return sum(
-            len(encoding.encode(m['content'])) + tokens_per_message
-            for m in messages
+            len(encoding.encode(m['content'])) if not m['content'] is None else 0 + tokens_per_message
+            for m in messages if not isinstance(m, ChatCompletionMessage)
         )
 
     def estimate_gpt_cost(self, prompt_tokens: int, completion_tokens: int, model: str) -> float:

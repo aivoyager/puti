@@ -37,7 +37,7 @@ class CZ(McpRole):
         """.format(text)
         judge_rsp = await self.agent_node.chat([UserMessage.from_any(intention_prompt).to_message_dict()])
         if judge_rsp == '1':
-            resp = await super(CZ, self).run(*args, **kwargs)
+            resp = await super(CZ, self).run(text, *args, **kwargs)
         else:
             search_rsp = self.faiss_db.search(text)[1]
             numbered_rsp = []
