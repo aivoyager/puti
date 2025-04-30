@@ -3,11 +3,15 @@
 x_api.py
 封装推文发送与回复功能的API类
 """
+import json
 from typing import Optional
 import requests
 from typing import Optional
 from conf.client_config import TwitterConfig
 from requests_oauthlib import OAuth1Session, OAuth2Session
+from logs import logger_factory
+
+lgr = logger_factory.client
 
 
 class TwitterAPI:
@@ -43,14 +47,20 @@ class TwitterAPI:
         """
         url = f"{self.base_url}/tweets"
         payload = {"text": text}
-        if getattr(self, "auth_type", None) == "oauth1":
-            resp = self.oauth.post(url, json=payload)
-        else:
-            resp = requests.post(url, headers=self.headers, json=payload)
         try:
+            resp = None
+            if getattr(self, "auth_type", None) == "oauth1":
+                resp = self.oauth.post(url, json=payload, timeout=10)
+            else:
+                lgr.debug('post tweet by oauth2')
+                resp = requests.post(url, headers=self.headers, json=payload, timeout=10, verify=False)
+                lgr.debug(resp)
+            resp.raise_for_status()
             return resp.json()
+        except requests.Timeout:
+            return {"error": "请求超时", "status_code": getattr(resp, 'status_code', None)}
         except Exception as e:
-            return {"error": str(e), "status_code": resp.status_code}
+            return {"error": str(e), "status_code": getattr(resp, 'status_code', None)}
 
     def reply_tweet(self, text: str, in_reply_to_status_id: str) -> dict:
         """

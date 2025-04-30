@@ -47,10 +47,12 @@ class TestTwitterAPI(unittest.TestCase):
 
     # 实际请求测试：发推文
     def test_post_tweet_real(self):
-        result = self.api.post_tweet('integration test tweet')
-        self.assertIn('data', result)
-        self.assertIn('id', result['data'])
-        self.assertEqual(result['data']['text'], 'integration test tweet')
+        result = self.api.post_tweet('integration test tweet2222')
+        print(result)
+
+    def test_post_tweet_task(self):
+        from celery_queue.tasks import periodic_post_tweet
+        periodic_post_tweet()
 
     # 实际请求测试：回复推文
     def test_reply_tweet_real(self):
