@@ -24,3 +24,8 @@ def generate_cz_tweet(request: GenerateCzTweetRequest):
     cz = CZ()
     resp = cz.cp.invoke(cz.run, request.text)
     return resp
+
+
+@chat_router.get('/callback')
+def callback():
+    return "ok"

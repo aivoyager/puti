@@ -15,7 +15,8 @@ class TwitterAPI:
         self.config = config or TwitterConfig()
         self.base_url = "https://api.twitter.com/2"
         # 判断认证方式
-        if self.config.ACCESS_TOKEN and self.config.ACCESS_TOKEN_SECRET and self.config.API_KEY and self.config.API_SECRET_KEY:
+        # if self.config.ACCESS_TOKEN and self.config.ACCESS_TOKEN_SECRET and self.config.API_KEY and self.config.API_SECRET_KEY:
+        if False:
             # OAuth 1.0a 用户上下文
             self.auth_type = "oauth1"
             self.oauth = OAuth1Session(
@@ -28,7 +29,7 @@ class TwitterAPI:
             # OAuth 2.0 Bearer Token（用户上下文或应用上下文）
             self.auth_type = "oauth2"
             self.headers = {
-                "Authorization": f"Bearer {self.config.BEARER_TOKEN}",
+                "Authorization": f"Bearer {self.config.ACCESS_TOKEN}",
                 "Content-Type": "application/json"
             }
         else:

@@ -151,7 +151,7 @@ def test_openai_node_cost():
     """测试OpenAINode的cost计算功能，覆盖常用模型和典型输入输出场景"""
     llm2 = OpenAINode(llm_name='openai')
     messages = [
-        {'role': "user", 'content': '哈哈哈哈哈哈'},
+        {'role': "user", 'content': '生成一个香港的地址'},
     ]
     resp = asyncio.run(llm2.chat(messages))
     cost = getattr(llm2, 'cost', None)
