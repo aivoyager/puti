@@ -30,6 +30,7 @@ class CZ(McpRole):
     name: str = 'cz or 赵长鹏 or changpeng zhao'
 
     async def run(self, text, *args, **kwargs):
+        self.agent_node.conf.STREAM = False
         intention_prompt = """
         Determine the user's intention, whether they want to post or receive a tweet. 
         Only return 1 or 0. 1 indicates that the user wants you to give them a tweet; otherwise, it is 0.

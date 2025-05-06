@@ -55,7 +55,7 @@ class TestTwitterAPI(unittest.TestCase):
 
     # 实际请求测试：发推文
     def test_post_tweet_real(self):
-        result = asyncio.run(self.api.post_tweet('5.7 ws'))
+        result = asyncio.run(self.api.post_tweet('5.7 ws2'))
         # result = self.api.post_tweet('5.7')
         print(result)
 
