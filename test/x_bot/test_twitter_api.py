@@ -1,4 +1,11 @@
+import time
 import unittest
+import json
+import time
+import os
+import requests
+
+from utils.path import root_dir
 from unittest.mock import patch, MagicMock
 from client.twitter.x_api import TwitterAPI
 from conf.client_config import TwitterConfig
@@ -71,13 +78,14 @@ class TestTwitterAPI(unittest.TestCase):
 
     def test_generate_oauth2_authorize_url_and_access_token(self):
         """串联测试：自动获取授权码并用其获取access token"""
-        config = TwitterConfig()
-        redirect_uri = config.REDIRECT_URI if hasattr(config, 'REDIRECT_URI') else "http://127.0.0.1:8000/ai/puti/chat/callback"
-        scope = config.SCOPE if hasattr(config, 'SCOPE') else "tweet.read tweet.write users.read offline.access"
+        redirect_uri = self.config.REDIRECT_URI if hasattr(self.config,
+                                                           'REDIRECT_URI') else "http://127.0.0.1:8000/ai/puti/chat/callback"
+        scope = self.config.SCOPE if hasattr(self.config,
+                                             'SCOPE') else "tweet.read tweet.write users.read offline.access"
         state = "teststate"
         code_challenge = "testchallenge"
         code_challenge_method = "plain"
-        url = config.generate_oauth2_authorize_url(
+        url = self.config.generate_oauth2_authorize_url(
             redirect_uri=redirect_uri,
             scope=scope,
             state=state,
@@ -99,10 +107,68 @@ class TestTwitterAPI(unittest.TestCase):
         code_verifier = code_challenge  # plain模式下两者一致
 
         # 调用token获取逻辑
-        self._do_access_token_exchange(code, code_verifier, redirect_uri, config)
+        self._do_access_token_exchange(code, code_verifier, redirect_uri, self.config)
+
+    def test_refresh_access_token(self):
+        """测试使用refresh token获取新的access token"""
+        # 此处应该从存储中获取之前保存的refresh token
+        refresh_token = "WmhzRGRqdUdPVmlPQmhaanFMQTE0X1hVRF9QZVJocDlUZHhYdmthRVhldXUwOjE3NDY1MDEwNDk3NzE6MToxOnJ0OjE"  # 替换为实际保存的refresh token
+
+        self._do_refresh_token_exchange(refresh_token)
+
+    def _do_refresh_token_exchange(self, refresh_token):
+        import requests
+        CLIENT_ID = self.config.CLIENT_ID
+        CLIENT_SECRET = self.config.CLIENT_SECRET
+        token_url = "https://api.twitter.com/2/oauth2/token"
+
+        payload = {
+            "grant_type": "refresh_token",
+            "refresh_token": refresh_token,
+            "client_id": CLIENT_ID
+        }
+
+        headers = {"Content-Type": "application/x-www-form-urlencoded"}
+        auth = (CLIENT_ID, CLIENT_SECRET)
+
+        try:
+            response = requests.post(token_url, data=payload, headers=headers, auth=auth)
+            response.raise_for_status()
+            token_data = response.json()
+
+            new_access_token = token_data.get("access_token")
+            new_refresh_token = token_data.get("refresh_token")  # Twitter usually provides a new refresh token
+            scope = token_data.get("scope")
+            expires_in = token_data.get("expires_in")
+
+            # 在实际应用中，应将新的token保存到数据库或缓存
+            print("Successfully refreshed tokens:")
+            print(f"  New Access Token: {new_access_token}")
+            if new_refresh_token:
+                print(f"  New Refresh Token: {new_refresh_token}")
+            print(f"  Scope: {scope}")
+            print(f"  Expires In (seconds): {expires_in}")
+
+            return {
+                "access_token": new_access_token,
+                "refresh_token": new_refresh_token,
+                "expires_in": expires_in,
+                "scope": scope
+            }
+        except requests.exceptions.RequestException as e:
+            print(f"Error refreshing token: {e}")
+            if e.response is not None:
+                print(f"Response Status Code: {e.response.status_code}")
+                try:
+                    print(f"Response Body: {e.response.json()}")
+                except ValueError:
+                    print(f"Response Body: {e.response.text}")
+            return None
+        except Exception as e:
+            print(f"An unexpected error occurred during token refresh: {e}")
+            return None
 
     def _do_access_token_exchange(self, authorization_code, code_verifier, redirect_uri, config):
-        import requests
         CLIENT_ID = config.CLIENT_ID
         CLIENT_SECRET = config.CLIENT_SECRET
         token_url = "https://api.twitter.com/2/oauth2/token"
@@ -123,12 +189,28 @@ class TestTwitterAPI(unittest.TestCase):
             refresh_token = token_data.get("refresh_token")
             scope = token_data.get("scope")
             expires_in = token_data.get("expires_in")
+
+            # 保存token到文件（在实际应用中应使用更安全的存储方式）
+            token_file = str(root_dir() / 'data' / "twitter_tokens.json")
+            token_store = {
+                "access_token": access_token,
+                "refresh_token": refresh_token,
+                "expires_at": int(time.time()) + expires_in,
+                "scope": scope
+            }
+
+            with open(token_file, "w") as f:
+                json.dump(token_store, f)
+
             print("Successfully obtained tokens:")
             print(f"  Access Token: {access_token}")
             if refresh_token:
                 print(f"  Refresh Token: {refresh_token}")
             print(f"  Scope: {scope}")
             print(f"  Expires In (seconds): {expires_in}")
+            print(f"  Tokens saved to {token_file}")
+
+            return token_store
         except requests.exceptions.RequestException as e:
             print(f"Error exchanging code for token: {e}")
             if e.response is not None:
@@ -137,8 +219,88 @@ class TestTwitterAPI(unittest.TestCase):
                     print(f"Response Body: {e.response.json()}")
                 except ValueError:
                     print(f"Response Body: {e.response.text}")
+            return None
         except Exception as e:
             print(f"An unexpected error occurred: {e}")
+            return None
+
+    def get_valid_access_token(self):
+        """获取有效的access token，如果过期则自动刷新"""
+
+        token_file = str(root_dir() / 'data' / "twitter_tokens.json")
+
+        # 检查token文件是否存在
+        if not os.path.exists(token_file):
+            print("No token file found. Please authorize first.")
+            return None
+
+        # 读取保存的token
+        with open(token_file, "r") as f:
+            token_data = json.load(f)
+
+        current_time = int(time.time())
+        expires_at = token_data.get("expires_at", 0)
+
+        # 检查token是否过期（提前5分钟刷新）
+        if current_time >= (expires_at - 300):
+            print("Access token expired or will expire soon. Refreshing...")
+            refresh_token = token_data.get("refresh_token")
+            if not refresh_token:
+                print("No refresh token available. Need to reauthorize.")
+                return None
+
+            # 使用refresh token获取新token
+            new_tokens = self._do_refresh_token_exchange(refresh_token)
+            if new_tokens:
+                # 更新token文件
+                token_data = {
+                    "access_token": new_tokens["access_token"],
+                    "refresh_token": new_tokens.get("refresh_token", refresh_token),
+                    "expires_at": int(time.time()) + new_tokens["expires_in"],
+                    "scope": new_tokens["scope"]
+                }
+
+                with open(token_file, "w") as f:
+                    json.dump(token_data, f)
+
+                print("Token refreshed and saved successfully.")
+                return token_data["access_token"]
+            else:
+                print("Failed to refresh token.")
+                return None
+        else:
+            print("Using existing valid access token.")
+            return token_data["access_token"]
+
+    def test_use_twitter_api_with_auto_refresh(self):
+        """测试使用自动刷新token的API调用"""
+        # 获取有效的access token（如果需要会自动刷新）
+        access_token = self.get_valid_access_token()
+        if not access_token:
+            print("Failed to obtain a valid access token")
+            return
+
+        # 使用token调用Twitter API
+        api_url = "https://api.twitter.com/2/users/me"
+        headers = {
+            "Authorization": f"Bearer {access_token}",
+            "Content-Type": "application/json"
+        }
+
+        try:
+            response = requests.get(api_url, headers=headers)
+            response.raise_for_status()
+            user_data = response.json()
+            print("API call successful:")
+            print(f"User data: {user_data}")
+        except requests.exceptions.RequestException as e:
+            print(f"API call failed: {e}")
+            if e.response is not None:
+                print(f"Response Status Code: {e.response.status_code}")
+                try:
+                    print(f"Response Body: {e.response.json()}")
+                except ValueError:
+                    print(f"Response Body: {e.response.text}")
 
 
 if __name__ == '__main__':
