@@ -14,8 +14,8 @@ from conf.client_config import TwitterConfig
 class TestTwitterAPI(unittest.TestCase):
     def setUp(self):
         """为每个测试方法准备相同的初始环境，避免重复代码"""
-        self.config = TwitterConfig()
-        self.api = TwitterAPI(self.config)
+        # self.api.conf = TwitterConfig()
+        self.api = TwitterAPI()
 
     # 使用unittest.mock的patch装饰器来模拟requests.post方法，避免实际发送HTTP请求
     @patch('client.twitter.x_api.requests.post')
@@ -54,7 +54,7 @@ class TestTwitterAPI(unittest.TestCase):
 
     # 实际请求测试：发推文
     def test_post_tweet_real(self):
-        result = self.api.post_tweet('integration test tweet2222')
+        result = self.api.post_tweet('5.7')
         print(result)
 
     def test_post_tweet_task(self):
@@ -78,14 +78,14 @@ class TestTwitterAPI(unittest.TestCase):
 
     def test_generate_oauth2_authorize_url_and_access_token(self):
         """串联测试：自动获取授权码并用其获取access token"""
-        redirect_uri = self.config.REDIRECT_URI if hasattr(self.config,
+        redirect_uri = self.api.conf.REDIRECT_URI if hasattr(self.api.conf,
                                                            'REDIRECT_URI') else "http://127.0.0.1:8000/ai/puti/chat/callback"
-        scope = self.config.SCOPE if hasattr(self.config,
+        scope = self.api.conf.SCOPE if hasattr(self.api.conf,
                                              'SCOPE') else "tweet.read tweet.write users.read offline.access"
         state = "teststate"
         code_challenge = "testchallenge"
         code_challenge_method = "plain"
-        url = self.config.generate_oauth2_authorize_url(
+        url = self.api.conf.generate_oauth2_authorize_url(
             redirect_uri=redirect_uri,
             scope=scope,
             state=state,
@@ -107,7 +107,7 @@ class TestTwitterAPI(unittest.TestCase):
         code_verifier = code_challenge  # plain模式下两者一致
 
         # 调用token获取逻辑
-        self._do_access_token_exchange(code, code_verifier, redirect_uri, self.config)
+        self._do_access_token_exchange(code, code_verifier, redirect_uri, self.api.conf)
 
     def test_refresh_access_token(self):
         """测试使用refresh token获取新的access token"""
@@ -118,8 +118,8 @@ class TestTwitterAPI(unittest.TestCase):
 
     def _do_refresh_token_exchange(self, refresh_token):
         import requests
-        CLIENT_ID = self.config.CLIENT_ID
-        CLIENT_SECRET = self.config.CLIENT_SECRET
+        CLIENT_ID = self.api.conf.CLIENT_ID
+        CLIENT_SECRET = self.api.conf.CLIENT_SECRET
         token_url = "https://api.twitter.com/2/oauth2/token"
 
         payload = {

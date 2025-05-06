@@ -28,3 +28,4 @@ python-box==7.3.2
 openai==1.65.4
 mcp==1.6.0
 faiss-cpu==1.10.0
+psutil

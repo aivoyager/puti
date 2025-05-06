@@ -17,6 +17,8 @@ accept_content = ['json']
 timezone = 'Asia/Shanghai'
 task_eager_propagates = True
 enable_utc = False
+max_retries = 3
+retry_delay = 3
 
 # 设置日志级别
 worker_log_level = 'INFO'

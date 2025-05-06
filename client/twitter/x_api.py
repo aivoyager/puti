@@ -1,108 +1,164 @@
 # -*- coding: utf-8 -*-
 """
 x_api.py
-封装推文发送与回复功能的API类
+Encapsulated API class for sending and replying to tweets
 """
 import json
-from typing import Optional
 import requests
-from typing import Optional
+
+from typing import Optional, Literal, Type
+from pydantic import ConfigDict, Field
 from conf.client_config import TwitterConfig
-from requests_oauthlib import OAuth1Session, OAuth2Session
 from logs import logger_factory
+from client.client import Client
+from abc import ABC
+from utils.path import root_dir
 
 lgr = logger_factory.client
 
 
-class TwitterAPI:
-    def __init__(self, config: Optional[TwitterConfig] = None):
-        self.config = config or TwitterConfig()
-        self.base_url = "https://api.twitter.com/2"
-        # 判断认证方式
-        # if self.config.ACCESS_TOKEN and self.config.ACCESS_TOKEN_SECRET and self.config.API_KEY and self.config.API_SECRET_KEY:
-        if False:
-            # OAuth 1.0a 用户上下文
-            self.auth_type = "oauth1"
-            self.oauth = OAuth1Session(
-                self.config.API_KEY,
-                client_secret=self.config.API_SECRET_KEY,
-                resource_owner_key=self.config.ACCESS_TOKEN,
-                resource_owner_secret=self.config.ACCESS_TOKEN_SECRET
-            )
-        elif self.config.BEARER_TOKEN:
-            # OAuth 2.0 Bearer Token（用户上下文或应用上下文）
-            self.auth_type = "oauth2"
+class TwitterAPI(Client, ABC):
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+    headers: dict = None
+    auth_type: Literal['oauth2'] = Field(default='oauth2', description='OAuth type, oauth2 user context')
+    base_url: str = 'https://api.twitter.com/2'
+
+    def model_post_init(self, __context):
+        if not self.conf:
+            self.init_conf(conf=TwitterConfig)
+        if not self.headers:
             self.headers = {
-                "Authorization": f"Bearer {self.config.ACCESS_TOKEN}",
+                "Authorization": f"Bearer {self.conf.ACCESS_TOKEN}",
                 "Content-Type": "application/json"
             }
+            
+    def login(self):
+        pass
+    
+    def logout(self):
+        pass
+
+    def init_conf(self, conf: Type[TwitterConfig]):
+        self.conf = conf()
+
+    def get_valid_access_token(self):
+        """Get a valid access token, automatically refresh if expired"""
+        import os
+        import time
+        token_file = str(root_dir() / 'data' / 'twitter_tokens.json')
+        if not os.path.exists(token_file):
+            lgr.error("No token file found. Please authorize first.")
+            return None
+        with open(token_file, "r") as f:
+            token_data = json.load(f)
+        current_time = int(time.time())
+        expires_at = token_data.get("expires_at", 0)
+        if current_time >= (expires_at - 300):
+            lgr.info("Access token expired or will expire soon. Refreshing...")
+            refresh_token = token_data.get("refresh_token")
+            if not refresh_token:
+                lgr.error("No refresh token available. Need to reauthorize.")
+                return None
+            new_tokens = self._do_refresh_token_exchange(refresh_token)
+            if new_tokens:
+                token_data = {
+                    "access_token": new_tokens["access_token"],
+                    "refresh_token": new_tokens.get("refresh_token", refresh_token),
+                    "expires_at": int(time.time()) + new_tokens["expires_in"],
+                    "scope": new_tokens["scope"]
+                }
+                with open(token_file, "w") as f:
+                    json.dump(token_data, f)
+                lgr.info("Token refreshed and saved successfully.")
+                return token_data["access_token"]
+            else:
+                lgr.error("Failed to refresh token.")
+                return None
         else:
-            raise ValueError("Twitter API认证信息不完整，请检查配置。")
+            lgr.info("Using existing valid access token.")
+            return token_data["access_token"]
+
+    def _do_refresh_token_exchange(self, refresh_token):
+        """Use refresh_token to refresh access_token, return new token dict, return None if failed"""
+        url = f"https://api.twitter.com/2/oauth2/token"
+        data = {
+            "refresh_token": refresh_token,
+            "grant_type": "refresh_token",
+            "client_id": self.conf.CLIENT_ID,
+        }
+        try:
+            resp = requests.post(url, data=data, headers={"Content-Type": "application/x-www-form-urlencoded"})
+            resp.raise_for_status()
+            return resp.json()
+        except Exception as e:
+            lgr.error(f"Refresh token failed: {e}")
+            return None
+
+    def _refresh_headers(self):
+        """Refresh access_token in headers"""
+        access_token = self.get_valid_access_token()
+        if access_token:
+            self.headers = {
+                "Authorization": f"Bearer {access_token}",
+                "Content-Type": "application/json"
+            }
 
     def post_tweet(self, text: str) -> dict:
-        """
-        发送推文
-        :param text: 推文内容
-        :return: 推文发送结果
-        """
+        self._refresh_headers()
         url = f"{self.base_url}/tweets"
         payload = {"text": text}
-        try:
-            resp = None
-            if getattr(self, "auth_type", None) == "oauth1":
-                resp = self.oauth.post(url, json=payload, timeout=10)
-            else:
+        resp = False
+        for i in range(2):
+            try:
                 lgr.debug('post tweet by oauth2')
                 resp = requests.post(url, headers=self.headers, json=payload, timeout=10, verify=False)
                 lgr.debug(resp)
-            resp.raise_for_status()
-            return resp.json()
-        except requests.Timeout:
-            return {"error": "请求超时", "status_code": getattr(resp, 'status_code', None)}
-        except Exception as e:
-            return {"error": str(e), "status_code": getattr(resp, 'status_code', None)}
+                if resp.status_code == 401 and i == 0:
+                    self._refresh_headers()
+                    continue
+                resp.raise_for_status()
+                return resp.json()
+            except requests.Timeout:
+                return {"error": "Request timed out", "status_code": getattr(resp, 'status_code', None)}
+            except Exception as e:
+                if isinstance(resp, bool) and resp is False:
+                    return {"error": str(e), "status_code": 400}
+                if hasattr(resp, 'status_code') and resp.status_code == 401 and i == 0:
+                    self._refresh_headers()
+                    continue
+                return {"error": str(e), "status_code": getattr(resp, 'status_code', None)}
 
     def reply_tweet(self, text: str, in_reply_to_status_id: str) -> dict:
-        """
-        回复推文
-        :param text: 回复内容
-        :param in_reply_to_status_id: 被回复推文的ID
-        :return: 回复结果
-        """
+        self._refresh_headers()
         url = f"{self.base_url}/tweets"
         payload = {
             "text": text,
             "reply": {"in_reply_to_tweet_id": in_reply_to_status_id}
         }
-        if getattr(self, "auth_type", None) == "oauth1":
-            resp = self.oauth.post(url, json=payload)
-        else:
+        for i in range(2):
             resp = requests.post(url, headers=self.headers, json=payload)
-        try:
-            return resp.json()
-        except Exception as e:
-            return {"error": str(e), "status_code": resp.status_code}
+            if resp.status_code == 401 and i == 0:
+                self._refresh_headers()
+                continue
+            try:
+                return resp.json()
+            except Exception as e:
+                return {"error": str(e), "status_code": resp.status_code}
 
     def get_unreplied_mentions(self) -> list:
         """
-        查询所有未回复的提及推文
-        :return: 未回复推文的列表
+        Query all unreplied mention tweets
+        :return: List of unreplied tweets
         """
-        url = f"{self.base_url}/users/{self.config.MY_ID}/mentions"
-        if getattr(self, "auth_type", None) == "oauth1":
-            resp = self.oauth.get(url)
-        else:
-            resp = requests.get(url, headers=self.headers)
+        url = f"{self.base_url}/users/{self.conf.MY_ID}/mentions"
+        resp = requests.get(url, headers=self.headers)
         try:
             mentions = resp.json().get("data", [])
         except Exception as e:
             return [{"error": str(e), "status_code": resp.status_code}]
         replied_ids = set()
-        url_replies = f"{self.base_url}/users/{self.config.MY_ID}/tweets"
-        if getattr(self, "auth_type", None) == "oauth1":
-            replies_resp = self.oauth.get(url_replies)
-        else:
-            replies_resp = requests.get(url_replies, headers=self.headers)
+        url_replies = f"{self.base_url}/users/{self.conf.MY_ID}/tweets"
+        replies_resp = requests.get(url_replies, headers=self.headers)
         try:
             replies = replies_resp.json().get("data", [])
             for tweet in replies:
