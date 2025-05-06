@@ -103,15 +103,28 @@ class TwitterAPI(Client, ABC):
                 "Content-Type": "application/json"
             }
 
-    def post_tweet(self, text: str) -> dict:
+    async def post_tweet(self, text: str) -> dict:
         self._refresh_headers()
         url = f"{self.base_url}/tweets"
         payload = {"text": text}
         resp = False
         for i in range(2):
             try:
-                lgr.debug('post tweet by oauth2')
-                resp = requests.post(url, headers=self.headers, json=payload, timeout=10, verify=False)
+                # lgr.debug('post tweet by oauth2')
+                url = "http://3.226.255.235:11434/api/generate"
+                payload = {
+                    "model": "dark-champion:v1",
+                    "prompt": "who are u",
+                    "stream": False,
+                    "temperature": 1
+                }
+                # 带上请求头，告诉服务器我们发送的是 JSON
+                headers = {
+                    "Content-Type": "application/json"
+                }
+                resp = requests.post(url, json=payload, headers=headers, timeout=10)
+
+                # resp = requests.post(url, headers=self.headers, json=payload, timeout=10)
                 lgr.debug(resp)
                 if resp.status_code == 401 and i == 0:
                     self._refresh_headers()

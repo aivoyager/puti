@@ -1,3 +1,4 @@
+import asyncio
 import time
 import unittest
 import json
@@ -54,7 +55,8 @@ class TestTwitterAPI(unittest.TestCase):
 
     # 实际请求测试：发推文
     def test_post_tweet_real(self):
-        result = self.api.post_tweet('5.7')
+        result = asyncio.run(self.api.post_tweet('5.7 ws'))
+        # result = self.api.post_tweet('5.7')
         print(result)
 
     def test_post_tweet_task(self):

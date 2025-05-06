@@ -48,8 +48,10 @@ def amqp():
         lgr.error(f'Unsupported OS {current_os}')
         raise Exception('Unsupported OS')
     subprocess.Popen(amqp_stop_command)
-    process = subprocess.Popen(amqp_command)
-    # Add logic to wait for RabbitMQ port to listen
+    time.sleep(1)
+    subprocess.Popen(amqp_command)
+    time.sleep(1)
+    # 增加端口检测，确保RabbitMQ服务已启动
     for i in range(20):
         time.sleep(1)
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -60,6 +62,8 @@ def amqp():
             sock.close()
             break
         except Exception as e:
+            amqp_command = ['brew', 'services', 'start', 'rabbitmq']
+            subprocess.Popen(amqp_command)
             lgr.info(f'[RabbitMQ] Waiting for service to start...({i+1}/20): {e}')
         finally:
             sock.close()
@@ -75,14 +79,15 @@ def celery():
     subprocess.Popen(celery_command)
     subprocess.Popen(celery_beat)
     subprocess.Popen(celery_flower)
+    time.sleep(2)
 
 
 def init_services():
     """
-    Unified detection and startup of Redis, AMQP (RabbitMQ), and Celery Worker/Beat services
+    统一检测并启动 Redis、AMQP（RabbitMQ）、Celery Worker/Beat 服务
     """
     broker_url = celery_config.broker_url
-    # Start Redis (only needed for local development environment)
+    # 启动 Redis（仅本地开发环境需要）
     if current_os in ['Windows', 'Darwin']:
         try:
             redis_running = any("redis-server" in p.name() for p in psutil.process_iter())
@@ -92,12 +97,12 @@ def init_services():
                 time.sleep(2)
         except Exception as psutil_error:
             lgr.warning(f"[Redis] process check failed: {psutil_error}")
-    # Start RabbitMQ (if using AMQP)
+    # 启动 RabbitMQ（如果使用 AMQP）
     if broker_url.startswith('amqp'):
         lgr.info("[Auto trying start RabbitMQ service]")
         amqp()
-        # Removed the original fixed wait, replaced by port detection
-    # Start Celery Worker/Beat
+        # 端口检测已在amqp函数内实现，无需额外等待
+    # 启动 Celery Worker/Beat
     check_celery_worker_and_beat()
 
 

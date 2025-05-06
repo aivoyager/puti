@@ -14,6 +14,7 @@ from constant.base import TaskPostType
 from client.twitter.x_api import TwitterAPI
 from conf.client_config import TwitterConfig
 from celery.schedules import crontab
+from celery import shared_task
 
 lgr = logger_factory.default
 
@@ -32,17 +33,19 @@ def add(x, y):
         lgr.info('[任务] add 执行结束')
 
 
-@celery_app.task(task_always_eager=True)
+# @celery_app.task(task_always_eager=False)
+@shared_task()
 def periodic_post_tweet():
-    config = TwitterConfig()
-    api = TwitterAPI(config)
+    api = TwitterAPI()
     lgr.info('[定时任务] periodic_post_tweet 开始执行')
     try:
         content = "定时自动推文：Hello, Twitter!"
         lgr.debug(f'[定时任务] 准备发送推文内容: {content}')
         lgr.debug('[定时任务] 请求开始时间戳: {}'.format(datetime.now().isoformat()))
         start_time = datetime.now()
-        result = api.post_tweet(content)
+        loop = asyncio.get_event_loop()
+        result = loop.run_until_complete(api.post_tweet(content))
+        # result = asyncio.run(api.post_tweet(content))
         lgr.debug('[定时任务] 请求结束时间戳: {} 耗时: {:.2f}s'.format(
             datetime.now().isoformat(), 
             (datetime.now() - start_time).total_seconds()
