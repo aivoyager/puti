@@ -64,6 +64,50 @@ class Message(BaseModel):
     def to_message_list(cls, messages: List['Message']) -> List[dict]:
         return [msg.to_message_dict() for msg in messages]
 
+    @classmethod
+    def to_ollama3_format(cls, messages: List['Message']) -> str:
+        """
+            ollama3 format
+            <|begin_of_text|><|start_header_id|>system<|end_header_id|>
+
+            {{ system_prompt }}<|eot_id|><|start_header_id|>user<|end_header_id|>
+
+            {{ user_message_1 }}<|eot_id|><|start_header_id|>assistant<|end_header_id|>
+
+            {{ model_answer_1 }}<|eot_id|><|start_header_id|>user<|end_header_id|>
+
+            {{ user_message_2 }}<|eot_id|><|start_header_id|>assistant<|end_header_id|>
+        """
+        messages = cls.to_message_list(messages)
+        # 开始标记
+        prompt = "<|begin_of_text|>"
+
+        # 如果有 system 消息，就先处理 system
+        # 并且只取第一个 system 消息，当做系统提示
+        for msg in messages:
+            if msg["role"] == "system":
+                system_text = msg["content"].strip()
+                prompt += (
+                    "<|start_header_id|>system<|end_header_id|>\n\n"
+                    f"{system_text}<|eot_id|>"
+                )
+                break
+
+        # 遍历所有非 system 消息，按顺序拼接 user/assistant
+        for msg in messages:
+            role = msg["role"]
+            if role == "system":
+                continue
+            text = msg["content"].strip()
+            prompt += (
+                f"<|start_header_id|>{role}<|end_header_id|>\n\n"
+                f"{text}<|eot_id|>"
+            )
+
+        # 最后留给 assistant 继续回复
+        prompt += "<|start_header_id|>assistant<|end_header_id|>"
+        return prompt
+
     def to_message_dict(self, ample: bool = True) -> dict:
         if self.non_standard:
             return self.non_standard

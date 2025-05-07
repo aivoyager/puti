@@ -91,6 +91,11 @@ class LLMNode(BaseModel, ABC):
     async def chat(self, msg: List[Dict], *args, **kwargs) -> str:
         """ Async chat """
 
+    async def chat_text(self, text: str, *args, **kwargs):
+        messages = [{"role": "user", "content": text}]
+        resp = await self.chat(messages, *args, **kwargs)
+        return resp
+
 
 @singleton
 class OpenAINode(LLMNode):
@@ -161,11 +166,13 @@ class OllamaNode(LLMNode):
             collected_messages = []
             for chunk in response:
                 collected_messages.append(chunk.message.content)
+                print(chunk.message.content, end='')
             full_reply = ''.join(collected_messages)
             lgr.debug('ollama has not cost yet')
         else:
             if response.message.tool_calls:
                 return response.message
             full_reply = response.message.content
+            print(full_reply)
             lgr.debug('ollama has not cost yet')
         return full_reply
