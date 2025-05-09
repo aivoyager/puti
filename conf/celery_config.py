@@ -3,12 +3,20 @@
 @Time: 20/01/25 15:45
 @Description:  
 """
-from celery.schedules import crontab
+import platform
 
+from celery.schedules import crontab
+from conf.celery_private_conf import CeleryPrivateConfig
+
+c = CeleryPrivateConfig()
 
 # broker_url = 'redis://127.0.0.1:6379/0'
-broker_url = 'amqp://guest:guest@localhost//'
-result_backend = 'redis://127.0.0.1:6379/0'
+# if platform.system().lower() == 'linux':
+broker_url = c.BROKER_URL
+# else:
+#     broker_url = 'amqp://guest:guest@localhost//'
+result_backend = c.RESULT_BACKEND_URL
+# result_backend = 'redis://127.0.0.1:6379/0'
 # result_backend = 'amqp://guest:guest@localhost//'
 result_expires = 3600
 task_serializer = 'json'
@@ -25,9 +33,9 @@ worker_log_level = 'INFO'
 beat_log_level = 'INFO'
 
 beat_schedule = {
-    'periodic-post-tweet-every-5min': {
+    'periodic-post-tweet': {
         'task': 'celery_queue.tasks.periodic_post_tweet',
-        'schedule': crontab(minute='*/1'),
+        'schedule': crontab(hour=8, minute=0),
         'args': ()
     }
 }

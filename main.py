@@ -86,23 +86,23 @@ def init_services():
     """
     统一检测并启动 Redis、AMQP（RabbitMQ）、Celery Worker/Beat 服务
     """
-    broker_url = celery_config.broker_url
-    # 启动 Redis（仅本地开发环境需要）
-    if current_os in ['Windows', 'Darwin']:
-        try:
-            redis_running = any("redis-server" in p.name() for p in psutil.process_iter())
-            if not redis_running:
-                lgr.info("[start Redis service in advance]")
-                redis()
-                time.sleep(2)
-        except Exception as psutil_error:
-            lgr.warning(f"[Redis] process check failed: {psutil_error}")
-    # 启动 RabbitMQ（如果使用 AMQP）
-    if broker_url.startswith('amqp'):
-        lgr.info("[Auto trying start RabbitMQ service]")
-        amqp()
-        # 端口检测已在amqp函数内实现，无需额外等待
-    # 启动 Celery Worker/Beat
+    # broker_url = celery_config.broker_url
+    # # 启动 Redis（仅本地开发环境需要）
+    # if current_os in ['Windows', 'Darwin']:
+    #     try:
+    #         redis_running = any("redis-server" in p.name() for p in psutil.process_iter())
+    #         if not redis_running:
+    #             lgr.info("[start Redis service in advance]")
+    #             redis()
+    #             time.sleep(2)
+    #     except Exception as psutil_error:
+    #         lgr.warning(f"[Redis] process check failed: {psutil_error}")
+    # # 启动 RabbitMQ（如果使用 AMQP）
+    # if broker_url.startswith('amqp'):
+    #     lgr.info("[Auto trying start RabbitMQ service]")
+    #     amqp()
+    #     # 端口检测已在amqp函数内实现，无需额外等待
+    # # 启动 Celery Worker/Beat
     check_celery_worker_and_beat()
 
 

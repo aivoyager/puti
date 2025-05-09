@@ -46,3 +46,8 @@ def test_llm_conf():
     c = OpenaiConfig()
     assert c.API_KEY is not None
 
+
+def test_celery_conf():
+    from conf.celery_private_conf import CeleryPrivateConfig
+    c = CeleryPrivateConfig()
+    print('')

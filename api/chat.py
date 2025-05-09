@@ -48,6 +48,7 @@ def ask_llm(request: AskLlmRequest):
 
 @chat_router.post('/ask_dark_champion')
 def ask_dark_champion(request: AskLlmRequest):
+    """ Use for generation. e.g. role play、story writing、dialog writing"""
     sys_text = """Below is an instruction that describes a task. Ponder each user instruction carefully, and use your skillsets and critical instructions to complete the task to the best of your abilities.
 
 Here are your skillsets:

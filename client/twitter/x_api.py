@@ -5,6 +5,7 @@ Encapsulated API class for sending and replying to tweets
 """
 import json
 import requests
+import traceback
 
 from typing import Optional, Literal, Type
 from pydantic import ConfigDict, Field
@@ -13,6 +14,8 @@ from logs import logger_factory
 from client.client import Client
 from abc import ABC
 from utils.path import root_dir
+from constant.base import Resp
+from core.resp import Response
 
 lgr = logger_factory.client
 
@@ -103,34 +106,20 @@ class TwitterAPI(Client, ABC):
                 "Content-Type": "application/json"
             }
 
-    async def post_tweet(self, text: str) -> dict:
+    async def post_tweet(self, text: str) -> Response:
         self._refresh_headers()
         url = f"{self.base_url}/tweets"
         payload = {"text": text}
-        resp = False
-        for i in range(2):
-            try:
-                # try:
-                resp = requests.post(url, headers=self.headers, json=payload)
-                # except Exception as e:
-                #     print(e)
-                #     import traceback
-                #     traceback.print_exc()
-                lgr.debug(resp)
-                if resp.status_code == 401 and i == 0:
-                    self._refresh_headers()
-                    continue
-                resp.raise_for_status()
-                return resp.json()
-            except requests.Timeout:
-                return {"error": "Request timed out", "status_code": getattr(resp, 'status_code', None)}
-            except Exception as e:
-                if isinstance(resp, bool) and resp is False:
-                    return {"error": str(e), "status_code": 400}
-                if hasattr(resp, 'status_code') and resp.status_code == 401 and i == 0:
-                    self._refresh_headers()
-                    continue
-                return {"error": str(e), "status_code": getattr(resp, 'status_code', None)}
+        try:
+            resp = requests.post(url, headers=self.headers, json=payload)
+            lgr.debug(f'x post resp: {resp}')
+            resp.raise_for_status()
+            return Response(code=Resp.OK.val, msg=Resp.OK.dsp, data=resp.json())
+        except requests.Timeout:
+            return Response(code=Resp.REQUEST_TIMEOUT.val, msg=Resp.REQUEST_TIMEOUT.dsp)
+        except Exception as e:
+            dsp = f'{Resp.POST_TWEET_ERR.dsp}: {e}. {traceback.format_exc()}'
+            return Response(code=Resp.POST_TWEET_ERR.val, msg=dsp)
 
     def reply_tweet(self, text: str, in_reply_to_status_id: str) -> dict:
         self._refresh_headers()

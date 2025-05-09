@@ -43,7 +43,7 @@ class Modules(Base):
     CLIENT = ('client', 'client module')
     API = ('api', 'api module')
     LLM = ('llm', 'llm module')
-    UTILIS = ('utils', 'utils module')
+    UTILITIES = ('utilities', 'utilities module')
 
 
 class Resp(Base):
@@ -54,6 +54,7 @@ class Resp(Base):
     INTERNAL_SERVE_ERR = (500, 'internal server error')
     CP_ERR = (501, 'capturing error from `Capture`')
     POST_TWEET_ERR = (502, 'post tweet error')
+    REQUEST_TIMEOUT = (503, 'request timeout')
 
 
 class TaskType(Base):
