@@ -48,6 +48,7 @@ class Modules(Base):
 
 class Resp(Base):
     OK = (200, 'ok')
+    TOOL_OK = (201, 'tool ok')
 
     UNAUTHORIZED_ERR = (401, 'unauthorized error from tweet')
 
@@ -55,6 +56,8 @@ class Resp(Base):
     CP_ERR = (501, 'capturing error from `Capture`')
     POST_TWEET_ERR = (502, 'post tweet error')
     REQUEST_TIMEOUT = (503, 'request timeout')
+
+    TOOL_FAIL = (504, 'tool fail')
 
 
 class TaskType(Base):

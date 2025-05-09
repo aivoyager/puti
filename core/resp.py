@@ -27,15 +27,24 @@ class Response(BaseModel):
 
     @property
     def info(self):
-        info = str({
-            "code": self.code,
-            "msg": self.msg,
-            "data": self.data,
-        })
-        return f'{self.__class__} {info}'
+        return f'Error: {self.msg}' if not str(self.code).startswith('2') else f'{self.data}'
 
     def __str__(self):
         return self.info
 
     def __repr__(self):
         return self.info
+
+
+class ToolResponse(Response):
+    """ Tool Response """
+    data: str = Field(default='', validate_default=True, description='tool execution successfully result')
+    msg: str = Field(default=Resp.TOOL_OK.dsp, validate_default=True, description='tool execution failed result')
+
+    @classmethod
+    def fail(cls, msg: str = Resp.TOOL_FAIL.dsp) -> 'ToolResponse':
+        return ToolResponse(code=Resp.TOOL_FAIL.val, msg=msg)
+
+    @classmethod
+    def success(cls, data: Any = None) -> 'ToolResponse':
+        return ToolResponse(code=Resp.TOOL_OK.val, msg=Resp.TOOL_OK.dsp, data=data)

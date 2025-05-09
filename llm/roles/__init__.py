@@ -12,6 +12,7 @@ import pkgutil
 import inspect
 import threading
 
+from core.resp import ToolResponse
 from db.faisss import FaissIndex
 from functools import partial
 from ollama._types import Message as OMessage
@@ -299,6 +300,8 @@ class Role(BaseModel):
             run = partial(todo[0].run, llm=self.agent_node)
             try:
                 resp = await run(**todo[1])
+                if isinstance(resp, ToolResponse):
+                    resp = resp.info
                 resp = json.dumps(resp, ensure_ascii=False) if not isinstance(resp, str) else resp
             except Exception as e:
                 message = Message(non_standard_dic={
