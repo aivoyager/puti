@@ -4,6 +4,7 @@ import unittest
 import json
 import time
 import os
+import redis
 import requests
 
 from utils.path import root_dir
@@ -55,7 +56,7 @@ class TestTwitterAPI(unittest.TestCase):
 
     # 实际请求测试：发推文
     def test_post_tweet_real(self):
-        result = asyncio.run(self.api.post_tweet('5.9 ws 2'))
+        result = asyncio.run(self.api.post_tweet('test token save 222'))
         # result = self.api.post_tweet('5.7')
         print(result)
 
@@ -77,6 +78,22 @@ class TestTwitterAPI(unittest.TestCase):
     def test_get_unreplied_mentions_real(self):
         result = self.api.get_unreplied_mentions()
         self.assertIsInstance(result, list)
+
+    def test_save_tokens_to_redis(self):
+        """首次将 access_token、refresh_token、expires_at 信息以 tweet_token: 前缀保存到 redis 的指定位置，并验证写入"""
+        redis_url = ""
+        redis_client = redis.StrictRedis.from_url(redis_url)
+        access_token = ""
+        refresh_token = ""
+        expires_at = int(time.time()) + 7200
+        redis_client.set("tweet_token:twitter_access_token", access_token)
+        redis_client.set("tweet_token:twitter_refresh_token", refresh_token)
+        redis_client.set("tweet_token:twitter_expires_at", expires_at)
+        # 验证写入
+        self.assertEqual(redis_client.get("tweet_token:twitter_access_token").decode(), access_token)
+        self.assertEqual(redis_client.get("tweet_token:twitter_refresh_token").decode(), refresh_token)
+        self.assertEqual(int(redis_client.get("tweet_token:twitter_expires_at")), expires_at)
+
 
     def test_generate_oauth2_authorize_url_and_access_token(self):
         """串联测试：自动获取授权码并用其获取access token"""

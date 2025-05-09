@@ -6,10 +6,13 @@ Encapsulated API class for sending and replying to tweets
 import json
 import requests
 import traceback
+import redis
+import time
 
 from typing import Optional, Literal, Type
 from pydantic import ConfigDict, Field
 from conf.client_config import TwitterConfig
+from conf.celery_private_conf import CeleryPrivateConfig
 from logs import logger_factory
 from client.client import Client
 from abc import ABC
@@ -18,6 +21,7 @@ from constant.base import Resp
 from core.resp import Response
 
 lgr = logger_factory.client
+c = CeleryPrivateConfig()
 
 
 class TwitterAPI(Client, ABC):
@@ -45,41 +49,41 @@ class TwitterAPI(Client, ABC):
         self.conf = conf()
 
     def get_valid_access_token(self):
-        """Get a valid access token, automatically refresh if expired"""
-        import os
-        import time
-        token_file = str(root_dir() / 'data' / 'twitter_tokens.json')
-        if not os.path.exists(token_file):
-            lgr.error("No token file found. Please authorize first.")
-            return None
-        with open(token_file, "r") as f:
-            token_data = json.load(f)
+        """获取有效的access token，如果过期则自动刷新，全部从redis操作"""
+        redis_client = redis.StrictRedis.from_url(c.BROKER_URL)
+        access_token = redis_client.get("tweet_token:twitter_access_token").decode()
+        refresh_token = redis_client.get("tweet_token:twitter_refresh_token").decode()
+        expires_at = redis_client.get("tweet_token:twitter_expires_at").decode()
+        if expires_at is not None:
+            try:
+                expires_at = int(expires_at)
+            except Exception:
+                expires_at = 0
+        else:
+            expires_at = 0
         current_time = int(time.time())
-        expires_at = token_data.get("expires_at", 0)
+        if not access_token or not refresh_token or not expires_at:
+            lgr.error("Redis中未找到token信息，请先授权。")
+            return None
         if current_time >= (expires_at - 300):
-            lgr.info("Access token expired or will expire soon. Refreshing...")
-            refresh_token = token_data.get("refresh_token")
-            if not refresh_token:
-                lgr.error("No refresh token available. Need to reauthorize.")
-                return None
+            lgr.info("Access token已过期或即将过期，正在刷新...")
             new_tokens = self._do_refresh_token_exchange(refresh_token)
             if new_tokens:
-                token_data = {
-                    "access_token": new_tokens["access_token"],
-                    "refresh_token": new_tokens.get("refresh_token", refresh_token),
-                    "expires_at": int(time.time()) + new_tokens["expires_in"],
-                    "scope": new_tokens["scope"]
-                }
-                with open(token_file, "w") as f:
-                    json.dump(token_data, f)
-                lgr.info("Token refreshed and saved successfully.")
-                return token_data["access_token"]
+                access_token = new_tokens["access_token"]
+                refresh_token = new_tokens.get("refresh_token", refresh_token)
+                expires_in = new_tokens["expires_in"]
+                expires_at = int(time.time()) + expires_in
+                redis_client.set("tweet_token:twitter_access_token", access_token)
+                redis_client.set("tweet_token:twitter_refresh_token", refresh_token)
+                redis_client.set("tweet_token:twitter_expires_at", expires_at)
+                lgr.info("Token已刷新并保存到redis。")
+                return access_token
             else:
-                lgr.error("Failed to refresh token.")
+                lgr.error("刷新token失败。")
                 return None
         else:
-            lgr.info("Using existing valid access token.")
-            return token_data["access_token"]
+            lgr.info("使用redis中已有的有效access token。")
+            return access_token
 
     def _do_refresh_token_exchange(self, refresh_token):
         """Use refresh_token to refresh access_token, return new token dict, return None if failed"""
