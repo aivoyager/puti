@@ -35,6 +35,13 @@ class Response(BaseModel):
     def __repr__(self):
         return self.info
 
+    def is_success(self) -> bool:
+        """
+        判断响应的 code 字段是否在 200~299 范围内，表示请求成功
+        :return: bool
+        """
+        return 200 <= self.code < 300
+
 
 class ToolResponse(Response):
     """ Tool Response """

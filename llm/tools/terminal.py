@@ -114,11 +114,11 @@ Note: You MUST append a `sleep 0.05` to the end of the command for commands that
                         result = ToolResponse.fail(msg=str(e))
                     finally:
                         self.process = None
-            if result.data:
+            if result.is_success():
                 final_output.data += (
                     (result.data + '\n') if result.data else result.data
                 )
-            if result.msg:
+            if not result.is_success():
                 final_output.msg += (
                     (result.msg + '\n') if result.msg else result.msg
                 )

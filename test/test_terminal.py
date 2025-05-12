@@ -22,4 +22,6 @@ def test_echo():
 
 def test_python():
     alex = Alex()
-    resp = asyncio.run(alex.run('给出鸡兔同笼问题并计算'))
+    # resp = asyncio.run(alex.run('请定义一个函数 square(n) 并输出 square(5) 的结果'))
+    resp = asyncio.run(alex.run('在当前目录 用python写一个贪吃蛇游戏 并写入文件 snake_game.py'))
+    print(resp)

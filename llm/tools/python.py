@@ -3,6 +3,7 @@
 @Time:  2025-05-09 18:13
 @Description:  
 """
+import json
 import multiprocessing
 import sys
 
@@ -69,7 +70,7 @@ class Python(BaseTool, ABC):
                 proc.join(1)
                 msg = f'{Resp.TOOL_TIMEOUT.dsp} after {timeout} seconds'
                 return ToolResponse(code=Resp.TOOL_TIMEOUT.val, msg=msg)
-            return ToolResponse(code=Resp.TOOL_OK.val, data=dict(result))
+            return ToolResponse(code=Resp.TOOL_OK.val, data=json.dumps(dict(result), ensure_ascii=False))
 
 
 

@@ -148,19 +148,19 @@ class Role(BaseModel):
        )
         tool_exp = (
             'You have some tools that you can use to help the user or meet user needs, '
-            'fully understand the tool functions and their arguments before using them,'
-            'make sure the types and values of the arguments you provided to the tool functions are correct'
-            'and always provide parameters that must be worn, '
-            'tools give you only the intermediate product, '
-            'no matter whether use tool or not,'
-            'ultimately you need to give a clearly final reply prefix with END like "END you final reply here",'
-            'let others know that your part is done.'
+            # 'fully understand the tool functions and their arguments before using them,'
+            # 'make sure the types and values of the arguments you provided to the tool functions are correct'
+            # 'and always provide parameters that must be worn, '
+            # 'tools give you only the intermediate product, '
+            # 'no matter whether use tool or not,'
+            # 'ultimately you need to give a clearly final reply '
+            # 'let others know that your part is done.'
             'If there is an error in calling the tool, you need to fix it yourself.'
         )
         finish_exp = ("Based on user requirements and your prior knowledge to jude "
                       "if you've accomplished your goal, prefix your final reply with 'END you reply'.")
         # definition = name_exp + skill_exp + goal_exp + constraints_exp + tool_exp
-        definition = name_exp + skill_exp + goal_exp + constraints_exp
+        definition = name_exp + skill_exp + goal_exp + constraints_exp + tool_exp
         return definition
 
     def publish_message(self):
@@ -283,7 +283,7 @@ class Role(BaseModel):
                     if is_valid_json(match_group):
                         think_process = json.loads(match_group).get('think_process', '')
                 self.answer = AssistantMessage(content=content, sender=self.name)
-                return False, json.dumps({'final_answer': content, 'think_process': think_process})
+                return False, json.dumps({'final_answer': content, 'think_process': think_process}, ensure_ascii=False)
             else:
                 fix_msg = 'Your returned json data does not have a "FINAL ANSWER" key. Please check'
                 return self._correction(fix_msg)
