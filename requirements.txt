@@ -30,3 +30,5 @@ mcp==1.6.0
 faiss-cpu==1.10.0
 psutil
 tenacity
+redis
+gevent
