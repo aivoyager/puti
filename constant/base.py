@@ -58,6 +58,7 @@ class Resp(Base):
     REQUEST_TIMEOUT = (503, 'request timeout')
 
     TOOL_FAIL = (504, 'tool fail')
+    TOOL_TIMEOUT = (505, 'tool timeout')
 
 
 class TaskType(Base):

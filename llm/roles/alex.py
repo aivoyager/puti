@@ -7,6 +7,7 @@ from llm.roles import Role, RoleType, McpRole
 from typing import List, Literal
 from llm.tools.talk import Reply
 from llm.tools.terminal import Terminal
+from llm.tools.python import Python
 
 
 class Alex(Role):
@@ -14,4 +15,4 @@ class Alex(Role):
 
     def __init__(self, **kwargs) -> None:
         super().__init__(**kwargs)
-        self.set_tools([Terminal])
+        self.set_tools([Terminal, Python])

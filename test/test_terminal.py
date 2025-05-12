@@ -18,3 +18,8 @@ def test_echo():
                                 '4.切换到项目根目录，并查看内容'
                                 '5.测试危险命令拦截'
                                 ''))
+
+
+def test_python():
+    alex = Alex()
+    resp = asyncio.run(alex.run('给出鸡兔同笼问题并计算'))
