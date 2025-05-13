@@ -10,7 +10,7 @@ from llm.envs import Env
 from llm.roles.talker import PuTi, PuTiMCP
 from llm.messages import Message
 from llm.roles.debater import Debater
-from llm.nodes import OllamaNode, ollama_node, openai_node
+from llm.nodes import OllamaNode
 from conf.llm_config import LlamaConfig
 from llm.roles.cz import CZ
 from llm.nodes import OpenAINode

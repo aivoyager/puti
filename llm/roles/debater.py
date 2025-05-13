@@ -9,7 +9,7 @@ from llm.tools.debate import Debate
 from llm.envs import Env
 from llm.roles.talker import PuTi, PuTiMCP
 from llm.messages import Message
-from llm.nodes import OllamaNode, ollama_node
+from llm.nodes import OllamaNode
 
 
 class Debater(McpRole):

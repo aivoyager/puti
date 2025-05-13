@@ -47,6 +47,7 @@ class ToolResponse(Response):
     """ Tool Response """
     data: str = Field(default='', validate_default=True, description='tool execution successfully result')
     msg: str = Field(default=Resp.TOOL_OK.dsp, validate_default=True, description='tool execution failed result')
+    code: int = Field(default=Resp.TOOL_OK.val, validate_default=True, description='tool execution failed result')
 
     @classmethod
     def fail(cls, msg: str = Resp.TOOL_FAIL.dsp) -> 'ToolResponse':
