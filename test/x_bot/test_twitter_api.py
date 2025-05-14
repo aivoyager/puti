@@ -321,6 +321,11 @@ class TestTwitterAPI(unittest.TestCase):
                 except ValueError:
                     print(f"Response Body: {e.response.text}")
 
+    def test_get_my_id(self):
+        user_id = self.api.get_my_id()
+        print(f"当前用户ID: {user_id}")
+        assert isinstance(user_id, str) and len(user_id) > 0, "获取的用户ID应为非空字符串"
+
 
 if __name__ == '__main__':
     unittest.main()

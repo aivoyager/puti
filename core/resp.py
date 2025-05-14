@@ -54,5 +54,5 @@ class ToolResponse(Response):
         return ToolResponse(code=Resp.TOOL_FAIL.val, msg=msg)
 
     @classmethod
-    def success(cls, data: Any = None) -> 'ToolResponse':
+    def success(cls, data: str = None) -> 'ToolResponse':
         return ToolResponse(code=Resp.TOOL_OK.val, msg=Resp.TOOL_OK.dsp, data=data)

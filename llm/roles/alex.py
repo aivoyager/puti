@@ -8,6 +8,7 @@ from typing import List, Literal
 from llm.tools.talk import Reply
 from llm.tools.terminal import Terminal
 from llm.tools.python import Python
+from llm.tools.file import File
 
 
 class Alex(Role):
@@ -15,4 +16,4 @@ class Alex(Role):
 
     def __init__(self, **kwargs) -> None:
         super().__init__(**kwargs)
-        self.set_tools([Terminal, Python])
+        self.set_tools([Terminal, Python, File])

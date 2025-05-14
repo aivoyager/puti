@@ -144,23 +144,21 @@ class Role(BaseModel):
             'You constraint is utilize the same language for seamless communication'
             ' and always give a clearly in final reply with format json format {"FINAL_ANSWER": Your final answer here}'
             ' do not give ANY other information except this json.'
-            ' Pay attention to historical information to distinguish and make decision.'
+            ' Pay attention to historical information to distinguish and make decision.\n'
        )
         tool_exp = (
             'You have some tools that you can use to help the user or meet user needs, '
-            # 'fully understand the tool functions and their arguments before using them,'
-            # 'make sure the types and values of the arguments you provided to the tool functions are correct'
-            # 'and always provide parameters that must be worn, '
-            # 'tools give you only the intermediate product, '
-            # 'no matter whether use tool or not,'
-            # 'ultimately you need to give a clearly final reply '
-            # 'let others know that your part is done.'
-            'If there is an error in calling the tool, you need to fix it yourself.'
+            'fully understand the tool functions and their arguments before using them,'
+            'make sure the types and values of the arguments you provided to the tool functions are correct,'
+            'if there is an error in calling the tool, you need to fix it yourself.\n'
         )
-        finish_exp = ("Based on user requirements and your prior knowledge to jude "
-                      "if you've accomplished your goal, prefix your final reply with 'END you reply'.")
-        # definition = name_exp + skill_exp + goal_exp + constraints_exp + tool_exp
-        definition = name_exp + skill_exp + goal_exp + constraints_exp + tool_exp
+        tool_exp = """You have some tools that you can use to help the user or meet user needs.
+Before calling any tool, you must fully understand the tool's functions and their arguments.
+Always reason step by step.  If any argument is unknown or ambiguous, consider using other available tools (such as search or file inspection tools) to gather the necessary information before calling the target tool.
+Ensure the types and values of all arguments you provide to the tool functions are correct.
+If there is an error in calling the tool, you need to fix it yourself.\n
+        """
+        definition = name_exp + skill_exp + goal_exp + '\n' + constraints_exp
         return definition
 
     def publish_message(self):
@@ -182,7 +180,7 @@ class Role(BaseModel):
         lgr.debug("Self-Correction: %s", fix_msg)
         err = UserMessage(content=fix_msg, sender=RoleType.USER.val)
         self.rc.buffer.put_one_msg(err)
-        return False, ''
+        return False, 'self-correction'
 
     async def _perceive(self, ignore_history: bool = False) -> bool:
         news = self.rc.buffer.pop_all()
@@ -201,29 +199,31 @@ class Role(BaseModel):
         if len(self.rc.news) == 0:
             lgr.debug(f'{self} no new messages, waiting.')
         else:
-            new_texts = [f'{m.role.val}: {m.content[:60]}...' for m in self.rc.news]
+            new_texts = [f'{m.role.val}: {m.content[:80]}...' for m in self.rc.news]
             lgr.debug(f'{self} perceive {new_texts}.')
         return True if len(self.rc.news) > 0 else False
 
     async def _think(self) -> Optional[Tuple[bool, str]]:
         message = [self.sys_think_msg] + Message.to_message_list(self.rc.memory.get())
-        last_msg = message[-1]
         message_pure = []
 
-        # only show tool call intermediate info when fc, history info won't process it
-        if isinstance(last_msg, dict):
+        # filter history part of tool call message
+        if len(message) > 2:
+            do_not_del_lines = [len(message) - 1, len(message)]
             my_prefix = f'{self.name}({self.identity.val}):'
             my_tool_prefix = f'{self.name}({RoleType.TOOL.val}):'
-            if not last_msg['content'].startswith(my_prefix) and not last_msg['content'].startswith(my_tool_prefix):
-                for msg in message:
-                    if not isinstance(msg, dict):
-                        if not isinstance(msg, ChatCompletionMessage):
-                            message_pure.append(msg)
-                            continue
-                    else:
-                        if not msg['content'].startswith(my_tool_prefix):
-                            message_pure.append(msg)
-                            continue
+            for idx, msg in enumerate(message):
+                if isinstance(msg, ChatCompletionMessage):
+                    if idx + 1 in do_not_del_lines:
+                        message_pure.append(msg)
+                elif isinstance(msg, dict) and msg['content'].startswith(my_prefix):
+                    message_pure.append(msg)
+                elif isinstance(msg, dict) and msg['content'].startswith(my_tool_prefix):
+                    if idx + 1 in do_not_del_lines:
+                        message_pure.append(msg)
+                else:
+                    message_pure.append(msg)
+
         message_pure = message if not message_pure else message_pure
 
         think: Union[ChatCompletionMessage, str] = await self.agent_node.chat(message_pure, tools=self.toolkit.param_list)
@@ -283,6 +283,7 @@ class Role(BaseModel):
                     if is_valid_json(match_group):
                         think_process = json.loads(match_group).get('think_process', '')
                 self.answer = AssistantMessage(content=content, sender=self.name)
+                self.rc.memory.add_one(self.answer)
                 return False, json.dumps({'final_answer': content, 'think_process': think_process}, ensure_ascii=False)
             else:
                 fix_msg = 'Your returned json data does not have a "FINAL ANSWER" key. Please check'
@@ -297,11 +298,15 @@ class Role(BaseModel):
     async def _react(self) -> Optional[Message]:
         message = Message.from_any('no tools taken yet')
         for todo in self.rc.todos:
+            lgr.debug(f'{self} react `{todo[0].name}` with args {todo[1]}')
             run = partial(todo[0].run, llm=self.agent_node)
             try:
                 resp = await run(**todo[1])
                 if isinstance(resp, ToolResponse):
-                    resp = resp.info
+                    if resp.is_success():
+                        resp = resp.info
+                    else:
+                        resp = resp.msg
                 resp = json.dumps(resp, ensure_ascii=False) if not isinstance(resp, str) else resp
             except Exception as e:
                 message = Message(non_standard_dic={
@@ -332,6 +337,8 @@ class Role(BaseModel):
                 break
             todo, reply = await self._think()
             if not todo:
+                if reply == 'self-correction':
+                    continue
                 self.publish_message()
                 return reply
             resp = await self._react()

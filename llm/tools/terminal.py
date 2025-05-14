@@ -27,7 +27,7 @@ class Terminal(BaseTool, ABC):
     model_config = ConfigDict(arbitrary_types_allowed=True, extra="allow")
 
     name: str = 'execute_command'
-    desc: str = """Request to execute a CLI command on the system.
+    desc: str = """Request to execute a CLI(Command-Line Interface) command on the system.
 Use this when you need to perform system operations or run specific commands to accomplish any step in the user's task.
 You must tailor your command to the user's system and provide a clear explanation of what the command does.
 Prefer to execute complex CLI commands over creating executable scripts, as they are more flexible and easier to run.

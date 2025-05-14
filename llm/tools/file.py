@@ -16,7 +16,7 @@ from utils.path import root_dir
 from abc import ABC
 from llm.tools import BaseTool, ToolArgs
 from pydantic import ConfigDict, Field, BaseModel
-from typing import Optional, Literal, List, Union, DefaultDict
+from typing import Optional, Literal, List, Union, DefaultDict, get_args
 from core.resp import ToolResponse, Response
 from constant.base import Resp
 from pathlib import Path
@@ -31,18 +31,20 @@ class FileOperator(BaseModel):
 
     encoding: str = 'utf-8'
 
-    async def read_file(self, path: Union[str, Path]) -> str:
+    async def read_file(self, path: Union[str, Path]) -> ToolResponse:
         try:
-            return Path(path).read_text(encoding=self.encoding)  # return entity file content
+            return ToolResponse.success(Path(path).read_text(encoding=self.encoding))  # return entity file content
         except Exception as e:
             lgr.error(e)
-            return str(e)
+            return ToolResponse.fail(f'An error occurred while reading the file, detail error: {e}')
 
-    async def write_file(self, path: Union[str, Path], context: str) -> None:
+    async def write_file(self, path: Union[str, Path], context: str) -> ToolResponse:
         try:
             Path(path).write_text(context, encoding=self.encoding)
+            return ToolResponse.success(f'File {path} written successfully.')
         except Exception as e:
             lgr.error(e)
+            return ToolResponse.fail(f'Failed to write file: {path}, error detail: {e}')
 
     @staticmethod
     async def is_directory(path: Union[str, Path]) -> bool:
@@ -121,7 +123,7 @@ Notes for using the `str_replace` command:
     f_op: FileOperator = FileOperator()
 
     max_response_len: int = 16000
-    snippet_lines: int = 4
+    snippet_lines: int = Field(default=4, description='For file change preview.')
     expand_tabs: bool = True
     init_line: int = Field(default=1, description='first line number')
     truncated_message: str = (
@@ -135,43 +137,98 @@ Notes for using the `str_replace` command:
         view_range: Optional[List[int]] = kwargs.pop('view_range', None)
         file_text: Optional[str] = kwargs.pop('file_text', None)
         old_str: Optional[str] = kwargs.pop('old_str', None)
+        new_str: Optional[str] = kwargs.pop('new_str', None)
+        insert_line: Optional[int] = kwargs.pop('insert_line', None)
 
-        await self.validate_path(command, Path(path))
+        validate_resp = await self.validate_path(command, Path(path))
+        if not validate_resp.is_success():
+            return validate_resp
 
         if command == 'view':
             resp = await self.view(path, view_range)
         elif command == 'create':
             if file_text is None:
-                raise ToolError('The `file_text` parameter is required for the `create` command.')
+                return ToolResponse.fail(
+                    'The `file_text` parameter is required for the `create` command.'
+                )
             else:
-                await self.f_op.write_file(path, file_text)
-                self.file_history[path].append(file_text)
-                resp = ToolResponse.success(f'File created successfully at: {path}')
+                write_resp = await self.f_op.write_file(path, file_text)
+                if not write_resp.is_success():
+                    return write_resp
+                else:
+                    self.file_history[path].append(file_text)
+                    resp = ToolResponse.success(f'File created successfully at: {path}')
         elif command == 'str_replace':
-           if old_str is None:
-               raise ToolError("Parameter `old_str` is required for command: str_replace")
-           resp = await self.str_replace
+           if not old_str:
+               return ToolResponse.fail("Parameter `old_str` is required for command: str_replace")
+           resp = await self.str_replace(path, old_str, new_str)
+        elif command == 'insert':
+            if insert_line is None:
+                return ToolResponse.fail("Parameter `insert_line` is required for command: insert")
+            if new_str is None:
+                return ToolResponse.fail('Parameter `new_str` is required for command: insert')
+            resp = await self.insert(path, insert_line, new_str)
+        elif command == 'undo_edit':
+            resp = await self.undo_edit(path)
+        else:
+            command_choices = get_args(FileArgs.__annotations__['command'])
+            return ToolResponse.fail(
+                f'Unrecognized command {command}. The allowed commands for the {self.name} tool are: {command_choices}'
+            )
+        resp: Union[str, ToolResponse]
+        return resp if isinstance(resp, ToolResponse) else ToolResponse.success(resp)
 
-        return ToolResponse()
-
-    async def validate_path(self, command: str, path: Path) -> None:
+    async def validate_path(self, command: str, path: Path) -> ToolResponse:
         """ validate input path """
-        if not path.is_absolute():
-            raise ToolError(f'Path {path} must be a absolute path')
+        # if not path.is_absolute():
+        #     return ToolResponse.fail(f'`path` parameter: `{path}` must be a absolute path')
 
         if command != 'create':
             if not await self.f_op.exists(path):
-                raise ToolError(f'Path {path} does not exist, please check')
+                return ToolResponse.fail(f'`path` parameter: `{path}` does not exist, please check')
 
             is_dir = await self.f_op.is_directory(path)
             if is_dir and command != 'view':
-                raise ToolError(f'The path {path} is a directory and only the `view` command can be used on directories')
+                return ToolResponse.fail(f'The path {path} is a directory and only the `view` command can be used on directories')
 
         elif command == 'create':
             exists = await self.f_op.exists(path)
             if exists:
-                raise ToolError(f'Path {path} already exists, please check, '
-                                f'Cannot overwrite files using command `create`.')
+                return ToolResponse.fail(
+                    f'Path {path} already exists, please check, '
+                    f'Cannot overwrite files using command `create`.'
+                )
+        return ToolResponse.success('Path validated')
+
+    def _warp_output(
+            self,
+            file_content: Union[str, ToolResponse],
+            file_description: str,
+            init_line: int = 1,
+            expand_tabs: bool = True
+    ) -> str:
+        if isinstance(file_content, ToolResponse):
+            file_content = file_content.data
+        # truncate
+        if self.max_response_len and len(file_content) > self.max_response_len:
+            return file_content[:self.max_response_len] + self.truncated_message
+
+        if expand_tabs:
+            file_content = file_content.expandtabs()
+
+        file_content = '\n'.join(
+            [
+                f'{i + init_line:6}\t{line}'
+                for i, line in enumerate(file_content.split('\n'))
+            ]
+        )
+
+        final_content = (
+            f"Here's the result of running `cat -n` on {file_description}:\n"
+            + file_content
+            + '\n'
+        )
+        return final_content
 
     async def _view_directory(self, path) -> ToolResponse:
         file_cmd = f'find {path} -maxdepth 2 -not -path "*/\\.*"'
@@ -182,33 +239,35 @@ Notes for using the `str_replace` command:
                 f"excluding hidden items: \n{stdout}\n"
             )
         if stderr:
-            return ToolResponse(code=Resp.TOOL_OK.val, data=stdout)
+            return ToolResponse.fail(stderr)
         else:
-            return ToolResponse(code=Resp.TOOL_OK.val, msg=stderr)
+            return ToolResponse.success(stdout)
 
     async def _view_file(self, path, view_range, expand_tabs: bool = True) -> ToolResponse:
         file_content = await self.f_op.read_file(path)
+        if not file_content.is_success():
+            return file_content
 
         if view_range:
             if len(view_range) != 2 or not all(isinstance(i, int) for i in view_range):
-                raise ToolError(f'Invalid view_range, must be a list of two integers, e.g. [1, 10]')
+                return ToolResponse.fail(f'Invalid view_range, must be a list of two integers, e.g. [1, 10]')
 
             file_lines = file_content.split('\n')
             n_lines_file = len(file_lines)
             self.init_line, final_line = view_range
 
             if self.init_line < 1 or self.init_line > n_lines_file:
-                raise ToolError(
+                return ToolResponse.fail(
                     f'Invalid `view_range`: {view_range}. Its first element `{self.init_line}` should be '
                     f'within the range of lines of the file: {[1, n_lines_file]}'
                 )
             if final_line > n_lines_file:
-                raise ToolError(
+                return ToolResponse.fail(
                     f'Invalid `view_range`: {view_range}. Its second element `{final_line}` should be '
                     f'smaller than the number of lines in the file: `{n_lines_file}`'
                 )
             if final_line != -1 and final_line < self.init_line:
-                raise ToolError(
+                return ToolResponse.fail(
                     f'Invalid `view_range`: {view_range}. Its second element `{final_line}` should be '
                     f'larger or equal than its first `{self.init_line}`'
                 )
@@ -219,26 +278,8 @@ Notes for using the `str_replace` command:
                 file_content = '\n'.join(file_lines[self.init_line - 1: final_line])
 
         # truncate
-        if self.max_response_len and len(file_content) > self.max_response_len:
-            file_content = file_content[:self.max_response_len] + self.truncated_message
-        if expand_tabs:
-            file_content = file_content.expandtabs()
-
-        # add line number
-        file_content = '\n'.join(
-            [
-                f'{i + self.init_line:6}\t{line}'  # format width 6, right alignment
-                for i, line in enumerate(file_content.split('\n'))
-            ]
-        )
-
-        # postprocess
-        final_resp = (
-            f"Here's the result of running `cat -n` on {path}:\n"
-            + file_content
-            + "\n"
-        )
-        return ToolResponse(data=final_resp)
+        final_resp = self._warp_output(file_content, str(path), init_line=self.init_line)
+        return ToolResponse.success(data=final_resp)
 
     async def view(self, path: Union[str, Path], view_range: Optional[List[int]] = None) -> ToolResponse:
         """ view file / directory """
@@ -246,19 +287,24 @@ Notes for using the `str_replace` command:
 
         if is_dir:
             if view_range:
-                raise ToolError(f'The `view_range` parameter is not allowed when `path` points to a directory.')
+                return ToolResponse.fail(
+                    f'The `view_range` parameter is not allowed when `path` points to a directory.'
+                )
             return await self._view_directory(path)
         else:
             return await self._view_file(path, view_range)
 
-    async def str_replace(self, path: Union[str, Path], old_str: str, new_str: Optional[str] = None):
-        file_content = (await self.f_op.read_file(path)).expandtabs()
+    async def str_replace(self, path: Union[str, Path], old_str: str, new_str: Optional[str] = None) -> ToolResponse:
+        file_content = await self.f_op.read_file(path)
+        if not file_content.is_success():
+            return file_content
+        file_content = file_content.data.expandtabs()
         old_str = old_str.expandtabs()
         new_str = new_str.expandtabs() if new_str is not None else ''
 
         occurrences = file_content.count(old_str)
         if occurrences == 0:
-            raise ToolError(f"No replacement was performed, old_str `{old_str}` did not appear verbatim in {path}.")
+            return ToolResponse.fail(f"No replacement was performed, old_str `{old_str}` did not appear verbatim in {path}.")
         elif occurrences > 1:
             file_content_lines = file_content.split('\n')
             lines = [
@@ -266,14 +312,16 @@ Notes for using the `str_replace` command:
                 for idx, line in enumerate(file_content_lines)
                 if old_str in line
             ]
-            raise ToolError(
+            return ToolResponse.fail(
                 f"No replacement was performed. Multiple occurrences of old_str `{old_str}` "
                 f"in lines {lines}. Please ensure it is unique"
             )
 
         new_file_content = file_content.replace(old_str, new_str)
 
-        await self.f_op.write_file(path, new_file_content)
+        write_resp = await self.f_op.write_file(path, new_file_content)
+        if not write_resp.is_success():
+            return write_resp
 
         # save original
         self.file_history[path].append(file_content)
@@ -284,23 +332,62 @@ Notes for using the `str_replace` command:
         snippet = '\n'.join(new_file_content.split('\n')[start_line: end_line + 1])
 
         success_msg = f'The file {path} has been edited. '
+        success_msg += self._warp_output(snippet, f'a snippet of {path}', start_line + 1)
+        success_msg += 'Review the changes and make sure they are as expected. Edit the file again if necessary.'
+        return ToolResponse.success(data=success_msg)
 
-        if self.max_response_len and len(snippet) > self.max_response_len:
-            snippet = snippet[:self.max_response_len] + self.truncated_message
-        if self.expand_tabs:
-            snippet = snippet.expandtabs()
+    async def insert(self, path, insert_line, new_str):
+        file_text = await self.f_op.read_file(path)
+        if not file_text.is_success():
+            return file_text
+        file_text = file_text.data.expandtabs()
+        new_str = new_str.expandtabs()
+        file_text_lines = file_text.split('\n')
+        n_lines_file = len(file_text_lines)
 
-        # add line number
-        snippet = '\n'.join(
-            [
-                f'{i + start_line + 1:6}\t{line}'  # format width 6, right alignment
-                for i, line in enumerate(snippet.split('\n'))
-            ]
+        if insert_line < 0 or insert_line > n_lines_file:
+            return ToolResponse.fail(
+                f"Invalid `insert_line` parameter: {insert_line}. It should be within "
+                f"the range of lines of the file: {[0, n_lines_file]}"
+            )
+
+        # perform insertion
+        new_str_lines = new_str.split('\n')
+        new_file_text_lines = (
+            file_text_lines[:insert_line]
+            + new_str_lines
+            + file_text_lines[insert_line:]
         )
 
-        # postprocess
-        final_resp = (
-            f"Here's the result of running `cat -n` on a snippet of {path}:\n"
-            + snippet
-            + "\n"
+        # for preview
+        snippet_lines = (
+            file_text_lines[max(0, insert_line - self.snippet_lines): insert_line]
+            + new_str_lines
+            + file_text_lines[insert_line: insert_line + self.snippet_lines]
         )
+
+        new_file_text = '\n'.join(new_file_text_lines)
+        snippet = '\n'.join(snippet_lines)
+
+        write_resp = await self.f_op.write_file(path, new_file_text)
+        if not write_resp.is_success():
+            return write_resp
+        self.file_history[path].append(file_text)
+
+        success_msg = f'The file {path} has been edited.'
+        success_msg += self._warp_output(snippet, 'a snippet of the edited file', max(1, insert_line - self.snippet_lines + 1))
+        success_msg += ('Review the changes and make sure they are as expected (correct indentation,'
+                        ' no duplicate lines, etc). Edit the file again if necessary.')
+        return ToolResponse.success(data=success_msg)
+
+    async def undo_edit(self, path: Union[str, Path]) -> ToolResponse:
+        if not self.file_history[path]:
+            return ToolResponse.fail(f"No edit history found for {path}.")
+
+        old_text = self.file_history[path].pop()
+        write_resp = await self.f_op.write_file(path, old_text)
+        if not write_resp.is_success():
+            return write_resp
+        display_text = self._warp_output(old_text, str(path))
+        display_text = f"Last edit to {path} undone successfully. {display_text}"
+        return ToolResponse.success(display_text)

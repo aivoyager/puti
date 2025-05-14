@@ -147,6 +147,7 @@ class TwitterAPI(Client, ABC):
         Query all unreplied mention tweets
         :return: List of unreplied tweets
         """
+        self._refresh_headers()
         url = f"{self.base_url}/users/{self.conf.MY_ID}/mentions"
         resp = requests.get(url, headers=self.headers)
         try:
@@ -165,3 +166,18 @@ class TwitterAPI(Client, ABC):
             pass
         unreplied = [m for m in mentions if m["id"] not in replied_ids]
         return unreplied
+
+    def get_my_id(self) -> str:
+        """
+        获取当前认证用户的ID
+        :return: 用户ID字符串
+        """
+        self._refresh_headers()
+        url = f"{self.base_url}/users/me"
+        try:
+            resp = requests.get(url, headers=self.headers)
+            resp.raise_for_status()
+            return resp.json()["data"]["id"]
+        except Exception as e:
+            lgr.error(f"获取用户ID失败: {e}")
+            return ""
