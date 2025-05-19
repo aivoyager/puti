@@ -32,3 +32,4 @@ psutil
 tenacity
 redis
 gevent
+googlesearch-python

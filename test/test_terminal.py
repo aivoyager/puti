@@ -6,8 +6,10 @@
 import asyncio
 import json
 
+from llm.tools.web_search import WebSearch
 from llm.tools.terminal import Terminal
 from llm.roles.alex import Alex
+from llm.tools.web_search import GoogleSearchEngine
 
 
 def test_echo():
@@ -58,3 +60,15 @@ def test_file():
     prompt_delete = "请删除 test_file_tool_renamed.txt 文件"
     resp_delete = asyncio.run(alex.run(prompt_delete))
     assert '删除' in resp_delete or '不存在' in asyncio.run(alex.run('请读取 test_file_tool_renamed.txt'))
+
+
+def test_web_search_tool():
+    # g_search = GoogleSearchEngine()
+    # resp = g_search.search('罗伯特 唐尼')
+    # resp = list(resp)
+    # alex = Alex()
+    # resp = asyncio.run(alex.run('请搜索 "python" 并输出前5条结果'))
+
+    wb = WebSearch()
+    resp = asyncio.run(wb.run(query='罗伯特 唐尼', num_results=10))
+    print(resp)
