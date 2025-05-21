@@ -37,6 +37,16 @@ beat_schedule = {
         'task': 'celery_queue.tasks.periodic_post_tweet',
         'schedule': crontab(hour=11, minute=40),
         'args': ()
+    },
+    'periodic-get-mentions': {
+        'task': 'celery_queue.tasks.periodic_get_mentions',
+        'schedule': crontab(minute='*/4'),
+        'args': ()
+    },
+    'periodic-reply-to-tweet': {
+        'task': 'celery_queue.tasks.periodic_reply_to_tweet',
+        'schedule': crontab(minute='*/5'),
+        'args': ()
     }
 }
 broker_transport_options = {

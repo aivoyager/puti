@@ -9,3 +9,4 @@ from constant.base import Base
 
 class Utilities(Base):
     CELERY = ('celery', 'celery module')
+    MYSQL = ('mysql', 'mysql module')

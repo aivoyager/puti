@@ -51,3 +51,15 @@ def test_celery_conf():
     from conf.celery_private_conf import CeleryPrivateConfig
     c = CeleryPrivateConfig()
     print('')
+
+
+def test_mysql_config():
+    from conf.mysql_conf import MysqlConfig
+    config = MysqlConfig()
+    assert config.USERNAME is not None, "USERNAME 配置未加载"
+    assert config.PASSWORD is not None, "PASSWORD 配置未加载"
+    assert config.HOSTNAME is not None, "HOSTNAME 配置未加载"
+    assert config.DB_NAME is not None, "DB_NAME 配置未加载"
+    assert config.PORT is not None, "PORT 配置未加载"
+    print(f"MysqlConfig: USERNAME={config.USERNAME}, HOSTNAME={config.HOSTNAME}, DB_NAME={config.DB_NAME}, PORT={config.PORT}")
+

@@ -59,7 +59,7 @@ class WebSearch(BaseTool, ABC):
                 script.decompose()
 
             text = soup.get_text(separator='\n')
-            resp = f'\n{}'
+            # resp = f'\n{}'
             return ToolResponse.success(data='Searched context: ' + text.strip())
         except Exception as e:
             return ToolResponse.fail(msg=f"Failed to fetch text from URL: {url}. Error: {str(e)}")
