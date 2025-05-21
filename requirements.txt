@@ -33,3 +33,4 @@ tenacity
 redis
 gevent
 googlesearch-python
+pymysql
