@@ -144,6 +144,23 @@ class OpenAINode(LLMNode):
                 lgr.info(f"cost: {self.cost.total_cost}")
             return full_reply
 
+    async def embedding(self, text: str, model: str = None, **kwargs) -> List[float]:
+        """调用 OpenAI embedding 接口，将文本转换为向量"""
+        try:
+            model_name = model or getattr(self.conf, 'EMBEDDING_MODEL', 'text-embedding-ada-002')
+            resp = self.cli.embeddings.create(
+                input=text,
+                model=model_name,
+                **kwargs
+            )
+            embedding = resp.data[0].embedding if hasattr(resp, 'data') and resp.data else None
+            if embedding is None:
+                raise ValueError('Embedding 返回为空')
+            return embedding
+        except Exception as e:
+            lgr.error(f"embedding 失败: {e}")
+            raise
+
 
 @singleton
 class OllamaNode(LLMNode):

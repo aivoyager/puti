@@ -5,6 +5,8 @@
 """
 import asyncio
 import requests
+import time
+import random
 
 from utils.path import root_dir
 from abc import ABC, abstractmethod
@@ -26,7 +28,17 @@ class WebSearchEngine(BaseModel, ABC):
 class GoogleSearchEngine(WebSearchEngine):
 
     def search(self, query, num_results: int = 10, *args, **kwargs):
-        return g_search(query, num=num_results, *args, **kwargs)
+        gen_resp = g_search(query, num=num_results, *args, **kwargs)
+        count = 0
+        resp = []
+        while count < num_results:
+            try:
+                url = next(gen_resp)
+                resp.append(url)
+                count += 1
+            except StopIteration:
+                break
+        return resp
 
 
 class WebSearchArgs(ToolArgs, ABC):
@@ -50,17 +62,21 @@ class WebSearch(BaseTool, ABC):
     @staticmethod
     def fetch_text_from_url(url) -> ToolResponse:
         try:
-            headers = {'User-Agent': 'Mozilla/5.0'}
+            # time.sleep(random.uniform(1, 3))
+            headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'}
             resp = requests.get(url, headers=headers, timeout=10)
             resp.raise_for_status()
-            soup = BeautifulSoup(resp.text, 'html.parser')
+            if resp.status_code == 200:
+                soup = BeautifulSoup(resp.text, 'html.parser')
+                for script in soup(['script', 'style']):
+                    script.decompose()
 
-            for script in soup(['script', 'style']):
-                script.decompose()
-
-            text = soup.get_text(separator='\n')
-            # resp = f'\n{}'
-            return ToolResponse.success(data='Searched context: ' + text.strip())
+                text = soup.get_text(separator='\n')
+                lines = [line.strip() for line in text.splitlines()]
+                clean_text = ''.join(line for line in lines if line)
+                return ToolResponse.success(data='Searched context: ' + clean_text)
+            else:
+                return ToolResponse.fail(msg=f"Failed to fetch text from URL: {url}. Status code: {resp.status_code}")
         except Exception as e:
             return ToolResponse.fail(msg=f"Failed to fetch text from URL: {url}. Error: {str(e)}")
 
@@ -70,6 +86,13 @@ class WebSearch(BaseTool, ABC):
         loop = asyncio.get_event_loop()
         search_resp = await loop.run_in_executor(
             None,
-            lambda: list(search_engine.search(query, num_results=num_results))
+            lambda: search_engine.search(query, num_results=num_results)
         )
+        total_content = []
+        for url in search_resp:
+            resp = await self.fetch_text_from_url(url)
+
+            if resp.is_success():
+                return resp
+        
         return search_resp
