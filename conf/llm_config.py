@@ -42,6 +42,7 @@ class LLMConfig(Config):
 
 
 class OpenaiConfig(LLMConfig):
+    model_config = ConfigDict(arbitrary_types_allowed=True)
 
     FAISS_SEARCH_TOP_K: Optional[int] = None
 

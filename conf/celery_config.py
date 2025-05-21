@@ -45,7 +45,7 @@ beat_schedule = {
     },
     'periodic-reply-to-tweet': {
         'task': 'celery_queue.tasks.periodic_reply_to_tweet',
-        'schedule': crontab(minute='*/5'),
+        'schedule': crontab(minute='*/1'),
         'args': ()
     }
 }

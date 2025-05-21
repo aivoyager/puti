@@ -11,9 +11,10 @@ from llm.roles.talker import PuTi, PuTiMCP
 from llm.messages import Message
 from llm.roles.debater import Debater
 from llm.nodes import OllamaNode
-from conf.llm_config import LlamaConfig
+from conf.llm_config import LlamaConfig, OpenaiConfig
 from llm.roles.cz import CZ
 from llm.nodes import OpenAINode
+from llm.roles.x_bot import TwitWhiz
 
 # sys.stdout.reconfigure(line_buffering=True)
 
@@ -78,5 +79,10 @@ def test_state_choose():
 def test_cz():
     cz = CZ(agent_node=OpenAINode())
     resp = cz.cp.invoke(cz.run, 'generate a cz tweet')
+    print(resp)
+
+def test_x_bot():
+    x_bot = TwitWhiz()
+    resp = x_bot.cp.invoke(x_bot.run, 'hihi')
     print(resp)
 
