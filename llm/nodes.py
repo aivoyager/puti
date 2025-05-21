@@ -97,7 +97,7 @@ class LLMNode(BaseModel, ABC):
         return resp
 
 
-@singleton
+# @singleton
 class OpenAINode(LLMNode):
 
     async def chat(self, msg: List[Dict], **kwargs) -> Union[str, ChatCompletionMessage]:
@@ -109,7 +109,7 @@ class OpenAINode(LLMNode):
                 messages=msg,
                 timeout=self.conf.LLM_API_TIMEOUT,
                 stream=stream,
-                max_tokens=self.conf.MAX_TOKEN,
+                # max_tokens=self.conf.MAX_TOKEN,
                 temperature=self.conf.TEMPERATURE,
                 model=self.conf.MODEL,
                 **kwargs

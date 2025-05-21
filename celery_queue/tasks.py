@@ -48,9 +48,11 @@ def add(x, y):
 def periodic_post_tweet():
     start_time = datetime.now()
     try:
-        loop = asyncio.get_event_loop()
-        tweet = loop.run_until_complete(cz.run('give me a tweet'))
-        tweet = json.loads(tweet)['final_answer']
+        # loop = asyncio.get_event_loop()
+        lgr.debug(f'============== [定时任务] periodic_post_tweet 开始执行 ==============')
+        tweet = cz.cp.invoke(cz.run, 'give me a tweet')
+        # tweet = loop.run_until_complete(cz.run('give me a tweet'))
+        tweet = tweet.data['final_answer']
         lgr.debug(f'[定时任务] 准备发送推文内容: {tweet}')
 
         def safe_post_tweet():

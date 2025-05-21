@@ -77,8 +77,8 @@ def test_state_choose():
 
 
 def test_cz():
-    cz = CZ(agent_node=OpenAINode())
-    resp = cz.cp.invoke(cz.run, 'generate a cz tweet')
+    cz = CZ()
+    resp = cz.cp.invoke(cz.run, 'give me a tweet')
     print(resp)
 
 def test_x_bot():

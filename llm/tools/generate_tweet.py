@@ -23,16 +23,20 @@ model = 'gemini-2.5-pro-preview-03-25'
 
 
 class GenerateCzArgs(ToolArgs):
-    topic: str = Field(default='', description="It is necessary to determine whether the user's intention is to want a tweet about a specific topic. "
-                                   "If so, then pass in this parameter as the corresponding topic; otherwise, don't pass this parameter."
-                       )
+    topic: str = Field(
+        default='',
+        description="""`topic` is an optional parameter that guides tweet generation toward a specific theme, subject, or keyword.
+If the user’s input clearly expresses a desire to focus on a particular topic (e.g., “Write a tweet about Elon Musk”), extract the relevant keyword or phrase and set it as the topic.
+If the input is vague or does not suggest any particular direction (e.g., “Post something funny”), leave topic unset and allow the model to generate freely.
+"""
+)
 
 
 class GenerateTweet(BaseTool, ABC):
     model_config = ConfigDict(arbitrary_types_allowed=True, extra="allow")
 
     name: str = 'generate_tweet'
-    desc: str = 'Use this tool to generate/post a tweet can be posted on twitter/x.'
+    desc: str = 'Use this tool to generate a tweet can be posted on x website.'
     args: GenerateCzArgs = None
 
     async def run(self, topic='', *args, **kwargs):
@@ -46,21 +50,25 @@ class GenerateTweet(BaseTool, ABC):
             topic_exp = ''
             topic_constraint = ''
         sys = """
-You play a role in the blockchain area called "赵长鹏" （cz or changpeng zhao）. Reply with his accent（learn from recent tweeting styles by search result).
+You play a role in the blockchain area called "赵长鹏" （cz or changpeng zhao）, Reply with his accent.
 """
         prompt = f"""
-Come up a tweet{topic_exp}, which tweet characters must be around 200. Just give the tweet, nothing extra.
-Easier to understand(English).{topic_constraint}. Be more diverse and don't always use fixed catchphrases.
-Your cognition is limited. For some unfamiliar fields, reply to tweets like a normal person. Sometimes casually, sometimes seriously. 
-Don't act too much like an expert.Analyze cz's recent 30 tweet style (Retweets are not counted) from your search results. Return tweets and think process
-in following json format, 
-        """
-        json_format = '{"generated_tweet": Your generated tweet result, "think_process": Your think process result}.'
+1. Come up a tweet{topic_exp}, which tweet characters must be around 200. 
+2. Just give the tweet and think process, nothing extra.
+3. Easier to understand(English).{topic_constraint} Be more diverse and don't always use fixed catchphrases.
+4. Your cognition is limited. For some unfamiliar fields, reply to tweets like a normal person. Sometimes casually, sometimes seriously. 
+5. Don't act too much like an expert.Analyze cz's recent 30 tweet style (Retweets are not counted) from your search results.
+Return in fixed json format:
+"""
+        json_format = ' {"generated_tweet": Your generated tweet result, "think_process": Your think process result}'
         prompt += json_format
 
         with open(root_dir() / 'data' / 'tweet_chunk.txt', 'r') as f:
             his_tweets = f.read()
-        history_tweets_prompt = f'\nThe following are some historical tweets of cz that are separated by the === symbol as style references\n{his_tweets}'
+        history_tweets_prompt = (
+            f'\nThe following are some historical tweets of cz that are separated by the'
+            f' === symbol as style references\n{his_tweets}'
+        )
         prompt += history_tweets_prompt
 
         message = [

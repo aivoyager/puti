@@ -3,12 +3,16 @@
 @Time:  2025-04-09 16:32
 @Description:  
 """
+from typing import Any
 
 from llm.roles import McpRole
 from llm.tools.generate_tweet import GenerateTweet
 from llm.messages import UserMessage
 from db.faisss import FaissIndex
 from utils.path import root_dir
+from logs import logger_factory
+
+lgr = logger_factory.llm
 
 rag_prompt = """
 Here is some reference information that you can use to answer the user's question:
@@ -29,6 +33,9 @@ Based on the above provided information (Just a reference.), please answer the u
 class CZ(McpRole):
     name: str = 'cz or 赵长鹏 or changpeng zhao'
 
+    def model_post_init(self, __context: Any) -> None:
+        self.agent_node.conf.MODEL = 'gemini-2.5-pro-preview-03-25'
+
     async def run(self, text, *args, **kwargs):
         self.agent_node.conf.STREAM = False
         intention_prompt = """
@@ -37,6 +44,7 @@ class CZ(McpRole):
         Here is user input: {}
         """.format(text)
         judge_rsp = await self.agent_node.chat([UserMessage.from_any(intention_prompt).to_message_dict()])
+        lgr.debug(f'post tweet choice is {judge_rsp}')
         if judge_rsp == '1':
             resp = await super(CZ, self).run(text, *args, **kwargs)
         else:

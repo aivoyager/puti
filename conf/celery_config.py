@@ -23,9 +23,10 @@ task_serializer = 'json'
 result_serializer = 'json'
 accept_content = ['json']
 timezone = 'Asia/Shanghai'
+task_always_eager = True
 task_eager_propagates = True
 enable_utc = False
-max_retries = 3
+max_retries = 0
 retry_delay = 3
 
 # 设置日志级别
@@ -35,17 +36,17 @@ beat_log_level = 'INFO'
 beat_schedule = {
     'periodic-post-tweet': {
         'task': 'celery_queue.tasks.periodic_post_tweet',
-        'schedule': crontab(hour=15, minute=10),
+        'schedule': crontab(hour=8, minute=0),
         'args': ()
     },
     'periodic-get-mentions': {
         'task': 'celery_queue.tasks.periodic_get_mentions',
-        'schedule': crontab(minute='*/1'),
+        'schedule': crontab(minute='*/5'),
         'args': ()
     },
     'periodic-reply-to-tweet': {
         'task': 'celery_queue.tasks.periodic_reply_to_tweet',
-        'schedule': crontab(minute='*/1'),
+        'schedule': crontab(minute='*/5'),
         'args': ()
     }
 }
