@@ -35,12 +35,12 @@ beat_log_level = 'INFO'
 beat_schedule = {
     'periodic-post-tweet': {
         'task': 'celery_queue.tasks.periodic_post_tweet',
-        'schedule': crontab(hour=11, minute=40),
+        'schedule': crontab(hour=15, minute=10),
         'args': ()
     },
     'periodic-get-mentions': {
         'task': 'celery_queue.tasks.periodic_get_mentions',
-        'schedule': crontab(minute='*/4'),
+        'schedule': crontab(minute='*/1'),
         'args': ()
     },
     'periodic-reply-to-tweet': {
