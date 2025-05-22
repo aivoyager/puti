@@ -45,7 +45,7 @@ class Response(BaseModel):
 
 class ToolResponse(Response):
     """ Tool Response """
-    data: str = Field(default='', validate_default=True, description='tool execution successfully result')
+    data: Union[str, dict, list] = Field(default='', validate_default=True, description='tool execution successfully result')
     msg: str = Field(default=Resp.TOOL_OK.dsp, validate_default=True, description='tool execution failed result')
     code: int = Field(default=Resp.TOOL_OK.val, validate_default=True, description='tool execution failed result')
 
@@ -54,5 +54,5 @@ class ToolResponse(Response):
         return ToolResponse(code=Resp.TOOL_FAIL.val, msg=msg)
 
     @classmethod
-    def success(cls, data: str = None) -> 'ToolResponse':
+    def success(cls, data: Union[str, dict, list] = None) -> 'ToolResponse':
         return ToolResponse(code=Resp.TOOL_OK.val, msg=Resp.TOOL_OK.dsp, data=data)

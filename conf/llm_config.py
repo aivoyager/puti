@@ -5,7 +5,7 @@
 """
 from conf.config import Config
 from constant.base import Modules
-from pydantic import ConfigDict
+from pydantic import ConfigDict, Field
 from constant.llm import LLM
 from typing import Optional, Union
 from openai.types.chat_model import ChatModel
@@ -45,6 +45,7 @@ class OpenaiConfig(LLMConfig):
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     FAISS_SEARCH_TOP_K: Optional[int] = None
+    EMBEDDING_MODEL: str = Field(default=None, description='Embedding model name')
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)

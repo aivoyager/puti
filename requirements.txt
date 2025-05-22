@@ -34,3 +34,4 @@ redis
 gevent
 googlesearch-python
 pymysql
+llama_index
