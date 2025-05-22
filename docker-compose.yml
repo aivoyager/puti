@@ -12,7 +12,7 @@ services:
       # 服务的部署模式。replicated 模式意味着该服务将以指定的副本数进行复制部署。其他模式包括 global，它会在每个节点上运行一个实例。
       mode: replicated
       # 启动三个 api 服务的实例，以确保高可用性和负载均衡。
-      replicas: 3
+      replicas: 1
       # Traefik反向代理
       labels:
         traefik.enable: 'true'
