@@ -53,7 +53,7 @@ setup(
         "pymysql==1.1.1",
         "llama_index==0.12.37",
     ],
-    python_requires="==3.12",
+    python_requires=">=3.10",
     classifiers=[
         "Programming Language :: Python :: 3",
         "License :: OSI Approved :: MIT License",
