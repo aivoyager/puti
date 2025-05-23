@@ -1,0 +1,59 @@
+client:
+  - # If you have `twitter` third party server, see more detail in `twitter` official dev dashboard
+    - twitter:
+        BEARER_TOKEN: ""
+        API_KEY: ""
+        API_SECRET_KEY: ""
+        ACCESS_TOKEN: ""  # oath 2 access token
+        ACCESS_TOKEN_SECRET: ""
+        CLIENT_ID: ""
+        CLIENT_SECRET: ""
+        USER_NAME: ""
+        PASSWORD: ""
+        MY_ID: ""
+    # If you have `lunar` third party server
+    - lunar:
+        HOST: ""  # e.g. https://lunarcrush.com/api4
+        API_KEY: "You `lunar` api key here"
+        ENDPOINT: ""  # e.g. /public/creator/twitter/{name}/v1
+utilities:
+    # If you have `celery` server
+    - celery:
+        BROKER_URL: ""  # e.g. redis://127.0.0.1:6379/0
+        RESULT_BACKEND_URL: ""  # e.g. redis://127.0.0.1:6379/1
+    # If you have `mysql` server
+    - mysql:
+        USERNAME: ""
+        PASSWORD: ""
+        HOSTNAME: ""
+        DB_NAME: ""
+        PORT: 3306
+llm:
+    - openai:
+        EMBEDDING_MODEL: ""  # e.g. text-embedding-3-small
+        FAISS_SEARCH_TOP_K: 5
+        MODEL: ""  # e.g. o4-mini
+        BASE_URL: ""
+        API_KEY: "Your openai API key here"  # < required >
+        MAX_TOKEN: 4096
+        TEMPERATURE: 0.0
+        TOP_K: 1.0
+        TOP_P: 0
+        REPETITION_PENALTY: 1.0
+        STOP: null
+        PRESENCE_PENALTY: 0.0
+        FREQUENCY_PENALTY: 0.0
+        BEST_OF: null
+        N: null
+        STREAM: true
+        SEED: null
+        LOGPROBS:
+        TOP_LOGPROBS: null
+        TIMEOUT: 10
+        CONTEXT_LENGTH: null
+        LLM_API_TIMEOUT: 60
+        VERBOSE: true
+    - llama:
+        BASE_URL: "Your ollama server ip:host"  # ollama e.g. 127.0.0.1:11434
+        MODEL: "Your model name"  # e.g. llama3.1
+        STREAM: true

@@ -1,7 +1,7 @@
 """
 @Author: obstacles
 @Time:  2025-05-19 10:57
-@Description:  
+@Description:  `llama_index` not support python 3.12
 """
 import re
 import asyncio
@@ -19,7 +19,6 @@ from bs4 import BeautifulSoup
 from googlesearch import search as g_search
 from pydantic import BaseModel, ConfigDict, Field
 # from llama_index.core import VectorStoreIndex, Document
-
 from core.resp import Response, ToolResponse
 from llm.nodes import LLMNode, OpenAINode
 from llm.tools import BaseTool, ToolArgs

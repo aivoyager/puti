@@ -24,10 +24,8 @@ from constant.client import Client
 __all__ = ['Config', 'conf']
 
 system_name = platform.system()
-conf_path = Path('/Users/wangshuang/PycharmProjects/data/config2.yaml')
 
-if system_name.upper() == 'LINUX':
-    conf_path = root_dir() / 'conf' / 'config2.yaml'
+conf_path = root_dir() / 'conf' / 'config.yaml'
 
 # Later priority is higher, storing your secret key in somewhere else
 DEFAULT_CONF_PATHS: List[Path] = [
