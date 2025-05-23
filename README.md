@@ -50,6 +50,9 @@ Puti is a Multi-Agent framework designed to tackle complex tasks through collabo
 ## 📦 Installation
 
 Clone the repository and install required dependencies:
+```bash
+pip install ai-puti
+```
 
 ```bash
 git clone https://github.com/aivoyager/puti.git

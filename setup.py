@@ -6,11 +6,11 @@ with open(os.path.join(os.path.dirname(__file__), "README.md"), "r", encoding="u
 
 setup(
     name="ai_puti",
-    version="0.1.0b1",
+    version="0.1.0b2",
     description="puti: MultiAgent-based package for LLM",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    keywords="llm, multiagent, package, agent, twikit, openai, websearch, terminal, python, file, fastapi",
+    keywords="llm, multiagent, package, agent, twikit, openai, websearch, terminal, python, file, fastapi, mcp",
     maintainer="obstaclews",
     author="obstaclews",
     author_email="obstaclesws@qq.com",
@@ -20,7 +20,7 @@ setup(
     install_requires=[
         "pytz==2022.6",
         "click==8.1.3",
-        "requests==2.28.1",
+        "requests",
         "celery==5.4.0",
         "colorama==0.4.6",
         "fastapi==0.115.11",
