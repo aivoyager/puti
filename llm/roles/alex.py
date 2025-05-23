@@ -9,6 +9,7 @@ from llm.tools.talk import Reply
 from llm.tools.terminal import Terminal
 from llm.tools.python import Python
 from llm.tools.file import File
+from llm.tools.web_search import WebSearch
 
 
 class Alex(Role):
@@ -16,4 +17,4 @@ class Alex(Role):
 
     def __init__(self, **kwargs) -> None:
         super().__init__(**kwargs)
-        self.set_tools([Terminal, Python, File])
+        self.set_tools([Terminal, Python, File, WebSearch])

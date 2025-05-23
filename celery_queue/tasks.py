@@ -48,13 +48,12 @@ def add(x, y):
 def periodic_post_tweet():
     start_time = datetime.now()
     try:
-        # loop = asyncio.get_event_loop()
-        lgr.debug(f'============== [定时任务] periodic_post_tweet 开始执行 ==============')
-        tweet = cz.cp.invoke(cz.run, 'give me a tweet')
-        # tweet = loop.run_until_complete(cz.run('give me a tweet'))
-        tweet = tweet.data['final_answer']
+        loop = asyncio.get_event_loop()
+        tweet = loop.run_until_complete(cz.run('give me a tweet'))
+        tweet = json.loads(tweet)['final_answer']
         lgr.debug(f'[定时任务] 准备发送推文内容: {tweet}')
 
+        @retry(stop=stop_after_attempt(3), wait=wait_fixed(1), reraise=True)
         def safe_post_tweet():
             url = f"https://api.game.com/ai/xx-bot/twikit/post_tweet?text={quote(tweet)}"
             response = requests.post(url, timeout=10)
@@ -78,6 +77,7 @@ def periodic_get_mentions():
         url = f"https://api.game.com/ai/xx-bot/twikit/get_mentions?query_name={x_conf.USER_NAME}"
         lgr.debug(f'[定时任务] 请求接口: {url}')
 
+        @retry(stop=stop_after_attempt(3), wait=wait_fixed(1), reraise=True)
         def safe_get_mentions():
             response = requests.post(url, timeout=10)
             response.raise_for_status()
@@ -114,6 +114,7 @@ def periodic_reply_to_tweet():
                 url = f"https://api.game.com/ai/xx-bot/twikit/reply_to_tweet?text={quote(reply_text)}&tweet_id={mention_id}&author_id={author_id}"
                 lgr.debug(f'[定时任务] 请求接口: {url}')
 
+                @retry(stop=stop_after_attempt(3), wait=wait_fixed(1), reraise=True)
                 def safe_reply_to_tweet():
                     response = requests.post(url, timeout=10)
                     response.raise_for_status()

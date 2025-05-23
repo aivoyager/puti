@@ -9,10 +9,11 @@ import random
 import requests
 import time
 import numpy as np
+import itertools
+import tiktoken
 
 from sklearn.metrics.pairwise import cosine_similarity
 from typing import List
-
 from abc import ABC, abstractmethod
 from bs4 import BeautifulSoup
 from googlesearch import search as g_search
@@ -32,17 +33,18 @@ lgr = logger_factory.llm
 class WebSearchEngine(BaseModel, ABC):
 
     @abstractmethod
-    def search(self, query, num_results: int = 10, *args, **kwargs):
+    def search(self, query, retrieval_url_count, *args, **kwargs):
         pass
 
 
 class GoogleSearchEngine(WebSearchEngine):
 
-    def search(self, query, num_results: int = 10, *args, **kwargs):
-        gen_resp = g_search(query, num=num_results, *args, **kwargs)
+    def search(self, query, retrieval_url_count, *args, **kwargs):
+        # `num` This argument didn't work
+        gen_resp = g_search(query, num=retrieval_url_count, *args, **kwargs)
         count = 0
         resp = []
-        while count < num_results:
+        while count < retrieval_url_count:
             try:
                 url = next(gen_resp)
                 resp.append(url)
@@ -53,8 +55,8 @@ class GoogleSearchEngine(WebSearchEngine):
 
 
 class WebSearchArgs(ToolArgs, ABC):
-    query: str = Field(..., description="The search query to submit to the search engine.")
-    num_results: int = Field(default=10, description="The number of search results to return. Default is 10.")
+    query: str = Field(..., description="The search query text.")
+    num_results: int = Field(default=3, description="The number of search results to return. Default is 3.")
 
 
 class WebSearch(BaseTool, ABC):
@@ -62,9 +64,17 @@ class WebSearch(BaseTool, ABC):
     model_config = ConfigDict(arbitrary_types_allowed=True, extra="allow")
 
     name: str = 'web_search'
-    desc: str = """Perform a web search and return a list of relevant links.
-    This function attempts to use the primary search engine API to get up-to-date results.
-    If an error occurs, it falls back to an alternative search engine."""
+    desc: str = """Performs a web search using a search engine to find real-time, up-to-date information from the
+     internet. Use this tool when you need current information beyond your knowledge cut-off date, or to find specific
+      facts, news, articles, or general information on any topic not readily available in your training data.
+      When to use:
+        "To find information about current events, news, or topics that have developed after your last knowledge update.",
+        "To answer specific factual questions that require up-to-date information (e.g., 'What is the current stock price of AAPL? ', 'When is the next solar eclipse visible from North America?').",
+        "When asked to find specific articles, research papers, product details, or official documentation available online.",
+        "To verify information or find diverse perspectives on a topic from multiple web sources.",
+        "When the user explicitly asks you to search the internet or 'Google' something.",
+        "If your internal knowledge is insufficient, too general, or likely outdated for the user's query."
+      """
     args: WebSearchArgs = None
 
     _search_engine: dict[str, WebSearchEngine] = {
@@ -72,40 +82,53 @@ class WebSearch(BaseTool, ABC):
     }
     chunk_storage: List[str] = []
 
-    def split_into_chunks(self, text: str, max_length: int = 500, chunk_overlap: float = 0.1) -> List[str]:
-        sentences = re.findall(r'[^。！？．!?.,]+[。！？．!?.,]?', text)
-        chunks = []
+    def split_into_chunks(self, text: str, max_chars: int = 5000, overlap_sentences_count: int = 1) -> List[str]:
+        sentences_text_list = re.findall(r'[^。！？．!?.]+[。！？．!?.]?', text)
+        sentences_text_list = [s.strip() for s in sentences_text_list if s.strip()]
+        if not sentences_text_list:
+            return []
+        chunk_storage = []
         current_chunk = []
-        current_length = 0
-        overlap_size = int(max_length * chunk_overlap)
-
-        for sentence in sentences:
-            sentence = sentence.strip()
-            if not sentence:
+        current_chunk_chars = 0
+        enc = tiktoken.get_encoding("cl100k_base")
+        for sentence in sentences_text_list:
+            sentence_text = sentence.strip()
+            if not sentence_text:
                 continue
-            # 首个chunk不进行分块
-            if current_length + len(sentence) > max_length and current_chunk:
-                chunks.append(' '.join(current_chunk))
-                # 保留重叠部分 current[N:] 最后n个句子作为重叠内容 ，保留上一轮的N个句子
-                current_chunk = current_chunk[
-                                -int(
-                                    # 保留多少个句子才能达到overlap_size字符数的重叠，为粗略估计，假设所有句子长度和最后一句差不多
-                                    # overlap_size / len(current_chunk[-1])
-                                    overlap_size / (
-                                        len(current_chunk[-1]) if current_chunk else 1
-                                    )
-                                ):
-                ]
-                current_length = sum(len(s) for s in current_chunk)
 
-            current_chunk.append(sentence)
-            current_length += len(sentence)
+            while len(sentence_text) > max_chars:
+                overlap_len = max_chars // 5 if overlap_sentences_count > 0 else 0
+                chunk_storage.append(sentence_text[:max_chars])
+                print(f"[debug] forced split chunk chars={len(sentence_text[:max_chars])} tokens={len(enc.encode(sentence_text[:max_chars]))}")
+                sentence_text = sentence_text[max_chars - overlap_len:]
 
+            if current_chunk:
+                join_len = len(''.join(current_chunk)) + len(sentence_text)
+            else:
+                join_len = len(sentence_text)
+
+            if join_len > max_chars:
+                chunk = ''.join(current_chunk)
+                lgr.debug(f"chunk chars={len(chunk)} tokens={len(enc.encode(chunk))}")
+                chunk_storage.append(chunk)
+                if overlap_sentences_count > 0 and len(current_chunk) > 0:
+                    overlap = current_chunk[-overlap_sentences_count:] if len(current_chunk) >= overlap_sentences_count else current_chunk
+                    # don't add overlap if it exceeds max_chars
+                    if len(''.join(current_chunk)) + len(sentence_text) > max_chars:
+                        current_chunk = []
+                    else:
+                        current_chunk = overlap.copy()
+                else:
+                    current_chunk = []
+                current_chunk_chars = len(''.join(current_chunk))
+            current_chunk.append(sentence_text)
+            current_chunk_chars = len(''.join(current_chunk))
         if current_chunk:
-            chunks.append(' '.join(current_chunk))
-
-            self.chunk_storage.extend(chunks)
-        return chunks
+            chunk = ''.join(current_chunk)
+            lgr.debug(f"chunk chars={len(chunk)} tokens={len(enc.encode(chunk))}")
+            chunk_storage.append(chunk)
+        self.chunk_storage.extend(chunk_storage)
+        return chunk_storage
 
     async def fetch_text_from_url(self, url) -> ToolResponse:
         try:
@@ -118,16 +141,16 @@ class WebSearch(BaseTool, ABC):
                     script.decompose()
 
                 text = soup.get_text(separator='\n')
-                chunks = self.split_into_chunks(text, max_length=200, chunk_overlap=0.01)
+                text = re.sub(r'\t+', '\t', text)  # Replace multiple tabs with a single tab
+                text = re.sub(r'\n+', ' ', text).strip()  # Replace multiple newlines with a single space and strip
+                # Further clean up multiple spaces that might have resulted from replacements
+                text = re.sub(r'\s+', ' ', text)
+                chunks = self.split_into_chunks(text, max_chars=5000, overlap_sentences_count=1)
                 return ToolResponse.success(data=chunks)
             else:
                 return ToolResponse.fail(msg=f"Failed to fetch text from URL: {url}. Status code: {resp.status_code}")
         except Exception as e:
             return ToolResponse.fail(msg=f"Failed to fetch text from URL: {url}. Error: {str(e)}")
-
-    @staticmethod
-    async def get_embeddings(llm, contents: list):
-        return await asyncio.gather(*[llm.embedding(text=content) for content in contents])
 
     @staticmethod
     def compute_similarity(embeddings, query_embedding, top_k=3):
@@ -139,46 +162,52 @@ class WebSearch(BaseTool, ABC):
         top_indices = similarities.argsort()[::-1][:top_k]
         return top_indices, similarities
 
-    async def embedding_similarity_search(self, llm: OpenAINode, query: str, num_results: int = 10, *args, **kwargs) -> ToolResponse:
-        engine_name = kwargs.get('search_engine', 'google')
-        search_engine = self._search_engine.get(engine_name)
-        fetch_resp = await self.fetch_urls_and_contents(search_engine, query, num_results)
-        if not fetch_resp.is_success():
-            return fetch_resp
-
-        all_chunks = [chunk for content in fetch_resp.data for chunk in content]
-        embeddings = await self.get_embeddings(llm, all_chunks)
-        query_embedding = await llm.embedding(text=query)
-        top_indices, _ = self.compute_similarity(embeddings, query_embedding, top_k=3)
-        relevant_contents = [all_chunks[i] for i in top_indices]
-        return ToolResponse(data=relevant_contents)
-
     async def run(
             self,
             llm: OpenAINode,
             query: str,
-            num_results: int = 10,
+            num_results: int = 3,
             *args,
             **kwargs
     ) -> ToolResponse:
+        retrieval_url_count = num_results * 2
+
         self.chunk_storage.clear()
         st = time.time()
         loop = asyncio.get_event_loop()
         search_resp = await loop.run_in_executor(
             None,
-            lambda: self._search_engine['google'].search(query, num_results=num_results)
+            lambda: self._search_engine['google'].search(query, retrieval_url_count=retrieval_url_count)
         )
+        lgr.debug(f'google web search started with `{query}`.')
         urls = search_resp[:num_results]
 
         responses = await asyncio.gather(*[self.fetch_text_from_url(url) for url in urls])
+        lgr.debug(f'fetch text from urls done. cost time: {time.time() - st}.')
 
         total_content = []
         for url, resp in zip(urls, responses):
             if resp.is_success():
+                if len(resp.data) > 100:  # we think this is not a valid content
+                    continue
                 total_content.append(resp.data)
             else:
                 lgr.warning(f"Failed to fetch content from URL: {url}. Error: {resp.msg}")
+        total_content = list(itertools.chain.from_iterable(total_content))
         if not total_content:
             return ToolResponse.fail(msg=f"Failed to fetch content from URL: {search_resp}")
-        lgr.debug(f'fetch_urls_and_contents cost: {time.time()-st}')
-        return ToolResponse.success(data=total_content)
+
+        # TODO: embeddings cost
+        embeddings = await asyncio.gather(*[llm.embedding(text=content) for content in total_content])
+        query_embedding = await llm.embedding(text=query)
+        lgr.debug(f'embeddings done. cost time: {time.time() - st}.')
+
+        top_indices, _ = self.compute_similarity(embeddings, query_embedding, top_k=num_results)
+
+        selected = np.array(total_content)[top_indices].astype(str)
+        prefix = np.arange(1, len(selected) + 1).astype(str)
+        numbered_selected = np.char.add(prefix, '. ')
+        numbered_selected = np.char.add(numbered_selected, selected)
+        final = {'searched_result_on_google': numbered_selected}
+        lgr.debug(f'google web search done. {num_results} founded. cost time: {time.time() - st}.')
+        return ToolResponse.success(data=final)

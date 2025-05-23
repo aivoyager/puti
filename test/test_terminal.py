@@ -71,38 +71,33 @@ def test_web_search_tool():
     from llm.nodes import OpenAINode
 
     wb = WebSearch()
-    resp = asyncio.run(wb.run(query='罗伯特 唐尼', num_results=10, llm=OpenAINode()))
+    resp = asyncio.run(wb.run(query='罗伯特 唐尼', llm=OpenAINode()))
     print(resp)
-
-
-def test_split_demo():
-    current_chunk = ["A" * 30, "B" * 40, "C" * 50]  # 每个句子长度为 30, 40, 50
-    overlap_size = 50
-    print(len(current_chunk[-1]))
-    print((overlap_size / 50))
-    print(int(overlap_size / 50))
-    print(current_chunk[-1:])
-    print('')
 
 
 def test_split_into_chunks():
     # 普通文本分割测试
-    w = WebSearch()
     text = '这是一个测试句子。第二个句子！第三个问题？第四个句子。'
-    a = w.split_into_chunks(text)
-    # assert len(chunks) == 4
+    chunks = WebSearch.split_into_chunks(text, max_length=50)
+    assert len(chunks) == 4
 
     # 长文本自动分块测试
-    long_text = 'a' * 600 + '.awda'
-    b = w.split_into_chunks(text=long_text)
-    # assert 500 >= len(chunks[0]) >= 400
-    # assert len(chunks) == 2
+    long_text = 'a' * 600
+    chunks = WebSearch.split_into_chunks(long_text, max_length=500)
+    assert 500 >= len(chunks[0]) >= 400
+    assert len(chunks) == 2
 
     # 标点符号分割测试
     mixed_text = 'Hello.World!你好世界？测试'
-    c = w.split_into_chunks(mixed_text)
-    # assert len(chunks) == 3
+    chunks = WebSearch.split_into_chunks(mixed_text)
+    assert len(chunks) == 3
 
     # 空文本处理测试
-    d = w.split_into_chunks('')
-    print('')
+    assert WebSearch.split_into_chunks('') == []
+
+
+def test_web_search():
+    alex = Alex()
+    resp = alex.cp.invoke(alex.run, '帮我看看今天的股票行情概要')
+    print(resp)
+    print()
