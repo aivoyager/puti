@@ -5,8 +5,8 @@
 """
 from pydantic import BaseModel, Field, ConfigDict, create_model, model_validator, PrivateAttr, SerializeAsAny, field_validator
 from typing import Optional, List, Iterable, Literal, Union
-from llm.messages import Message
-from llm.roles import RoleType
+from puti.llm.messages import Message
+from puti.llm.roles import RoleType
 
 
 class Memory(BaseModel):

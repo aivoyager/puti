@@ -5,7 +5,7 @@
 """
 from pydantic import BaseModel, Field, SerializeAsAny, ConfigDict
 from typing import Any, Dict, Union, Iterable
-from constant.base import Resp
+from puti.constant.base import Resp
 
 
 class Response(BaseModel):
@@ -36,10 +36,6 @@ class Response(BaseModel):
         return self.info
 
     def is_success(self) -> bool:
-        """
-        判断响应的 code 字段是否在 200~299 范围内，表示请求成功
-        :return: bool
-        """
         return 200 <= self.code < 300
 
 
@@ -47,7 +43,7 @@ class ToolResponse(Response):
     """ Tool Response """
     data: Union[str, dict, list] = Field(default='', validate_default=True, description='tool execution successfully result')
     msg: str = Field(default=Resp.TOOL_OK.dsp, validate_default=True, description='tool execution failed result')
-    code: int = Field(default=Resp.TOOL_OK.val, validate_default=True, description='tool execution failed result')
+    code: int = Field(default=Resp.TOOL_OK.val, validate_default=True, description='tool execution result code')
 
     @classmethod
     def fail(cls, msg: str = Resp.TOOL_FAIL.dsp) -> 'ToolResponse':

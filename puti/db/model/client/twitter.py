@@ -5,7 +5,7 @@
 """
 import datetime
 
-from db.model import Model
+from puti.db.model import Model
 from pydantic import Field
 from typing import Optional
 

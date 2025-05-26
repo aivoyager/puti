@@ -11,7 +11,7 @@ from pydantic import BaseModel, Field
 from typing import List, Union, Literal, Optional
 from pathlib import Path
 from logs import logger_factory
-from utils.common import has_decorator
+from puti.utils.common import has_decorator
 from functools import wraps
 
 lgr = logger_factory.default
@@ -45,8 +45,8 @@ class FileModel(BaseModel):
             lgr.error(err)
             raise ValueError(err)
         if not file_path.exists():
-            lgr.warning(f"File {file_path} does not exist.")
-            return {}
+            lgr.error(f"File {file_path} does not exist.")
+            raise FileNotFoundError(f"File {file_path} does not exist.")
         methods = {name: func for name, func in inspect.getmembers(self, predicate=inspect.ismethod) if has_decorator(func, 'read_wrapper')}
         read_func = methods.get(f'_read_{file_type}')
         data = read_func(file_path)

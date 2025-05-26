@@ -5,11 +5,8 @@
 """
 from typing import Any
 
-from llm.roles import McpRole
-from llm.tools.generate_tweet import GenerateTweet
-from llm.messages import UserMessage
-from db.faisss import FaissIndex
-from utils.path import root_dir
+from puti.llm.roles import McpRole
+from puti.llm.messages import UserMessage
 from logs import logger_factory
 
 lgr = logger_factory.llm

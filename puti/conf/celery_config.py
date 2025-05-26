@@ -6,7 +6,7 @@
 import platform
 
 from celery.schedules import crontab
-from conf.celery_private_conf import CeleryPrivateConfig
+from puti.conf.celery_private_conf import CeleryPrivateConfig
 
 c = CeleryPrivateConfig()
 

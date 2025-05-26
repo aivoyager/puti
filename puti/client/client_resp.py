@@ -5,9 +5,9 @@
 """
 from pydantic import ConfigDict
 from typing import Dict, Union, Iterable
-from core.resp import Response
-from constant.client import Client
-from constant.base import Resp
+from puti.core.resp import Response
+from puti.constant.client import Client
+from puti.constant.base import Resp
 
 
 class CliResp(Response):

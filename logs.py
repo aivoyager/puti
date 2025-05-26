@@ -7,7 +7,7 @@ import sys
 
 from datetime import datetime
 from loguru import logger as _logger
-from constant.base import PuTi
+from puti.constant.base import PuTi
 
 _print_level = 'DEBUG'
 _logfile_level = 'DEBUG'

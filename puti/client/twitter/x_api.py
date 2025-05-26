@@ -11,14 +11,14 @@ import time
 
 from typing import Optional, Literal, Type
 from pydantic import ConfigDict, Field
-from conf.client_config import TwitterConfig
-from conf.celery_private_conf import CeleryPrivateConfig
+from puti.conf.client_config import TwitterConfig
+from puti.conf.celery_private_conf import CeleryPrivateConfig
 from logs import logger_factory
-from client.client import Client
+from puti.client.client import Client
 from abc import ABC
-from utils.path import root_dir
-from constant.base import Resp
-from core.resp import Response
+from puti.utils.path import root_dir
+from puti.constant.base import Resp
+from puti.core.resp import Response
 
 lgr = logger_factory.client
 c = CeleryPrivateConfig()

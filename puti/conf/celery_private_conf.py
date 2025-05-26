@@ -3,9 +3,9 @@
 @Time:  2025-05-09 14:08
 @Description:  
 """
-from conf.config import Config
-from constant.utilities import Utilities
-from constant.base import Modules
+from puti.conf.config import Config
+from puti.constant.utilities import Utilities
+from puti.constant.base import Modules
 from pydantic import ConfigDict
 
 

@@ -5,8 +5,8 @@
 """
 import datetime
 
-from db.model import Model
-from constant.base import TaskType, TaskActivityType, TaskPostType
+from puti.db.model import Model
+from puti.constant.base import TaskType, TaskActivityType, TaskPostType
 from typing import Optional, Any, List
 from pydantic import Field
 

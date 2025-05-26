@@ -10,7 +10,7 @@ from queue import Queue, Empty
 from typing import Any, List, Optional, Type
 from pydantic import BaseModel
 from pydantic_core import PydanticUndefined
-from constant.base import PuTi
+from puti.constant.base import PuTi
 
 # __all__ = ['SQLiteModelHandlerWithPool', 'dbm_maker']
 

@@ -13,9 +13,9 @@ from inspect import iscoroutinefunction
 from typing import Union, Dict
 from pydantic import BaseModel, ConfigDict
 from logs import logger_factory
-from utils.common import get_structured_exception, is_valid_json
-from core.resp import Response
-from constant.base import Resp
+from puti.utils.common import get_structured_exception, is_valid_json
+from puti.core.resp import Response
+from puti.constant.base import Resp
 
 
 lgr = logger_factory.default

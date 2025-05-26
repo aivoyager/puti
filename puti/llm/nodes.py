@@ -3,28 +3,21 @@
 @Time:  2025-03-10 17:08
 @Description:  
 """
-import ollama
-import tiktoken
-
 from ollama._types import Message
 from ollama import Client
-from pydantic import BaseModel, Field, ConfigDict, create_model, model_validator, PrivateAttr, SerializeAsAny, field_validator
-from typing import Optional, List, Iterable, Literal, Annotated, Dict, TypedDict, Any, Required, NotRequired, ClassVar, cast
-from constant.llm import RoleType
+from pydantic import BaseModel, Field, ConfigDict, create_model, model_validator
+from typing import Optional, List
+from puti.constant.llm import RoleType
 from typing import Dict, Tuple, Type, Any, Union
-from conf.llm_config import LLMConfig, OpenaiConfig
+from puti.conf.llm_config import LLMConfig, OpenaiConfig
 from openai import AsyncOpenAI, OpenAI
 from abc import ABC, abstractmethod
-from llm.cost import CostManager
+from puti.llm.cost import CostManager
 from logs import logger_factory
 from openai import AsyncStream
 from openai.types.chat import ChatCompletionChunk
 from openai.types.chat.chat_completion import ChatCompletion
-from openai.types import CompletionUsage
-from conf.llm_config import LlamaConfig
-from openai.types.chat.chat_completion_chunk import ChoiceDeltaToolCall
 from openai.types.chat.chat_completion_message import ChatCompletionMessage
-from utils.singleton import singleton
 
 
 lgr = logger_factory.llm
@@ -51,42 +44,6 @@ class LLMNode(BaseModel, ABC):
         if not self.cost:
             self.cost = CostManager()
 
-    def create_model_class(cls, class_name: str, mapping: Dict[str, Tuple[Type, Any]]):
-        """基于pydantic v2的模型动态生成，用来检验结果类型正确性"""
-
-        def check_fields(cls, values):
-            all_fields = set(mapping.keys())
-            required_fields = set()
-            for k, v in mapping.items():
-                type_v, field_info = v
-                if LLMNode.is_optional_type(type_v):
-                    continue
-                required_fields.add(k)
-
-            missing_fields = required_fields - set(values.keys())
-            if missing_fields:
-                raise ValueError(f"Missing fields: {missing_fields}")
-
-            unrecognized_fields = set(values.keys()) - all_fields
-            if unrecognized_fields:
-                lgr.warning(f"Unrecognized fields: {unrecognized_fields}")
-            return values
-
-        validators = {"check_missing_fields_validator": model_validator(mode="before")(check_fields)}
-
-        new_fields = {}
-        for field_name, field_value in mapping.items():
-            if isinstance(field_value, dict):
-                # 对于嵌套结构，递归创建模型类
-                nested_class_name = f"{class_name}_{field_name}"
-                nested_class = cls.create_model_class(nested_class_name, field_value)
-                new_fields[field_name] = (nested_class, ...)
-            else:
-                new_fields[field_name] = field_value
-
-        new_class = create_model(class_name, __validators__=validators, **new_fields)
-        return new_class
-
     @abstractmethod
     async def chat(self, msg: List[Dict], *args, **kwargs) -> str:
         """ Async chat """
@@ -97,7 +54,6 @@ class LLMNode(BaseModel, ABC):
         return resp
 
 
-# @singleton
 class OpenAINode(LLMNode):
 
     async def chat(self, msg: List[Dict], **kwargs) -> Union[str, ChatCompletionMessage]:
@@ -153,14 +109,13 @@ class OpenAINode(LLMNode):
             )
             embedding = resp.data[0].embedding if hasattr(resp, 'data') and resp.data else None
             if embedding is None:
-                raise ValueError('Embedding 返回为空')
+                raise ValueError(f'`{self.conf.EMBEDDING_MODEL}` embedding query `{text}`. Embedding result is empty...')
             return embedding
         except Exception as e:
-            lgr.error(f"embedding 失败: {e}")
+            lgr.error(f"Embedding failed detail: {e}")
             raise
 
 
-@singleton
 class OllamaNode(LLMNode):
 
     def model_post_init(self, __context):

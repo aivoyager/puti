@@ -12,37 +12,34 @@ import pkgutil
 import inspect
 import threading
 
-from core.resp import ToolResponse
-from db.faisss import FaissIndex
+from puti.core.resp import ToolResponse
+from puti.db.faisss import FaissIndex
 from functools import partial
 from ollama._types import Message as OMessage
-from llm.prompts import prompt_setting
-from llm import tools
-from llm.tools import BaseTool
+from puti.llm.prompts import prompt_setting
+from puti.llm import tools
+from puti.llm.tools import BaseTool
 from pydantic import BaseModel, Field, ConfigDict, PrivateAttr, model_validator, field_validator, SerializeAsAny
 from typing import Optional, List, Iterable, Literal, Set, Dict, Tuple, Type, Any, Union
-from constant.llm import RoleType
+from puti.constant.llm import RoleType
 from logs import logger_factory
-from constant.llm import TOKEN_COSTS, MessageRouter
+from puti.constant.llm import TOKEN_COSTS, MessageRouter
 from asyncio import Queue, QueueEmpty
-from llm.nodes import LLMNode, OpenAINode
-from llm.messages import Message, ToolMessage, AssistantMessage, UserMessage
-from llm.envs import Env
-from llm.memory import Memory
-from utils.common import any_to_str, is_valid_json
+from puti.llm.nodes import LLMNode, OpenAINode
+from puti.llm.messages import Message, ToolMessage, AssistantMessage, UserMessage
+from puti.llm.envs import Env
+from puti.llm.memory import Memory
+from puti.utils.common import any_to_str, is_valid_json
 from capture import Capture
-from llm.tools import ToolArgs
-from llm.nodes import OllamaNode
-from mcp.client.sse import sse_client
 from mcp.client.stdio import stdio_client
 from mcp import ClientSession, StdioServerParameters
 from contextlib import AsyncExitStack
-from utils.path import root_dir
-from constant.client import McpTransportMethod
+from puti.utils.path import root_dir
+from puti.constant.client import McpTransportMethod
 from typing import Annotated, Dict, TypedDict, Any, Required, NotRequired, ClassVar, cast
-from llm.tools import ToolArgs
+from puti.llm.tools import ToolArgs
 from pydantic.fields import FieldInfo
-from llm.tools import Toolkit
+from puti.llm.tools import Toolkit
 from openai.types.chat.chat_completion_message import ChatCompletionMessage
 
 
@@ -367,7 +364,7 @@ class McpRole(Role):
     conn_type: McpTransportMethod = McpTransportMethod.STDIO
     exit_stack: AsyncExitStack = Field(default_factory=AsyncExitStack, validate_default=True)
     session: Optional[ClientSession] = Field(default=None, description='Session used for communication.', validate_default=True)
-    server_script: str = Field(default=str(root_dir() / 'mcpp' / 'server.py'), description='Server script')
+    server_script: str = Field(default=str(root_dir() / 'mcpp' / 'test_server.py'), description='Server script')
 
     initialized: bool = False
     init_lock: asyncio.Lock = Field(default_factory=asyncio.Lock, exclude=True)

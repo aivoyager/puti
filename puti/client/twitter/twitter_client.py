@@ -3,27 +3,26 @@
 @Time: 10/01/25 11:21
 @Description:  
 """
-import datetime
-import re
 import pytz
+import re
+import datetime
 
 from abc import ABC
 from twikit import Tweet
 from twikit.utils import Result
 from httpx import ConnectTimeout
-from typing import Optional, Type, Union, List
+from typing import Optional, Type, Union, List, Literal
 from pydantic import Field, ConfigDict, PrivateAttr
 from twikit.client.client import Client as TwitterClient
-from client.client import Client
 from logs import logger_factory
-from conf.client_config import TwitterConfig
-from utils.common import parse_cookies, filter_fields
-from constant.client import LoginMethod, TwikitSearchMethod
-from constant.base import Resp
-from client.client_resp import CliResp
-from db.model.client.twitter import Mentions
-from constant.client import Client as Cli
-
+from puti.client.client import Client
+from puti.conf.client_config import TwitterConfig
+from puti.utils.common import parse_cookies, filter_fields
+from puti.constant.client import LoginMethod, TwikitSearchMethod
+from puti.constant.base import Resp
+from puti.client.client_resp import CliResp
+from puti.constant.client import Client as Cli
+from puti.db.mysql_operator import MysqlOperator
 
 lgr = logger_factory.client
 
@@ -39,38 +38,80 @@ class TwikitClient(Client, ABC):
     _cli: TwitterClient = PrivateAttr(default_factory=lambda: TwitterClient('en-US'))
 
     async def save_my_tweet(self) -> None:
-        self.db.tb_type = Mentions
+
         rs = await self.get_tweets_by_user(self.conf.MY_ID)
+        db = MysqlOperator()
         for tweet in rs.data:
-            info = {
-                'text': re.sub(r' https://t\.co/\S+', '', tweet.text),
-                'author_id': self.conf.MY_ID,
-                'mention_id': tweet.id,
-                'parent_id': None,
-                'data_time': datetime.datetime.now(),
-                'replied': False,
-            }
-            mentions = Mentions(**info)
-            self.db.dbh.insert(mentions)
+            text = re.sub(r' https://t\.co/\S+', '', tweet.text)
+            author_id = self.conf.MY_ID
+            mention_id = tweet.id
+            parent_id = None
+            data_time = datetime.datetime.now()
+            replied = False
+            sql = """
+                INSERT INTO twitter_mentions (text, author_id, mention_id, parent_id, data_time, replied)
+                VALUES (%s, %s, %s, %s, %s, %s)
+            """
+            params = (text, author_id, mention_id, parent_id, data_time, replied)
+            db.insert(sql, params)
+        db.close()
         lgr.info('Tweet saved successfully.')
 
-    async def get_tweets_by_user(self, user_id: int) -> CliResp:
-        # TODO: fixed param `count`
-        tweets = await self._cli.get_user_tweets(user_id=str(user_id), tweet_type='Tweets', count=50)
-        lgr.info('Tweets fetched by user successfully.')
-        return CliResp.default(data=tweets)
+    async def get_tweets_by_user(
+            self,
+            user_id: str,
+            recursive: bool = False,
+            tweet_type: Literal['Tweets', 'Replies', 'Media', 'Likes'] = 'Tweets',
+            count: int = 50
+    ) -> CliResp:
+        all_tweets = []
+        cursor = None
 
-    async def reply_to_tweet(self, text: str, media_path: list[str], tweet_id: int, author_id: int) -> CliResp:
-        lgr.info(f"reply to tweet text :{text} author_id: {author_id} link = https://twitter.com/i/web/status/{tweet_id}")
-        if author_id == self.conf.my_id:
-            return CliResp(code=Resp.OK, msg="don't reply myself")
+        while True:
+            tweets_page = await self._cli.get_user_tweets(
+                user_id=str(user_id),
+                tweet_type=tweet_type,
+                count=count,
+                cursor=cursor
+            )
+            if tweets_page:
+                all_tweets.extend(tweets_page)
+                if recursive and tweets_page.next_cursor:
+                    cursor = tweets_page.next_cursor
+                else:
+                    break  # Exit if not recursive or no more pages
+            else:
+                break  # Exit if no tweets are returned
+
+        lgr.info(f'Tweets fetched for user {user_id} successfully. Total tweets: {len(all_tweets)}')
+        return CliResp.default(data=all_tweets)
+
+    async def reply_to_tweet(self, text: str, media_path: list[str], tweet_id: int, author_id: int = None) -> CliResp:
+        lgr.info(
+            f"reply to tweet text :{text} author_id: {author_id} link = https://twitter.com/i/web/status/{tweet_id}")
+        # if author_id == self.conf.my_id:
+        #     return CliResp(code=Resp.OK, msg="don't reply myself")
+        db = MysqlOperator()
+        # 检查是否已回复
+        sql_check = "SELECT replied FROM twitter_mentions WHERE mention_id = %s"
+        result = db.fetchone(sql_check, (tweet_id,))
+        if result is not None and result[0]:
+            db.close()
+            return CliResp(code=Resp.OK.val, msg="该推文已回复，无需重复操作")
+        # 执行回复
         rs = await self.post_tweet(text, media_path, reply_tweet_id=tweet_id)
-        if rs.status != Resp.OK.val:
+        if rs.code != Resp.OK.val:
+            db.close()
             return CliResp(code=Resp.POST_TWEET_ERR.val, msg=rs.message, cli=Cli.TWITTER)
+        # 回复成功，更新replied字段并保存记录
+        sql_update = "UPDATE twitter_mentions SET replied = TRUE WHERE mention_id = %s"
+        db.update(sql_update, (tweet_id,))
+        # 如需保存回复记录，可在此插入新记录（如业务需要）
+        db.close()
         return CliResp.default(msg="reply success")
 
-    async def post_tweet(self, text: str, image_path: Optional[List[str]] = None, reply_tweet_id: int = None) -> CliResp:
-        self.db.tb_type = Mentions
+    async def post_tweet(self, text: str, image_path: Optional[List[str]] = None,
+                         reply_tweet_id: int = None) -> CliResp:
         media_ids = []
         if image_path:
             for path in image_path:
@@ -81,34 +122,42 @@ class TwikitClient(Client, ABC):
 
         if tweet.is_translatable is not None:
             lgr.info(f"Post tweet text :{text} link = https://twitter.com/i/web/status/{reply_tweet_id}")
-            info = {
-                'text': text,
-                'author_id': self.conf.MY_ID,
-                'mention_id': tweet.id,
-                'parent_id': str(reply_tweet_id),
-                'data_time': datetime.datetime.now(),
-                'replied': True,
-            }
-            mentions = Mentions(**info)
-            self.db.dbh.insert(mentions)
+            author_id = self.conf.MY_ID
+            mention_id = tweet.id
+            parent_id = str(reply_tweet_id) if reply_tweet_id else None
+            data_time = datetime.datetime.now()
+            replied = True
+            sql = """
+                INSERT INTO twitter_mentions (text, author_id, mention_id, parent_id, data_time, replied)
+                VALUES (%s, %s, %s, %s, %s, %s)
+            """
+            params = (text, author_id, mention_id, parent_id, data_time, replied)
+            db = MysqlOperator()
+            db.insert(sql, params)
+            db.close()
         else:
-            lgr.info(f"Post id is {tweet.id} translatable is None | link = https://twitter.com/i/web/status/{reply_tweet_id}")
+            lgr.info(
+                f"Post id is {tweet.id} translatable is None | link = https://twitter.com/i/web/status/{reply_tweet_id}")
             return CliResp(code=Resp.POST_TWEET_ERR.val,
                            msg=f"Post id is {tweet.id} translatable is None | link = https://twitter.com/i/web/status/{reply_tweet_id}",
-                           cli=Cli.TWITTER)
-        return CliResp(status=Resp.OK.val, msg=f"Post id is {tweet.id} transatable {tweet.is_translatable}", cli=Cli.TWITTER)
+                           )
+        return CliResp(status=Resp.OK.val, msg=f"Post id is {tweet.id} transatable {tweet.is_translatable}")
 
     async def get_mentions(
-        self,
-        start_time: datetime = None,
-        reply_count: int = 100,
-        search_method: TwikitSearchMethod = TwikitSearchMethod.LATEST
+            self,
+            start_time: datetime = None,
+            reply_count: int = 100,
+            search_method: TwikitSearchMethod = TwikitSearchMethod.LATEST,
+            query_name: Optional[str] = None,
     ) -> CliResp:
-        self.db.tb_type = Mentions
-        tweets_replies = await self._cli.search_tweet(f'@{self.conf.MY_NAME}', search_method.val, count=reply_count)
+        if not query_name:
+            query_name = self.conf.MY_NAME
+        lgr.debug(query_name)
+        tweets_replies = await self._cli.search_tweet(query=f'@{query_name}', product=search_method.val,
+                                                      count=reply_count)
         lgr.debug(tweets_replies)
-        lgr.debug(self.conf.MY_NAME)
         all_replies = []
+        db = MysqlOperator()
 
         async def _save_replies_recursion(_tweet: Union[Tweet, Result, List[Tweet]]):
             for i in _tweet:
@@ -124,14 +173,23 @@ class TwikitClient(Client, ABC):
                     'data_time': datetime.datetime.now(),
                     'replied': replied,
                 }
+                sql_existing = "SELECT mention_id FROM twitter_mentions WHERE mention_id IN %s"
+                existing_ids = set(row[0] for row in db.fetchall(sql_existing, ([str(i.id) for i in _tweet],)))
+
+                if i.id not in existing_ids:
+                    sql = """
+                        INSERT INTO twitter_mentions (text, author_id, mention_id, parent_id, data_time, replied)
+                        VALUES (%s, %s, %s, %s, %s, %s)
+                    """
+                    params = (plaintext, i.user.id, i.id, i.in_reply_to, datetime.datetime.now(), replied)
+                    db.insert(sql, params)
+
                 all_replies.append(info)
-                mentions = Mentions(**info)
-                self.db.dbh.insert(mentions)
 
             if _tweet.next_cursor:
                 try:
                     tweets_reply_next = await self._cli.search_tweet(
-                        f'@{self.conf.MY_NAME}',
+                        f'@{query_name}',
                         search_method.val,
                         count=reply_count,
                         cursor=_tweet.next_cursor
@@ -143,6 +201,7 @@ class TwikitClient(Client, ABC):
                     await _save_replies_recursion(tweets_reply_next)
 
         await _save_replies_recursion(tweets_replies)
+        db.close()
         lgr.debug(all_replies)
         lgr.info('Get user mentions Successfully!')
         return CliResp(data=all_replies)
@@ -166,7 +225,7 @@ class TwikitClient(Client, ABC):
         lgr.info(f'Logout successful in TwitterClient!')
 
     def init_conf(self, conf: Type[TwitterConfig]):
-        self.conf = conf()
+        self.conf: TwitterConfig = conf()
 
     def model_post_init(self, __context):
         if not self.conf:

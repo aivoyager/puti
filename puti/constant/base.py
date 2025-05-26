@@ -4,7 +4,7 @@
 @Description:  
 """
 from enum import Enum
-from utils.path import root_dir
+from puti.utils.path import root_dir
 from typing import Type, TypeVar
 
 T = TypeVar("T", bound='Base')

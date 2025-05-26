@@ -10,7 +10,7 @@ import platform
 import importlib
 import requests
 
-from utils.singleton import singleton
+from puti.utils.singleton import singleton
 from requests.adapters import HTTPAdapter
 from urllib3 import Retry
 from pydantic.fields import FieldInfo
@@ -18,7 +18,7 @@ from pydantic import BaseModel, Field
 from typing import List, Dict, Any, get_origin, get_args
 from typing import Dict, Iterable, Callable, List, Tuple, Any, Union, Optional
 from collections import defaultdict
-from constant.base import Modules
+from puti.constant.base import Modules
 from logs import logger_factory
 from pathlib import Path
 from box import Box

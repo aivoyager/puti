@@ -3,10 +3,10 @@
 @Time:  2025-03-03 16:23
 @Description:  
 """
-from conf.config import Config
-from constant.base import Modules
+from puti.conf.config import Config
+from puti.constant.base import Modules
 from pydantic import ConfigDict, Field
-from constant.llm import LLM
+from puti.constant.llm import LLM
 from typing import Optional, Union
 from openai.types.chat_model import ChatModel
 

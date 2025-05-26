@@ -5,11 +5,11 @@
 """
 from pydantic import BaseModel, Field
 
-from client.client import Client
+from puti.client.client import Client
 from typing import List
 
 
-class AlphaCore(BaseModel):
+class PutiCore(BaseModel):
 
     startup_clients: List[Client] = Field(
         default_factory=list,

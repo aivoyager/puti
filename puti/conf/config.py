@@ -12,14 +12,14 @@ from typing import List, Dict, Optional, Tuple, Any
 from pathlib import Path
 from collections import defaultdict
 from pydantic.v1 import ConfigError
-from utils.file_model import FileModel
-from constant.base import PuTi, Modules
-from utils.common import (check_module,
+from puti.utils.file_model import FileModel
+from puti.constant.base import PuTi, Modules
+from puti.utils.common import (check_module,
                           get_extra_config_path,
                           get_extra_config_dict,
                           get_mainly_config_dict)
-from utils.path import root_dir
-from constant.client import Client
+from puti.utils.path import root_dir
+from puti.constant.client import Client
 
 __all__ = ['Config', 'conf']
 
@@ -36,7 +36,7 @@ DEFAULT_CONF_PATHS: List[Path] = [
 # If configure here, sub model field be automatically loaded when the subclass conf is created
 # key: {module}_{sub_name}_{FIELD in sub model}
 EXTRA_CONF_PATHS: List[Tuple[str, Path]] = [
-    # ('client_twitter_cookies',  Path('/Users/wangshuang/PycharmProjects/data/cookie_twitter.json'))
+    ('client_twitter_cookies',  Path('/Users/wangshuang/PycharmProjects/data/cookie_twitter.json'))
     # ('client_twitter_cookies',  Path('/Users/wangshuang/PycharmProjects/data/cookie_twiter2.json'))
 ]
 
@@ -57,10 +57,10 @@ class ConfigContext(BaseModel):
 
 class Config(BaseModel):
     """
-        -> Make sure 'Config' class is the first in conf succession
+        -> Make sure `Config` class is the first in conf succession
             ```python
-            from puti.conf.conf import Config
-            class TwitterConfig(Config, other cls...)
+                from puti.conf.conf import Config
+                class TwitterConfig(Config, other cls if have...)
             ```
     """
     model_config = ConfigDict(arbitrary_types_allowed=True)
@@ -78,18 +78,21 @@ class Config(BaseModel):
 
     @classmethod
     def _subconfig_init(cls, *, module, **kwargs):
-        cc = Box(cls._default()).cc
-        sub = cc.module.get(module, {})
+        try:
+            cc = Box(cls._default()).cc
+            sub = cc.module.get(module, {})
 
-        module_sub = kwargs.get(module, '')
-        if module_sub == Client.TWITTER.val:
-            mainly_conf = get_mainly_config_dict(configs=sub['mainly'], module_sub=module_sub)
-            sub_conf = get_extra_config_dict(configs=sub['extra'], module=module, module_sub=module_sub)
-            sub_conf.update(mainly_conf)
-        else:
-            if isinstance(sub, Dict):
-                sub = sub['mainly']
-            sub_conf = get_mainly_config_dict(configs=sub, module_sub=module_sub)
+            module_sub = kwargs.get(module, '')
+            if module_sub == Client.TWITTER.val:
+                mainly_conf = get_mainly_config_dict(configs=sub['mainly'], module_sub=module_sub)
+                sub_conf = get_extra_config_dict(configs=sub['extra'], module=module, module_sub=module_sub)
+                sub_conf.update(mainly_conf)
+            else:
+                if isinstance(sub, Dict):
+                    sub = sub['mainly']
+                sub_conf = get_mainly_config_dict(configs=sub, module_sub=module_sub)
+        except Exception as e:
+            raise ConfigError(f"Failed to initialize subconfig for module {module}: {e}, please check your config file")
         return sub_conf
 
     @field_validator('cc', mode='before')

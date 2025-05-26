@@ -4,7 +4,7 @@
 @Description:  
 """
 
-from constant.base import Base
+from puti.constant.base import Base
 
 
 class LLM(Base):

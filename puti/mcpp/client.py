@@ -4,13 +4,13 @@
 @Description:  
 """
 import asyncio
+
 from typing import Optional
 from contextlib import AsyncExitStack
-from utils.path import root_dir
-
+from puti.utils.path import root_dir
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
-from llm.nodes import OpenAINode
+from puti.llm.nodes import OpenAINode
 from anthropic import Anthropic
 from dotenv import load_dotenv
 
@@ -150,8 +150,9 @@ async def main():
     finally:
         await client.cleanup()
 
+
 if __name__ == '__main__':
     openai_node = OpenAINode()
     load_dotenv()
-    server_path = str(root_dir() / 'mcpp' / 'server.py')
+    server_path = str(root_dir() / 'mcpp' / 'test_server.py')
     asyncio.run(main())

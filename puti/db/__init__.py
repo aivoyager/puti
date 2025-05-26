@@ -4,11 +4,11 @@
 @Description:  
 """
 from typing import Type
-from db.db_sqlite import dbm_maker, SQLiteModelHandlerWithPool, SQLiteManagerWithPool, SQLiteConnectionPool
+from puti.db.db_sqlite import dbm_maker, SQLiteModelHandlerWithPool, SQLiteManagerWithPool, SQLiteConnectionPool
 from pydantic import BaseModel, ConfigDict, Field
-from db.model import Model
+from puti.db.model import Model
 from pathlib import Path
-from constant.base import PuTi
+from puti.constant.base import PuTi
 from logs import logger_factory
 
 lgr = logger_factory.default

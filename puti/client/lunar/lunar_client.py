@@ -5,11 +5,11 @@
 """
 import re
 
-from client.client import Client
+from puti.client.client import Client
 from abc import ABC
 from typing import Type
-from conf.client_config import LunarConfig
-from utils.common import request_url
+from puti.conf.client_config import LunarConfig
+from puti.utils.common import request_url
 from box import Box
 
 

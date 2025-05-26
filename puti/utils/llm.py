@@ -15,8 +15,8 @@ from langchain_openai.chat_models import ChatOpenAI
 from httpx import Client
 from langchain.prompts import ChatPromptTemplate
 from langchain.prompts.chat import ChatMessagePromptTemplate
-from conf.config import conf
-from llm.prompts import prompt_setting
+from puti.conf.config import conf
+from puti.llm.prompts import prompt_setting
 from langchain import hub
 
 

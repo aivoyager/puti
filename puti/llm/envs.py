@@ -3,21 +3,24 @@
 @Time:  2025-03-10 17:20
 @Description:  
 """
+
 from __future__ import annotations
 from pydantic import BaseModel, Field, ConfigDict, create_model, model_validator, PrivateAttr, SerializeAsAny, field_validator
 from typing import Optional, List, Iterable, Literal, Set
 from typing import Dict, Tuple, Type, Any, Union
 from uuid import uuid4
-from llm.messages import Message
+from puti.llm.messages import Message
 from logs import logger_factory
 from collections import defaultdict
 from typing import TYPE_CHECKING
-from constant.llm import MessageRouter
+from puti.constant.llm import MessageRouter
 from capture import Capture
-if TYPE_CHECKING:
-    from llm.roles import Role
+
 import asyncio
-from llm.messages import Message
+
+if TYPE_CHECKING:
+    from puti.llm.roles import Role
+from puti.llm.messages import Message
 
 lgr = logger_factory.llm
 

@@ -5,10 +5,8 @@
 """
 from typing import Any
 
-from llm.roles import Role
-from llm.nodes import LLMNode, OpenAINode
-from conf.llm_config import OpenaiConfig
-from pydantic import Field, ConfigDict, PrivateAttr
+from puti.llm.roles import Role
+from pydantic import Field, ConfigDict
 
 
 class TwitWhiz(Role):

@@ -6,11 +6,11 @@
 
 from pydantic import Field, BaseModel, ConfigDict, SerializeAsAny
 from abc import abstractmethod
-from conf.config import Config
+from puti.conf.config import Config
 from capture import Capture
 from typing import Type
-from db import DBM
-from db.model.client.twitter import UserModel
+from puti.db import DBM
+from puti.db.model.client.twitter import UserModel
 
 
 class Client(BaseModel):

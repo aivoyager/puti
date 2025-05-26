@@ -14,9 +14,9 @@ import pandas as pd
 
 from pathlib import Path
 from pydantic import BaseModel, Field, ConfigDict
-from llm.nodes import OpenAINode, LLMNode
-from utils.path import root_dir
-from conf.llm_config import LLMConfig, OpenaiConfig
+from puti.llm.nodes import OpenAINode, LLMNode
+from puti.utils.path import root_dir
+from puti.conf.llm_config import LLMConfig, OpenaiConfig
 
 
 class FaissIndex(BaseModel):

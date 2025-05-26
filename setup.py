@@ -15,7 +15,7 @@ setup(
     author="obstaclews",
     author_email="obstaclesws@qq.com",
     url="https://github.com/aivoyager/puti",
-    packages=find_packages(),
+    packages=find_packages(exclude=["test*", "celery_queue*", "data", "docs", "api*"]),
     include_package_data=True,
     install_requires=[
         "pytz==2022.6",
@@ -51,7 +51,6 @@ setup(
         "gevent==25.4.2",
         "googlesearch-python==1.3.0",
         "pymysql==1.1.1",
-        "llama_index==0.12.37",
     ],
     python_requires=">=3.10",
     classifiers=[

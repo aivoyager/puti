@@ -5,21 +5,19 @@
 """
 import os
 import sys
-
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import argparse
 import json
 
-from llm.tools.debate import Debate
-from llm.tools.generate_tweet import GenerateTweet
-from llm.tools.demo import GetFlightInfo
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from puti.llm.tools.generate_tweet import GenerateTweet
 from inspect import Parameter, Signature
 from pydantic import BaseModel, Field, ConfigDict
 from typing import Literal, List, Type, Any
-from llm.tools import BaseTool
+from puti.llm.tools import BaseTool
 from mcp.server.fastmcp import FastMCP
 from logs import logger_factory
-from constant.client import McpTransportMethod
+from puti.constant.client import McpTransportMethod
 
 
 lgr = logger_factory.client

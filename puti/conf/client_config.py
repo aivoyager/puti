@@ -4,9 +4,9 @@
 @Description:  
 """
 from typing import Optional, List
-from conf.config import Config
-from constant.client import Client
-from constant.base import Modules
+from puti.conf.config import Config
+from puti.constant.client import Client
+from puti.constant.base import Modules
 from pydantic import ConfigDict
 
 
@@ -61,6 +61,7 @@ class TwitterConfig(Config):
         from urllib.parse import urlencode
         return f"{base_url}?{urlencode(params)}"
 
+
 class LunarConfig(Config):
     HOST: Optional[str] = None
     API_KEY: Optional[str] = None
@@ -79,3 +80,15 @@ class LunarConfig(Config):
     def _init_headers(self):
         if not self.HEADERS:
             self.HEADERS = {'Authorization': 'Bearer {}'.format(self.API_KEY)}
+
+
+class GoogleConfig(Config):
+    GOOGLE_API_KEY: Optional[str] = None
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        field = self.__annotations__.keys()
+        conf = self._subconfig_init(module=Modules.CLIENT.val, client=Client.GOOGLE.val)
+        for i in field:
+            if not getattr(self, i):
+                setattr(self, i, conf.get(i, None))
