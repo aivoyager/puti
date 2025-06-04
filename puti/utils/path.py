@@ -8,7 +8,7 @@ from loguru import logger
 
 
 def root_dir():
-    package_root = Path(__file__).parent.parent
+    package_root = Path(__file__).parent.parent.parent
     for i in (".git", ".project_root", ".gitignore"):
         if (package_root / i).exists():
             break

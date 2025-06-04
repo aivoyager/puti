@@ -34,8 +34,8 @@ def get_chat_openai() -> ChatOpenAI:
         'max_tokens': None,  # default max len for specific model
         'verbose': True,
         'streaming': True,
-        'openai_api_base': conf.cc.module['llm']['BASE_URL'],
-        'openai_api_key': conf.cc.module['llm']['API_KEY'],
+        'openai_api_base': conf.cc.module['llm'][0]['openai']['BASE_URL'],
+        'openai_api_key': conf.cc.module['llm'][0]['openai']['API_KEY'],
         'openai_proxy': ''
     }
     model = ChatOpenAI(**params)
@@ -98,7 +98,7 @@ def create_model_chain(
         callback=None
 ):
     llm = get_chat_openai()
-    model_name = conf.cc.module['llm']['BASE_URL']['MODEL']
+    model_name = conf.cc.module['llm'][0]['openai']['MODEL']
     history = [
         # SystemMessagePromptTemplate.from_template('You are a helpful assistant.'),
         {'system': 'You are a helpful assistant.'},

@@ -3,6 +3,12 @@
 @Time: 21/01/25 15:01
 @Description:  
 """
+import sys
+import os
+
+PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+sys.path.insert(0, PROJECT_ROOT)
+
 from puti.utils.llm import get_chat_openai, create_model_chain, create_agents
 
 
@@ -16,7 +22,7 @@ def test_chat_completion():
 def test_create_model_chain():
     chain = create_model_chain()
     resp = chain.run('what is u name ?')
-    print('')
+    print(resp)
 
 
 def test_create_agents():
