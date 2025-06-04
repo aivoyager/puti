@@ -8,5 +8,5 @@ from puti.llm.roles.agents import Alex
 
 async def test_alex():
     alex = Alex()
-    resp = await alex.run('你好')
+    resp = await alex.run('介绍一下根目录下的logs.py')
     print(resp)

@@ -26,7 +26,7 @@ from logs import logger_factory
 from puti.constant.llm import TOKEN_COSTS, MessageRouter
 from asyncio import Queue, QueueEmpty
 from puti.llm.nodes import LLMNode, OpenAINode
-from puti.llm.messages import Message, ToolMessage, AssistantMessage, UserMessage
+from puti.llm.messages import Message, ToolMessage, AssistantMessage, UserMessage, SystemMessage
 from puti.llm.envs import Env
 from puti.llm.memory import Memory
 from puti.utils.common import any_to_str, is_valid_json
@@ -87,10 +87,11 @@ class RoleContext(BaseModel):
     memory: Memory = Field(default_factory=Memory)
     news: List[Message] = Field(default=None, description='New messages need to be handled')
     subscribe_sender: set[str] = Field(default={}, description='Subscribe role name for solution-subscription mechanism')
-    max_react_loop: int = Field(default=5, description='Max react loop number')
+    max_react_loop: int = Field(default=10, description='Max react loop number')
     state: int = Field(default=-1, description='State of the action')
     todos: List[Tuple] = Field(default=None, exclude=True, description='tools waited to call and arguments dict')
     action_taken: int = 0
+    root: str = str(root_dir())
 
 
 class Role(BaseModel):
@@ -126,7 +127,19 @@ class Role(BaseModel):
 
     @property
     def sys_think_msg(self) -> Optional[Dict[str, str]]:
-        return {'role': RoleType.SYSTEM.val, 'content': self._env_prompt + self.role_definition}
+        sys_single_agent = """You are a highly capable AI assistant designed to independently resolve user queries.
+
+Your primary objective is to find the definitive and complete answer to the user's request. You are equipped with a set of tools; utilize these tools effectively to gather any information required to formulate your answer.
+
+Strive to solve the problem by yourself using the available information and tools. **Your internal thought process, problem-solving steps, or any ambiguous intermediate information MUST NOT be included in your output.** Your focus is solely on providing the final, conclusive answer.
+
+If you have determined the final and complete answer, you MUST respond in the following JSON format and NOTHING ELSE. Do not include any other text, explanations, or conversational filler before or after this JSON object:
+{"FINAL_ANSWER": "<your_final_answer_here>"}"""
+        if not self.rc.env:
+            think_msg = SystemMessage.from_any(self.role_definition + sys_single_agent).to_message_dict()
+        else:
+            think_msg = ''
+        return think_msg
 
     @property
     def sys_react_msg(self) -> Optional[Dict[str, str]]:
@@ -134,28 +147,11 @@ class Role(BaseModel):
 
     @property
     def role_definition(self) -> str:
-        name_exp = f'You name is {self.name}, an helpful AI assistant,'
-        skill_exp = f'skill at {self.skill},' if self.skill else ''
-        goal_exp = f'your goal is {self.goal}.' if self.goal else ''
-        constraints_exp = (
-            'You constraint is utilize the same language for seamless communication'
-            ' and always give a clearly in final reply with format json format {"FINAL_ANSWER": Your final answer here}'
-            ' do not give ANY other information except this json.'
-            ' Pay attention to historical information to distinguish and make decision.\n'
-       )
-        tool_exp = (
-            'You have some tools that you can use to help the user or meet user needs, '
-            'fully understand the tool functions and their arguments before using them,'
-            'make sure the types and values of the arguments you provided to the tool functions are correct,'
-            'if there is an error in calling the tool, you need to fix it yourself.\n'
-        )
-        tool_exp = """You have some tools that you can use to help the user or meet user needs.
-Before calling any tool, you must fully understand the tool's functions and their arguments.
-Always reason step by step.  If any argument is unknown or ambiguous, consider using other available tools (such as search or file inspection tools) to gather the necessary information before calling the target tool.
-Ensure the types and values of all arguments you provide to the tool functions are correct.
-If there is an error in calling the tool, you need to fix it yourself.\n
-        """
-        definition = name_exp + skill_exp + goal_exp + '\n' + constraints_exp
+        name_exp = f'You name is {self.name}'
+        skill_exp = f'skill at {self.skill}' if self.skill else ''
+        goal_exp = f'your goal is {self.goal}' if self.goal else ''
+        working_dir = f'your working directory is {self.rc.root}' if self.rc.root else ''
+        definition = ','.join([i for i in [name_exp, skill_exp, goal_exp, working_dir] if i]) + '.'
         return definition
 
     def publish_message(self):
@@ -177,6 +173,7 @@ If there is an error in calling the tool, you need to fix it yourself.\n
         lgr.debug("Self-Correction: %s", fix_msg)
         err = UserMessage(content=fix_msg, sender=RoleType.USER.val)
         self.rc.buffer.put_one_msg(err)
+        self.rc.action_taken += 1
         return False, 'self-correction'
 
     async def _perceive(self, ignore_history: bool = False) -> bool:
@@ -206,17 +203,33 @@ If there is an error in calling the tool, you need to fix it yourself.\n
 
         # filter history part of tool call message
         if len(message) > 2:
-            do_not_del_lines = [len(message) - 1, len(message)]
+            keep_line = {len(message) - 1, len(message)}
             my_prefix = f'{self.name}({self.identity.val}):'
             my_tool_prefix = f'{self.name}({RoleType.TOOL.val}):'
+
+            idx = len(message)
+            while idx > 0:
+                current = message[idx - 1]
+                prev = message[idx - 2]
+
+                is_my_tool_reply = isinstance(current, dict) and current.get('content').startswith(my_tool_prefix) and 'tool_call_id' in current
+                is_tool_call = isinstance(prev, ChatCompletionMessage) and getattr(prev, 'tool_calls', None)
+
+                if is_my_tool_reply and is_tool_call:
+                    keep_line.add(idx)
+                    keep_line.add(idx - 1)
+                    idx -= 2
+                else:
+                    break
+
             for idx, msg in enumerate(message):
                 if isinstance(msg, ChatCompletionMessage):
-                    if idx + 1 in do_not_del_lines:
+                    if idx + 1 in keep_line:
                         message_pure.append(msg)
                 elif isinstance(msg, dict) and msg['content'].startswith(my_prefix):
                     message_pure.append(msg)
                 elif isinstance(msg, dict) and msg['content'].startswith(my_tool_prefix):
-                    if idx + 1 in do_not_del_lines:
+                    if idx + 1 in keep_line:
                         message_pure.append(msg)
                 else:
                     message_pure.append(msg)
@@ -264,7 +277,7 @@ If there is an error in calling the tool, you need to fix it yourself.\n
                     content = json.loads(think)
                 else:
                     content = json.loads(think.content)
-                content = content.get('FINAL_ANSWER')
+                final_answer = content.get('FINAL_ANSWER')
             except json.JSONDecodeError:
                 # send to self, no publish, no action
                 fix_msg = (f'Your returned an unexpected invalid json data, fix it please, '
@@ -272,18 +285,18 @@ If there is an error in calling the tool, you need to fix it yourself.\n
                            f'  ---> {think}')
                 return self._correction(fix_msg)
 
-            if content:
+            if final_answer:
                 json_match = re.search(r'({.*})', message_pure[-1]['content'], re.DOTALL)
                 think_process = ''
                 if json_match:
                     match_group = json_match.group()
                     if is_valid_json(match_group):
                         think_process = json.loads(match_group).get('think_process', '')
-                self.answer = AssistantMessage(content=content, sender=self.name)
+                self.answer = AssistantMessage(content=final_answer, sender=self.name)
                 self.rc.memory.add_one(self.answer)
-                return False, json.dumps({'final_answer': content, 'think_process': think_process}, ensure_ascii=False)
+                return False, json.dumps({'final_answer': final_answer, 'think_process': think_process}, ensure_ascii=False)
             else:
-                fix_msg = 'Your returned json data does not have a "FINAL ANSWER" key. Please check'
+                fix_msg = f'Your returned json data does not have a "FINAL ANSWER" key. Please check you answer:\n{final_answer}'
                 return self._correction(fix_msg)
 
         # unexpected think format
@@ -320,7 +333,7 @@ If there is an error in calling the tool, you need to fix it yourself.\n
                 self.answer = message
         return message
 
-    async def run(self, with_message: Optional[Union[str, Dict, Message]] = None, ignore_history: bool = False) -> Optional[Message]:
+    async def run(self, with_message: Optional[Union[str, Dict, Message]] = None, ignore_history: bool = False) -> Optional[Union[Message, str]]:
         if with_message:
             msg = Message.from_any(with_message)
             self.rc.buffer.put_one_msg(msg)
@@ -337,8 +350,9 @@ If there is an error in calling the tool, you need to fix it yourself.\n
                 if reply == 'self-correction':
                     continue
                 self.publish_message()
-                return json.loads(reply).get('final_answer', '')
+                return reply
             resp = await self._react()
+            lgr.debug(f'{self} react [{self.rc.action_taken}/{self.rc.max_react_loop}]')
         self.rc.todos = []
         return resp
 
