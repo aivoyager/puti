@@ -8,6 +8,21 @@ from pydantic import BaseModel
 
 
 class PromptSetting(BaseSettings):
+    rag_template: str = """"
+Here is some reference information that you can use to answer the user's question:
+
+### Reference Information:
+{}
+
+### User's Question:
+{}
+
+### Your Answer:
+Based on the above provided information (Just a reference.), please answer the user's question.
+ Ensure that your answer is comprehensive, directly related, and uses the reference information to form a well-supported response. 
+ There is no need to mention the content you referred to in the reply.
+    """
+
     THINK_TEMPLATE: str = """
 Conversation History
 ===

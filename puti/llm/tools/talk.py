@@ -3,10 +3,10 @@
 @Time:  2025-03-07 14:41
 @Description:  
 """
-from llm.tools import BaseTool, ToolArgs
+from puti.llm.tools import BaseTool, ToolArgs
 from pydantic import ConfigDict, Field
-from llm.nodes import LLMNode, OpenAINode
-from llm.messages import Message
+from puti.llm.nodes import LLMNode, OpenAINode
+from puti.llm.messages import Message
 
 
 class TalkArgs(ToolArgs):

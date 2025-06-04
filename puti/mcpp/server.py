@@ -8,9 +8,12 @@ import sys
 import argparse
 import json
 
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
-from puti.llm.tools.generate_tweet import GenerateTweet
+sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+from puti.llm.tools.generate_tweet import GenerateCzTweet
+from puti.llm.tools.terminal import Terminal
+from puti.llm.tools.python import Python
+from puti.llm.tools.file import File
+from puti.llm.tools.web_search import WebSearch
 from inspect import Parameter, Signature
 from pydantic import BaseModel, Field, ConfigDict
 from typing import Literal, List, Type, Any
@@ -107,5 +110,5 @@ class MCPServer(BaseModel):
 
 if __name__ == '__main__':
     mcp = MCPServer()
-    mcp.add_tools([GenerateTweet])
+    mcp.add_tools([GenerateCzTweet, Terminal, Python, File, WebSearch])
     mcp.run()

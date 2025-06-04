@@ -12,16 +12,16 @@ import sys
 import pty
 from collections import defaultdict
 
-from utils.path import root_dir
+from puti.utils.path import root_dir
 from abc import ABC
-from llm.tools import BaseTool, ToolArgs
+from puti.llm.tools import BaseTool, ToolArgs
 from pydantic import ConfigDict, Field, BaseModel
 from typing import Optional, Literal, List, Union, DefaultDict, get_args
-from core.resp import ToolResponse, Response
-from constant.base import Resp
+from puti.core.resp import ToolResponse, Response
+from puti.constant.base import Resp
 from pathlib import Path
 from logs import logger_factory
-from core.exce import ToolError
+from puti.core.exception import ToolError
 
 lgr = logger_factory.llm
 

@@ -3,9 +3,9 @@
 @Time:  2025-03-13 11:06
 @Description:  
 """
-from llm.tools import BaseTool
+from puti.llm.tools import BaseTool
 from pydantic import ConfigDict, Field
-from llm.tools import ToolArgs
+from puti.llm.tools import ToolArgs
 from typing import Dict, List, Annotated
 
 

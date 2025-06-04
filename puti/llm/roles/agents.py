@@ -1,30 +1,19 @@
 """
 @Author: obstacles
-@Time:  2025-04-09 16:32
+@Time:  2025-06-04 11:30
 @Description:  
 """
 from typing import Any
-
 from puti.llm.roles import McpRole
 from puti.llm.messages import UserMessage
 from logs import logger_factory
+from puti.llm.prompts import PromptSetting
 
 lgr = logger_factory.llm
 
-rag_prompt = """
-Here is some reference information that you can use to answer the user's question:
 
-### Reference Information:
-{}
-
-### User's Question:
-{}
-
-### Your Answer:
-Based on the above provided information (Just a reference.), please answer the user's question.
- Ensure that your answer is comprehensive, directly related, and uses the reference information to form a well-supported response. 
- There is no need to mention the content you referred to in the reply.
-"""
+class Alex(McpRole):
+    name: str = 'alex'
 
 
 class CZ(McpRole):
@@ -50,6 +39,6 @@ class CZ(McpRole):
             for i, j in enumerate(search_rsp, start=1):
                 numbered_rsp.append(f'{i}. {j}')
             his_rsp = '\n'.join(numbered_rsp)
-            prompt = rag_prompt.format(his_rsp, text)
+            prompt = PromptSetting.rag_template.format(his_rsp, text)
             resp = await super(CZ, self).run(prompt, *args, **kwargs)
         return resp

@@ -7,16 +7,16 @@ import json
 import re
 import asyncio
 
-from utils.path import root_dir
+from puti.utils.path import root_dir
 from abc import ABC
-from llm.tools import BaseTool, ToolArgs
+from puti.llm.tools import BaseTool, ToolArgs
 from pydantic import ConfigDict, Field
-from llm.nodes import OllamaNode, LLMNode
-from conf.llm_config import LlamaConfig, OpenaiConfig
-from llm.nodes import OpenAINode
+from puti.llm.nodes import OllamaNode, LLMNode
+from puti.conf.llm_config import LlamaConfig, OpenaiConfig
+from puti.llm.nodes import OpenAINode
 from logs import logger_factory
-from constant.llm import RoleType
-from llm.messages import Message, SystemMessage, UserMessage
+from puti.constant.llm import RoleType
+from puti.llm.messages import Message, SystemMessage, UserMessage
 
 lgr = logger_factory.llm
 model = 'gemini-2.5-pro-preview-03-25'
@@ -32,11 +32,11 @@ If the input is vague or does not suggest any particular direction (e.g., “Pos
 )
 
 
-class GenerateTweet(BaseTool, ABC):
+class GenerateCzTweet(BaseTool, ABC):
     model_config = ConfigDict(arbitrary_types_allowed=True, extra="allow")
 
     name: str = 'generate_tweet'
-    desc: str = 'Use this tool to generate a tweet can be posted on x website.'
+    desc: str = 'Use this tool to generate a cz tweet can be posted on x website.'
     args: GenerateCzArgs = None
 
     async def run(self, topic='', *args, **kwargs):

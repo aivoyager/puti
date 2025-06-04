@@ -5,9 +5,9 @@
 """
 import json
 
-from llm.tools import BaseTool, ToolArgs
+from puti.llm.tools import BaseTool, ToolArgs
 from pydantic import ConfigDict, Field
-from llm.nodes import LLMNode, OpenAINode
+from puti.llm.nodes import LLMNode, OpenAINode
 from typing import Annotated
 
 

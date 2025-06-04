@@ -6,13 +6,13 @@ import shlex
 import sys
 import pty
 
-from utils.path import root_dir
+from puti.utils.path import root_dir
 from abc import ABC
-from llm.tools import BaseTool, ToolArgs
+from puti.llm.tools import BaseTool, ToolArgs
 from pydantic import ConfigDict, Field
 from typing import Optional
-from core.resp import ToolResponse, Response
-from constant.base import Resp
+from puti.core.resp import ToolResponse, Response
+from puti.constant.base import Resp
 
 
 class TerminalArgs(ToolArgs):

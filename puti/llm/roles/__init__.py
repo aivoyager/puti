@@ -112,7 +112,7 @@ class Role(BaseModel):
     faiss_db: SerializeAsAny[FaissIndex] = Field(
         default_factory=lambda: FaissIndex(
             from_file=str(root_dir() / 'data' / 'cz_filtered.json'),
-            to_file=str(root_dir() / 'db' / 'cz_filtered.index')
+            to_file=str(root_dir() / 'data' / 'cz_filtered.index')
         ),
         validate_default=True, description='faiss vector database')
 
@@ -337,7 +337,7 @@ If there is an error in calling the tool, you need to fix it yourself.\n
                 if reply == 'self-correction':
                     continue
                 self.publish_message()
-                return reply
+                return json.loads(reply).get('final_answer', '')
             resp = await self._react()
         self.rc.todos = []
         return resp
@@ -364,7 +364,7 @@ class McpRole(Role):
     conn_type: McpTransportMethod = McpTransportMethod.STDIO
     exit_stack: AsyncExitStack = Field(default_factory=AsyncExitStack, validate_default=True)
     session: Optional[ClientSession] = Field(default=None, description='Session used for communication.', validate_default=True)
-    server_script: str = Field(default=str(root_dir() / 'mcpp' / 'test_server.py'), description='Server script')
+    server_script: str = Field(default=str(root_dir() / 'puti' / 'mcpp' / 'server.py'), description='Server script')
 
     initialized: bool = False
     init_lock: asyncio.Lock = Field(default_factory=asyncio.Lock, exclude=True)
@@ -384,7 +384,7 @@ class McpRole(Role):
         for _, module_name, _ in pkgutil.iter_modules(tools.__path__):
             if module_name == '__init__':
                 continue
-            module = importlib.import_module(f'llm.tools.{module_name}')
+            module = importlib.import_module(f'puti.llm.tools.{module_name}')
             for name, obj in inspect.getmembers(module, inspect.isclass):
                 if issubclass(obj, BaseTool) and obj is not BaseTool:
                     self.toolkit.add_tool(obj)
