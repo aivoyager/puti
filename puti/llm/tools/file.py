@@ -180,8 +180,8 @@ Notes for using the `str_replace` command:
 
     async def validate_path(self, command: str, path: Path) -> ToolResponse:
         """ validate input path """
-        # if not path.is_absolute():
-        #     return ToolResponse.fail(f'`path` parameter: `{path}` must be a absolute path')
+        if not path.is_absolute():
+            return ToolResponse.fail(f'`path` parameter: `{path}` must be a absolute path')
 
         if command != 'create':
             if not await self.f_op.exists(path):
