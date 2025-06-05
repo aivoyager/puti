@@ -12,3 +12,6 @@ async def test_alex():
     # resp = await alex.run('优化一下x_bot.py中的内容并进行修改')
     resp = await alex.run('25年4月份有什么重大新闻')
     print(resp)
+
+    resp = alex.cp.invoke(alex.run, '今天有什么重大新闻')
+    print(resp)

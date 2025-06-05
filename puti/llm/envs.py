@@ -62,15 +62,16 @@ class Env(BaseModel):
             lgr.warning(f'No receiver for message: {msg}')
         self.history.append(msg)
 
-    async def run(self):
+    async def run(self, run_round: int = 5):
         n = 0
-        while n <= 5:
+        while n < run_round:
             futures = []
             for member in self.members:
                 future = member.run()
                 futures.append(future)
             resp = await asyncio.gather(*futures)
             n += 1
+            lgr.debug(f'env [{self.name}] run round: [{n + 1}/{run_round}]; members: {self.members}')
             print(f'round: {n} resp: {resp}')
 
     @property
@@ -82,7 +83,7 @@ class Env(BaseModel):
 
     @classmethod
     def model_rebuild(cls, **kwargs):
-        from llm.roles import Role  # noqa: F401
+        from puti.llm.roles import Role  # noqa: F401
         super().model_rebuild(**kwargs)
 
 

@@ -8,8 +8,13 @@ from puti.llm.roles import McpRole
 from puti.llm.messages import UserMessage
 from logs import logger_factory
 from puti.llm.prompts import PromptSetting
+from puti.llm.roles import Role
+from puti.llm.tools.web_search import WebSearch
+
 
 lgr = logger_factory.llm
+
+__all__ = ['Alex', 'CZ', 'Debater']
 
 
 class Alex(McpRole):
@@ -42,3 +47,10 @@ class CZ(McpRole):
             prompt = PromptSetting.rag_template.format(his_rsp, text)
             resp = await super(CZ, self).run(prompt, *args, **kwargs)
         return resp
+
+
+class Debater(Role):
+    name: str = '乔治'
+
+    def model_post_init(self, __context: Any) -> None:
+        self.set_tools([WebSearch])

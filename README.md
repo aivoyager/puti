@@ -43,6 +43,7 @@ Puti is a Multi-Agent framework designed to tackle complex tasks through collabo
 
 *   **Multi-Agent Collaboration**: Supports communication and collaboration between multiple agents.
 *   **Flexible Agent Roles**: Allows defining agent roles with different goals and capabilities (e.g., Talker, Debater).
+*   **Powerful Tools**: Agents are equipped with `web search`, `file tool`, `terminal tool`, and `python tool` capabilities.
 *   **Environment Management**: Provides environment for managing agent interactions and message passing.
 *   **Configurable**: Easily configure LLM providers and other settings through YAML files.
 *   **Extensible**: Easy to build and integrate your own agents and tools.
@@ -62,82 +63,91 @@ pip install -r requirements.txt
 
 ## 💡 Usage Examples
 
-### 1. Basic Chat
-
-Simple conversation with a single agent.
-
+### 1. Agent Create
+Create a `Debater` agent with `web search` tool.
 ```python
-from llm.roles.talker import PuTi
-from llm.nodes import ollama_node  # Or your preferred LLM node
+from puti.llm.roles import Role
+from typing import Any
+from puti.llm.tools.web_search import WebSearch
 
-msg = 'What is calculus?'
-talker = PuTi(agent_node=ollama_node)
-response = talker.cp.invoke(talker.run, msg)
-print(response)
+class Debater(Role):
+    """ A debater agent with web search tool can find latest information for debate. """
+    name: str = '乔治'
+
+    def model_post_init(self, __context: Any) -> None:
+        
+        # setup tool here
+        self.set_tools([WebSearch])
 ```
 
-### 2. Chat with MCP
+### 2. Multi Agent Debate
 
-Interact with an agent that can call external tools using Message Coordination Protocol (MCP).
-
-```python
-import asyncio
-from llm.envs import Env
-from llm.roles.talker import PuTiMCP
-from llm.messages import Message
-
-env = Env()
-talker = PuTiMCP()  # This agent can potentially call tools via MCP server
-env.add_roles([talker])
-
-msg = 'How long is the flight from New York (NYC) to Los Angeles (LAX)?'
-env.publish_message(Message.from_any(msg))
-
-asyncio.run(env.run())
-print(env.history) # View the conversation history
-```
-
-### 3. Agent Debate
-
-Set up two agents for a debate.
+Set up two agents for a debate quickly.
 
 ```python
-import asyncio
-from llm.envs import Env
-from llm.messages import Message
-from llm.roles.debater import Debater
+from puti.llm.roles import Role
+from puti.llm.envs import Env
+from puti.llm.messages import Message
 
-env = Env(name='debate_game', desc='Agents debating a topic')
+# Debater
+Ethan = Role(name='Ethan', identity='Affirmative Debater')
+Olivia = Role(name='Olivia', identity='Opposition Debater')
 
-# Define two debaters with opposing goals
-debater1 = Debater(name='Alex', goal='Present positive arguments in each debate round. Your opponent is Rock.')
-debater2 = Debater(name='Rock', goal='Present negative arguments in each debate round. Your opponent is Alex.')
-
-env.add_roles([debater1, debater2])
-
-# Start the debate
-topic = 'Is technological development beneficial or harmful?'
-initial_message = Message.from_any(
-    f'You are now participating in a debate. The topic is: {topic}',
-    receiver=debater1.address, # Start with debater1
-    sender='user'
+# create a debate contest and put them in contest
+env = Env(
+    name='debate contest',
+    desc="""Welcome to the Annual Debate Championship, a dynamic forum where critical thinking, persuasive speaking, and intellectual rigor converge.  This competition brings together talented debaters from diverse backgrounds to engage in structured argumentation on pressing contemporary issues.  Participants will compete in teams, presenting arguments for or against a given motion, while being judged on clarity, evidence, rebuttal strength, and overall delivery.
+The goal of this debate is not only to win points but to foster respectful discourse, challenge assumptions, and inspire new perspectives.  Whether you are a passionate speaker or a curious listener, this event promises thought-provoking dialogue and high-level competition.
+          """
 )
+env.add_roles([Ethan, Olivia])
 
-# Add message to the other debater's memory as well
-debater2.rc.memory.add_one(initial_message)
+# topic
+topic = '科技发展是有益的还是有害的？ '
 
-env.publish_message(initial_message)
+# create a message start from Ethan
+msg = Message(content=topic, sender='user', receiver=Ethan.address)
+# Olivia needs user's input as background, but don't perceive it
+Olivia.rc.memory.add_one(msg)
 
-# Run the environment asynchronously
-asyncio.run(env.run())
+# then we publish this message to env
+env.publish_message(msg)
 
-# Print the debate history
+# start the debate in 5 round
+env.cp.invoke(env.run, run_round=5)
+
+# we can see all process from history
 print(env.history)
+```
+
+### 3. Alex Agent
+
+`Alex` is an mcp agent equipped with `web search`, `file tool`, `terminal tool`, and `python tool` capabilities. This section demonstrates its basic functionality.<br>
+You can even ask him to `write code` or `fix code` for you.
+```python
+from puti.llm.roles.agents import Alex
+
+alex = Alex()
+
+# using search tool here find result for free
+resp = alex.cp.invoke(alex.run, 'What major news is there today?')
+print(resp)
+```
+
+### 4. Custom your MCP Agent
+Server equipped with `web search`, `file tool`, `terminal tool`, and `python tool`
+```python
+from puti.llm.roles import McpRole
+
+class SoftwareEngineer(McpRole):
+    name: str = 'Rock'
+    skill: str = 'You are proficient in software development, including full-stack web development, software architecture design, debugging, and optimizing complex systems. You have expertise in programming languages such as Python, JavaScript, and C++, and are skilled in using tools like Git, Docker, and CI/CD pipelines. You are capable of writing clean, maintainable code, conducting code reviews, and collaborating effectively in agile development teams.'
+    goal: str = 'Your goal is to design, implement, and maintain scalable and robust software systems that meet user requirements and business objectives. You aim to continuously improve code quality, ensure timely delivery of features, and contribute to the overall success of the engineering team and product.'
 ```
 
 ## ⚙️ Configuration
 
-Configure your LLM provider and other settings in `conf/config.yaml`:
+Configure your LLM provider and other settings in `conf/config.yaml` by `demo file`:
 
 ```yaml
 # conf/config.yaml
@@ -155,9 +165,8 @@ llm:
 ```
 
 Access configuration in your code:
-
 ```python
-from conf.llm_config import OpenaiConfig, LlamaConfig
+from puti.conf.llm_config import OpenaiConfig, LlamaConfig
 
 # Access OpenAI configuration
 openai_conf = OpenaiConfig()

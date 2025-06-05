@@ -11,6 +11,8 @@ import time
 import numpy as np
 import itertools
 import tiktoken
+import urllib
+import codecs
 
 from sklearn.metrics.pairwise import cosine_similarity
 from typing import List
@@ -40,7 +42,7 @@ class GoogleSearchEngine(WebSearchEngine):
 
     def search(self, query, retrieval_url_count, *args, **kwargs):
         # `num` This argument didn't work
-        gen_resp = g_search(query, num=retrieval_url_count, *args, **kwargs)
+        gen_resp = g_search(query, num=retrieval_url_count, country='US', *args, **kwargs)
         count = 0
         resp = []
         while count < retrieval_url_count:
@@ -139,7 +141,7 @@ class WebSearch(BaseTool, ABC):
                 for script in soup(['script', 'style']):
                     script.decompose()
 
-                text = soup.get_text(separator='\n')
+                text = soup.get_text(separator='\n').encode('latin1').decode('utf-8')
                 text = re.sub(r'\t+', '\t', text)  # Replace multiple tabs with a single tab
                 text = re.sub(r'\n+', ' ', text).strip()  # Replace multiple newlines with a single space and strip
                 # Further clean up multiple spaces that might have resulted from replacements
