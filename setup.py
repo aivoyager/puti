@@ -59,8 +59,8 @@ setup(
         "Operating System :: OS Independent",
     ],
     entry_points={
-        # 'console_scripts': [
-        #     'puti=puti.main:main',
-        # ],
+        'console_scripts': [
+            'puti = puti.cli:main',
+        ],
     },
 )
