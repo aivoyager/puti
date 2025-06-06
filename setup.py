@@ -37,6 +37,9 @@ setup(
         "twikit==2.3.3",
         "pytest-asyncio==1.0.0",
         "pydantic==2.10.6",
+        "questionary==2.0.1",
+        "rich==13.7.1",
+        "python-dotenv==1.0.1",
     ],
     python_requires=">=3.10",
     classifiers=[
