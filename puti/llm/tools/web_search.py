@@ -42,7 +42,7 @@ class GoogleSearchEngine(WebSearchEngine):
 
     def search(self, query, retrieval_url_count, *args, **kwargs):
         # `num` This argument didn't work
-        gen_resp = g_search(query, num=retrieval_url_count, country='US', *args, **kwargs)
+        gen_resp = g_search(query, num_results=retrieval_url_count, region='US', *args, **kwargs)
         count = 0
         resp = []
         while count < retrieval_url_count:
@@ -141,7 +141,10 @@ class WebSearch(BaseTool, ABC):
                 for script in soup(['script', 'style']):
                     script.decompose()
 
-                text = soup.get_text(separator='\n').encode('latin1').decode('utf-8')
+                try:
+                    text = soup.get_text(separator='\n').encode('latin1').decode('utf-8')
+                except UnicodeEncodeError:
+                    text = soup.get_text()
                 text = re.sub(r'\t+', '\t', text)  # Replace multiple tabs with a single tab
                 text = re.sub(r'\n+', ' ', text).strip()  # Replace multiple newlines with a single space and strip
                 # Further clean up multiple spaces that might have resulted from replacements
@@ -209,6 +212,6 @@ class WebSearch(BaseTool, ABC):
         prefix = np.arange(1, len(selected) + 1).astype(str)
         numbered_selected = np.char.add(prefix, '. ')
         numbered_selected = np.char.add(numbered_selected, selected)
-        final = {'searched_result_on_google': numbered_selected}
+        final = {'searched_result_on_google': '\n\n'.join(numbered_selected)}
         lgr.debug(f'google web search done. {num_results} founded. cost time: {time.time() - st}.')
         return ToolResponse.success(data=final)

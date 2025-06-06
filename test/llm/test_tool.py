@@ -9,7 +9,7 @@ from puti.llm.tools.demo import GetFlightInfo
 from puti.llm.tools import toolkit
 from puti.llm.tools.common import GetTodayDate
 from puti.llm.tools.web_search import WebSearch
-from puti.llm.roles.alex import Alex
+from puti.llm.roles.agents import Alex
 from puti.llm.nodes import OpenAINode
 
 
@@ -24,6 +24,7 @@ def test_get_today_date():
     g = GetTodayDate()
     g.run()
     print('')
+
 
 def test_echo():
     alex = Alex()

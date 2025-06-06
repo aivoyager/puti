@@ -13,5 +13,5 @@ async def test_alex():
     resp = await alex.run('25年4月份有什么重大新闻')
     print(resp)
 
-    resp = alex.cp.invoke(alex.run, '今天有什么重大新闻')
+    resp = alex.cp.invoke(alex.run, '详细介绍一下第二条')
     print(resp)

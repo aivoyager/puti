@@ -130,7 +130,7 @@ class Role(BaseModel):
     @property
     def sys_think_msg(self) -> Optional[Dict[str, str]]:
         if not self.rc.env:
-            sys_single_agent = prompt_setting.sys_single_agent.replace('<WORKING_DIRECTORY_PATH>', self.rc.root)
+            sys_single_agent = prompt_setting.sys_single_agent.render(WORKING_DIRECTORY_PATH=self.rc.root)
             think_msg = SystemMessage.from_any(self.role_definition + sys_single_agent).to_message_dict()
         else:
             sys_multi_agent = prompt_setting.sys_multi_agent.render(
@@ -145,10 +145,6 @@ class Role(BaseModel):
             )
             think_msg = SystemMessage.from_any(sys_multi_agent).to_message_dict()
         return think_msg
-
-    @property
-    def sys_react_msg(self) -> Optional[Dict[str, str]]:
-        return {'role': RoleType.SYSTEM.val, 'content': self.role_definition}
 
     @property
     def role_definition(self) -> str:
@@ -174,7 +170,7 @@ class Role(BaseModel):
 
     def _correction(self, fix_msg: str):
         """ self-correction mechanism """
-        lgr.debug("Self-Correction: %s", fix_msg)
+        lgr.debug(f"self correction: {fix_msg}")
         err = UserMessage(content=fix_msg, sender=RoleType.USER.val)
         self.rc.buffer.put_one_msg(err)
         self.rc.action_taken += 1
@@ -285,9 +281,7 @@ class Role(BaseModel):
                 in_process_answer = content.get('IN_PROCESS')
             except json.JSONDecodeError:
                 # send to self, no publish, no action
-                fix_msg = (f'Your returned an unexpected invalid json data, fix it please, '
-                           f'make sure the repaired results include the full process and results rather than summary'
-                           f'  ---> {think}')
+                fix_msg = prompt_setting.self_reflection.render(INVALID_DATA=think)
                 return self._correction(fix_msg)
 
             if final_answer:
