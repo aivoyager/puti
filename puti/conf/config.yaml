@@ -30,11 +30,11 @@ utilities:
         PORT: 3306
 llm:
     - openai:
-        EMBEDDING_MODEL: ""  # e.g. text-embedding-3-small
+        EMBEDDING_MODEL: "text-embedding-3-small"
         FAISS_SEARCH_TOP_K: 5
-        MODEL: ""  # e.g. o4-mini
-        BASE_URL: ""
-        API_KEY: "Your openai API key here"  # < required >
+        MODEL: "${OPENAI_MODEL}"
+        BASE_URL: "${OPENAI_BASE_URL}"
+        API_KEY: "${OPENAI_API_KEY}"
         MAX_TOKEN: 4096
         TEMPERATURE: 0.0
         TOP_K: 1.0
@@ -54,6 +54,6 @@ llm:
         LLM_API_TIMEOUT: 60
         VERBOSE: true
     - llama:
-        BASE_URL: "Your ollama server ip:host"  # ollama e.g. 127.0.0.1:11434
-        MODEL: "Your model name"  # e.g. llama3.1
-        STREAM: true
+        BASE_URL: "http://localhost:11434"
+        MODEL: "llama3.1"
+        STREAM: true 

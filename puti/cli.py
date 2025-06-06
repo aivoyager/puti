@@ -1,3 +1,4 @@
+import puti.bootstrap  # noqa: F401, must be the first import
 import click
 import asyncio
 from puti.llm.roles.agents import Alex
