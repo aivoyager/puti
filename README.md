@@ -1,38 +1,21 @@
-# Puti - Multi-Agent Framework
+# Puti - Multi-Agent Framework 🤖
 
 <p align="center">
-    <em>Tackle complex tasks with autonomous agents.</em>
+  <a href="https://github.com/aivoyager/puti">
+    <img src="https://socialify.git.ci/aivoyager/puti/image?description=1&font=Inter&forks=1&issues=1&language=1&name=1&owner=1&pattern=Plus&stargazers=1&theme=Dark" alt="puti" width="650" height="325" />
+  </a>
 </p>
 
 <p align="center">
-    <a href="./README.md">
-        <img src="https://img.shields.io/badge/document-English-blue.svg" alt="EN doc">
-    </a>
-    <a href="https://opensource.org/licenses/MIT">
-        <img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License: MIT">
-    </a>
-    <a href="./docs/ROADMAP.MD">
-        <img src="https://img.shields.io/badge/ROADMAP-ROADMAP-blue.svg" alt="Roadmap">
-    </a>
+    <em>An elegant multi-agent framework for building autonomous agents to tackle complex tasks.</em>
 </p>
 
 <p align="center">
-    <!-- Project Stats -->
-    <a href="https://github.com/aivoyager/puti/issues">
-        <img src="https://img.shields.io/github/issues/aivoyager/puti" alt="GitHub issues">
-    </a>
-    <a href="https://github.com/aivoyager/puti/network">
-        <img src="https://img.shields.io/github/forks/aivoyager/puti" alt="GitHub forks">
-    </a>
-    <a href="https://github.com/aivoyager/puti/stargazers">
-        <img src="https://img.shields.io/github/stars/aivoyager/puti" alt="GitHub stars">
-    </a>
-    <a href="https://github.com/aivoyager/puti/blob/main/LICENSE">
-        <img src="https://img.shields.io/github/license/aivoyager/puti" alt="GitHub license">
-    </a>
-    <a href="https://star-history.com/#aivoyager/puti">
-        <img src="https://img.shields.io/github/stars/aivoyager/puti?style=social" alt="GitHub star chart">
-    </a>
+    <a href="https://pypi.org/project/ai-puti/"><img src="https://img.shields.io/pypi/v/ai-puti.svg?style=flat-square&logo=pypi&logoColor=white" alt="PyPI version"></a>
+    <a href="https://pypi.org/project/ai-puti/"><img src="https://img.shields.io/pypi/pyversions/ai-puti.svg?style=flat-square&logo=python&logoColor=white" alt="Python versions"></a>
+    <a href="https://github.com/aivoyager/puti/blob/main/LICENSE"><img src="https://img.shields.io/github/license/aivoyager/puti?style=flat-square" alt="License"></a>
+    <a href="https://github.com/aivoyager/puti/issues"><img src="https://img.shields.io/github/issues/aivoyager/puti?style=flat-square" alt="Issues"></a>
+    <a href="https://github.com/aivoyager/puti/pulls"><img src="https://img.shields.io/github/issues-pr/aivoyager/puti?style=flat-square" alt="Pull Requests"></a>
 </p>
 
 ## ✨ Introduction
@@ -41,29 +24,64 @@ Puti is a Multi-Agent framework designed to tackle complex tasks through collabo
 
 ## 🚀 Features
 
-*   **Multi-Agent Collaboration**: Supports communication and collaboration between multiple agents.
-*   **Flexible Agent Roles**: Allows defining agent roles with different goals and capabilities (e.g., Talker, Debater).
-*   **Powerful Tools**: Agents are equipped with `web search`, `file tool`, `terminal tool`, and `python tool` capabilities.
-*   **Environment Management**: Provides environment for managing agent interactions and message passing.
-*   **Configurable**: Easily configure LLM providers and other settings through YAML files.
-*   **Extensible**: Easy to build and integrate your own agents and tools.
+*   🤝 **Multi-Agent Collaboration**: Supports communication and collaboration between multiple agents.
+*   🎭 **Flexible Agent Roles**: Allows defining agent roles with different goals and capabilities (e.g., Talker, Debater).
+*   🛠️ **Powerful Tools**: Agents are equipped with `web search`, `file tool`, `terminal tool`, and `python tool` capabilities.
+*   💡 **Interactive Setup**: Get started instantly with a guided setup for your credentials.
+*   🌍 **Environment Management**: Provides an environment for managing agent interactions and message passing.
+*   🧩 **Extensible**: Easy to build and integrate your own agents and tools.
 
 ## 📦 Installation
 
-Clone the repository and install required dependencies:
+Install Puti directly from PyPI:
 ```bash
 pip install ai-puti
 ```
 
+Or, for development, clone the repository and install in editable mode:
 ```bash
 git clone https://github.com/aivoyager/puti.git
 cd puti
-pip install -r requirements.txt
+pip install -e .
 ```
+
+## 🚀 Quick Start: Chat with Alex
+
+Get started immediately with Puti's interactive, all-purpose AI assistant, Alex.
+
+```bash
+puti alex-chat
+```
+
+**On your first run**, Puti provides a guided setup experience:
+1.  🕵️ **Auto-detection**: The app checks if your OpenAI credentials are set up.
+2.  🗣️ **Interactive Prompts**: If anything is missing, you'll be prompted to enter your `API Key`, `Base URL`, and `Model`.
+3.  💾 **Secure, Local Storage**: Your credentials are saved securely in a local `.env` file for future use.
+
+On subsequent runs, the setup is skipped, and you'll jump right into the chat.
+
+## ⚙️ Configuration
+
+Puti uses a flexible configuration system that prioritizes environment variables.
+
+### 1. Guided Setup (Recommended)
+As described in the Quick Start, running `puti alex-chat` for the first time will automatically guide you through creating a `.env` file. This is the easiest way to get started.
+
+### 2. Manual Setup
+You can also configure Puti by manually creating a `.env` file in your project's root directory.
+
+```.env
+# .env file
+OPENAI_API_KEY="sk-..."
+OPENAI_BASE_URL="https://api.openai.com/v1"
+OPENAI_MODEL="gpt-4o-mini"
+```
+The application will automatically load these variables on startup. System-level environment variables will also work and will override the `.env` file.
+
 
 ## 💡 Usage Examples
 
-### 1. Agent Create
+### 1. 🧑‍🎨 Agent Create
 Create a `Debater` agent with `web search` tool.
 ```python
 from puti.llm.roles import Role
@@ -80,10 +98,8 @@ class Debater(Role):
         self.set_tools([WebSearch])
 ```
 
-### 2. Multi Agent Debate
-
+### 2. 🗣️ Multi Agent Debate
 Set up two agents for a debate quickly.
-
 ```python
 from puti.llm.roles import Role
 from puti.llm.envs import Env
@@ -96,9 +112,7 @@ Olivia = Role(name='Olivia', identity='Opposition Debater')
 # create a debate contest and put them in contest
 env = Env(
     name='debate contest',
-    desc="""Welcome to the Annual Debate Championship, a dynamic forum where critical thinking, persuasive speaking, and intellectual rigor converge.  This competition brings together talented debaters from diverse backgrounds to engage in structured argumentation on pressing contemporary issues.  Participants will compete in teams, presenting arguments for or against a given motion, while being judged on clarity, evidence, rebuttal strength, and overall delivery.
-The goal of this debate is not only to win points but to foster respectful discourse, challenge assumptions, and inspire new perspectives.  Whether you are a passionate speaker or a curious listener, this event promises thought-provoking dialogue and high-level competition.
-          """
+    desc="""Welcome to the Annual Debate Championship..."""
 )
 env.add_roles([Ethan, Olivia])
 
@@ -120,61 +134,25 @@ env.cp.invoke(env.run, run_round=5)
 print(env.history)
 ```
 
-### 3. Alex Agent
-
-`Alex` is an mcp agent equipped with `web search`, `file tool`, `terminal tool`, and `python tool` capabilities. This section demonstrates its basic functionality.<br>
-You can even ask him to `write code` or `fix code` for you.
+### 3. 👨‍💻 Alex Agent in Code
+`Alex` is an mcp agent equipped with `web search`, `file tool`, `terminal tool`, and `python tool` capabilities.
 ```python
 from puti.llm.roles.agents import Alex
 
 alex = Alex()
-
-# using search tool here find result for free
-resp = alex.cp.invoke(alex.run, 'What major news is there today?')
+resp = alex.run('What major news is there today?')
 print(resp)
 ```
 
-### 4. Custom your MCP Agent
+### 4. 🔧 Custom your MCP Agent
 Server equipped with `web search`, `file tool`, `terminal tool`, and `python tool`
 ```python
 from puti.llm.roles import McpRole
 
 class SoftwareEngineer(McpRole):
     name: str = 'Rock'
-    skill: str = 'You are proficient in software development, including full-stack web development, software architecture design, debugging, and optimizing complex systems. You have expertise in programming languages such as Python, JavaScript, and C++, and are skilled in using tools like Git, Docker, and CI/CD pipelines. You are capable of writing clean, maintainable code, conducting code reviews, and collaborating effectively in agile development teams.'
-    goal: str = 'Your goal is to design, implement, and maintain scalable and robust software systems that meet user requirements and business objectives. You aim to continuously improve code quality, ensure timely delivery of features, and contribute to the overall success of the engineering team and product.'
-```
-
-## ⚙️ Configuration
-
-Configure your LLM provider and other settings in `conf/config.yaml` by `demo file`:
-
-```yaml
-# conf/config.yaml
-llm:
-    - openai:
-        MODEL: "gpt-4o-mini"  # Or your preferred model
-        BASE_URL: "YOUR_OPENAI_COMPATIBLE_API_BASE_URL" # e.g., https://api.openai.com/v1
-        API_KEY: "YOUR_API_KEY"
-        MAX_TOKEN: 4096
-    - llama: # Example for Ollama
-        BASE_URL: "http://localhost:11434" # Your Ollama server address
-        MODEL: "llama3.1:latest"
-        STREAM: true
-    # Add other LLM configurations as needed
-```
-
-Access configuration in your code:
-```python
-from puti.conf.llm_config import OpenaiConfig, LlamaConfig
-
-# Access OpenAI configuration
-openai_conf = OpenaiConfig()
-print(f"Using OpenAI Model: {openai_conf.MODEL}")
-
-# Access Llama configuration
-llama_conf = LlamaConfig()
-print(f"Using Llama Model: {llama_conf.MODEL}")
+    skill: str = 'You are proficient in software development, including full-stack web development, software architecture design, debugging, and optimizing complex systems...'
+    goal: str = 'Your goal is to design, implement, and maintain scalable and robust software systems that meet user requirements and business objectives...'
 ```
 
 ## 🤝 Contributing
