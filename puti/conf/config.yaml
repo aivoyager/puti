@@ -32,9 +32,9 @@ llm:
     - openai:
         EMBEDDING_MODEL: "text-embedding-3-small"
         FAISS_SEARCH_TOP_K: 5
-        MODEL: "${OPENAI_MODEL}"
-        BASE_URL: "${OPENAI_BASE_URL}"
-        API_KEY: "${OPENAI_API_KEY}"
+        MODEL: "${OPENAI_MODEL}"  # will load from env
+        BASE_URL: "${OPENAI_BASE_URL}"  # will load from env
+        API_KEY: "${OPENAI_API_KEY}"  # will load from env
         MAX_TOKEN: 4096
         TEMPERATURE: 0.0
         TOP_K: 1.0
