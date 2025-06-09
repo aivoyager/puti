@@ -134,6 +134,8 @@ Notes for using the `str_replace` command:
     file_history: DefaultDict[Union[str, Path], List[str]] = defaultdict(list)
 
     async def run(self, command: str, path: str, *args, **kwargs) -> ToolResponse:
+        lgr.debug(f'{self.name} using...')
+
         view_range: Optional[List[int]] = kwargs.pop('view_range', None)
         file_text: Optional[str] = kwargs.pop('file_text', None)
         old_str: Optional[str] = kwargs.pop('old_str', None)

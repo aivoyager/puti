@@ -65,17 +65,12 @@ class WebSearch(BaseTool, ABC):
     model_config = ConfigDict(arbitrary_types_allowed=True, extra="allow")
 
     name: str = 'web_search'
-    desc: str = """Performs a web search using a search engine to find real-time, up-to-date information from the
-     internet. Use this tool when you need current information beyond your knowledge cut-off date, or to find specific
-      facts, news, articles, or general information on any topic not readily available in your training data.
-      When to use:
-        "To find information about current events, news, or topics that have developed after your last knowledge update.",
-        "To answer specific factual questions that require up-to-date information (e.g., 'What is the current stock price of AAPL? ', 'When is the next solar eclipse visible from North America?').",
-        "When asked to find specific articles, research papers, product details, or official documentation available online.",
-        "To verify information or find diverse perspectives on a topic from multiple web sources.",
-        "When the user explicitly asks you to search the internet or 'Google' something.",
-        "If your internal knowledge is insufficient, too general, or likely outdated for the user's query."
-      """
+    desc: str = (
+        "Performs a web search to find real-time, up-to-date information on the internet. "
+        "Use this tool when you need current information beyond your knowledge cut-off date, such as today's news, "
+        "recent events, or the latest developments on a topic. It is also useful for finding specific facts, "
+        "articles, or general information that is not part of your internal knowledge."
+    )
     args: WebSearchArgs = None
 
     _search_engine: dict[str, WebSearchEngine] = {
@@ -110,7 +105,7 @@ class WebSearch(BaseTool, ABC):
 
             if join_len > max_chars:
                 chunk = ''.join(current_chunk)
-                lgr.debug(f"chunk chars={len(chunk)} tokens={len(enc.encode(chunk))}")
+                # lgr.debug(f"chunk chars={len(chunk)} tokens={len(enc.encode(chunk))}")
                 chunk_storage.append(chunk)
                 if overlap_sentences_count > 0 and len(current_chunk) > 0:
                     overlap = current_chunk[-overlap_sentences_count:] if len(current_chunk) >= overlap_sentences_count else current_chunk
@@ -126,7 +121,7 @@ class WebSearch(BaseTool, ABC):
             current_chunk_chars = len(''.join(current_chunk))
         if current_chunk:
             chunk = ''.join(current_chunk)
-            lgr.debug(f"chunk chars={len(chunk)} tokens={len(enc.encode(chunk))}")
+            # lgr.debug(f"chunk chars={len(chunk)} tokens={len(enc.encode(chunk))}")
             chunk_storage.append(chunk)
         self.chunk_storage.extend(chunk_storage)
         return chunk_storage
@@ -174,6 +169,8 @@ class WebSearch(BaseTool, ABC):
             *args,
             **kwargs
     ) -> ToolResponse:
+        lgr.debug(f'{self.name} using...')
+
         retrieval_url_count = num_results * 2
 
         self.chunk_storage.clear()
@@ -183,11 +180,11 @@ class WebSearch(BaseTool, ABC):
             None,
             lambda: self._search_engine['google'].search(query, retrieval_url_count=retrieval_url_count)
         )
-        lgr.debug(f'google web search started with `{query}`.')
+        # lgr.debug(f'google web search started with `{query}`.')
         urls = search_resp[:num_results]
 
         responses = await asyncio.gather(*[self.fetch_text_from_url(url) for url in urls])
-        lgr.debug(f'fetch text from urls done. cost time: {time.time() - st}.')
+        # lgr.debug(f'fetch text from urls done. cost time: {time.time() - st}.')
 
         total_content = []
         for url, resp in zip(urls, responses):
@@ -196,7 +193,8 @@ class WebSearch(BaseTool, ABC):
                     continue
                 total_content.append(resp.data)
             else:
-                lgr.warning(f"Failed to fetch content from URL: {url}. Error: {resp.msg}")
+                # lgr.warning(f"Failed to fetch content from URL: {url}. Error: {resp.msg}")
+                pass
         total_content = list(itertools.chain.from_iterable(total_content))
         if not total_content:
             return ToolResponse.fail(msg=f"Failed to fetch content from URL: {search_resp}")
@@ -204,7 +202,7 @@ class WebSearch(BaseTool, ABC):
         # TODO: embeddings cost
         embeddings = await asyncio.gather(*[llm.embedding(text=content) for content in total_content])
         query_embedding = await llm.embedding(text=query)
-        lgr.debug(f'embeddings done. cost time: {time.time() - st}.')
+        # lgr.debug(f'embeddings done. cost time: {time.time() - st}.')
 
         top_indices, _ = self.compute_similarity(embeddings, query_embedding, top_k=num_results)
 
@@ -213,5 +211,5 @@ class WebSearch(BaseTool, ABC):
         numbered_selected = np.char.add(prefix, '. ')
         numbered_selected = np.char.add(numbered_selected, selected)
         final = {'searched_result_on_google': '\n\n'.join(numbered_selected)}
-        lgr.debug(f'google web search done. {num_results} founded. cost time: {time.time() - st}.')
+        # lgr.debug(f'google web search done. {num_results} founded. cost time: {time.time() - st}.')
         return ToolResponse.success(data=final)

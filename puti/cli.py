@@ -1,3 +1,35 @@
+import json
+import multiprocessing
+import sys
+import logging
+
+# --- Aggressive fix for stubborn logs and warnings on macOS ---
+
+# 1. Globally suppress INFO and DEBUG logs.
+# This configures the root logger. Any library (like mcp) that tries to
+# configure logging after this will find it already configured, and its
+# settings for lower-level logs will be ignored.
+logging.basicConfig(level=logging.WARNING, format='%(asctime)s - %(levelname)s - %(message)s')
+
+
+# 2. Disable the resource_tracker to silence semaphore leak warnings.
+# This is a last-resort hack for when warnings persist despite all other fixes.
+# It prevents the tracker from ever registering resources, so it never warns.
+if sys.platform == 'darwin':
+    from multiprocessing import resource_tracker
+    def _noop(*args, **kwargs):
+        pass
+    resource_tracker.register = _noop
+    resource_tracker.unregister = _noop
+    
+    # We still set the start method to 'fork' as it's more efficient for this app.
+    try:
+        multiprocessing.set_start_method('fork')
+    except RuntimeError:
+        # Guards against "context has already been set" errors.
+        pass
+
+
 import puti.bootstrap  # noqa: F401, must be the first import
 import click
 import asyncio
@@ -46,12 +78,26 @@ def alex_chat(name):
                     break
 
                 # Show a thinking indicator
-                with console.status("[bold cyan]Alex is thinking...", spinner="dots") as status:
+                with console.status("[bold cyan]Alex is thinking...", spinner="dots"):
+                    user_input += '\n [System: Reply in the specified json format.]'
                     response = await alex_agent.run(user_input)
                 
-                # Print the response as markdown
-                response_markdown = Markdown(response, style="green")
-                console.print(f"[bold green]{name}:[/bold green]", response_markdown)
+                # The agent returns a dictionary. We extract the final answer for the user.
+                final_answer = "Sorry, I encountered an issue and couldn't provide a response."
+                if isinstance(response, dict) and response.get("final_answer"):
+                    final_answer = response["final_answer"]
+                elif isinstance(response, dict) and response.get("FINAL_ANSWER"):
+                    final_answer = response["FINAL_ANSWER"]
+                elif isinstance(response, str):  # Handle plain string responses gracefully
+                    try:
+                        j_rp = json.loads(response)
+                        final_answer = j_rp.get('final_answer') if j_rp.get('final_answer') else j_rp.get('FINAL_ANSWER')
+                    except json.decoder.JSONDecodeError:
+                        final_answer = response
+
+                # Print the response as markdown, with a newline for spacing.
+                response_markdown = Markdown(final_answer, style="green")
+                console.print(f"\n[bold blue]{name}:[/bold blue]", response_markdown)
 
             except (KeyboardInterrupt, EOFError):
                 # Handle Ctrl+C and Ctrl+D

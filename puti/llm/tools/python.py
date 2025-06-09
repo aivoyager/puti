@@ -15,6 +15,8 @@ from pydantic import ConfigDict, Field
 from typing import Optional
 from puti.core.resp import ToolResponse, Response
 from puti.constant.base import Resp
+from logs import logger_factory
+lgr = logger_factory.llm
 
 
 class PythonArgs(ToolArgs):
@@ -51,6 +53,8 @@ class Python(BaseTool, ABC):
             sys.stdout = original_stdout
 
     async def run(self, code: str, timeout: int = 5, *args, **kwargs) -> ToolResponse:
+        lgr.debug(f'{self.name} using...')
+
         with multiprocessing.Manager() as manager:
             result = manager.dict({'observation': "", "success": False})
 

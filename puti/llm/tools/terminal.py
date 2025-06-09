@@ -13,6 +13,9 @@ from pydantic import ConfigDict, Field
 from typing import Optional
 from puti.core.resp import ToolResponse, Response
 from puti.constant.base import Resp
+from logs import logger_factory
+
+lgr = logger_factory.llm
 
 
 class TerminalArgs(ToolArgs):
@@ -82,6 +85,8 @@ Note: You MUST append a `sleep 0.02` to the end of the command for commands that
             return ToolResponse(code=Resp.TOOL_FAIL.val, msg=str(e))
 
     async def run(self, command: str, *args, **kwargs) -> ToolResponse:
+        lgr.debug(f'{self.name} using...')
+
         commands = [cmd.strip() for cmd in command.split('&') if cmd.strip()]
         final_output = ToolResponse(code=Resp.TOOL_OK.val, msg='', data='')
 

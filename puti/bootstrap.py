@@ -4,6 +4,8 @@
 @Description: Bootstrapping script to patch config with environment variables.
 """
 import os
+import sys
+from pathlib import Path
 from dotenv import load_dotenv, find_dotenv
 
 # --- CRITICAL: Load .env file BEFORE any other module code runs ---
@@ -12,6 +14,22 @@ from dotenv import load_dotenv, find_dotenv
 dotenv_path = find_dotenv()
 if dotenv_path:
     load_dotenv(dotenv_path)
+
+# --- FIX for multiprocessing leaks on macOS (from tiktoken or other libs) ---
+# This is a known robust fix for stubborn multiprocessing issues on macOS,
+# often triggered by libraries like `tiktoken` or `numpy`. It tells the
+# Objective-C runtime to be less strict about safety checks when a process
+# forks, which can prevent hangs and resource leaks.
+if sys.platform == "darwin":
+    os.environ["OBJC_DISABLE_INITIALIZE_FORK_SAFETY"] = "YES"
+
+# Set a specific cache directory for tiktoken. This is good practice and can
+# also help prevent some caching-related concurrency issues.
+if "TIKTOKEN_CACHE_DIR" not in os.environ:
+    # We create a dedicated cache directory within the user's home to avoid conflicts.
+    tiktoken_cache_dir = Path.home() / ".puti_cache" / "tiktoken"
+    tiktoken_cache_dir.mkdir(parents=True, exist_ok=True)
+    os.environ["TIKTOKEN_CACHE_DIR"] = str(tiktoken_cache_dir)
 
 # Now, with the environment correctly set, we can import the config modules.
 from box import Box

@@ -73,7 +73,7 @@ class OpenAINode(LLMNode):
             collected_messages = []
             async for chunk in resp:
                 chunk_message = chunk.choices[0].delta.content or '' if chunk.choices else ''
-                print(chunk_message, end='')
+                # print(chunk_message, end='')
                 collected_messages.append(chunk_message)
             full_reply = ''.join(collected_messages)
             self.cost.handle_chat_cost(msg, full_reply, self.conf.MODEL)
@@ -92,7 +92,7 @@ class OpenAINode(LLMNode):
             if resp.choices[0].message.tool_calls:
                 completion_text = resp.choices[0].message.content if hasattr(resp.choices[0].message, 'content') else ''
                 self.cost.handle_chat_cost(msg, completion_text, self.conf.MODEL)
-                lgr.info(f"cost: {self.cost.total_cost}")
+                # lgr.info(f"cost: {self.cost.total_cost}")
                 return resp.choices[0].message
             else:
                 full_reply = resp.choices[0].message.content if hasattr(resp.choices[0].message, 'content') else ''

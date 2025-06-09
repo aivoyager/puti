@@ -37,14 +37,14 @@ class Capture(BaseModel):
 
         try:
             if iscoroutinefunction(func):
+                loop = asyncio.get_event_loop()
                 try:
-                    loop = asyncio.get_event_loop()
                     if loop.is_running():
                         rs = loop.run_until_complete(func(*args, **kwargs))
                     else:
                         rs = asyncio.run(func(*args, **kwargs))
                 except RuntimeError:
-                    rs = asyncio.run(func(*args, **kwargs))
+                    rs = loop.run_until_complete(func(*args, **kwargs))
             else:
                 rs = func(*args, **kwargs)
         except Unauthorized as e:

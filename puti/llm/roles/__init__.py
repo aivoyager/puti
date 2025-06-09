@@ -170,7 +170,7 @@ class Role(BaseModel):
 
     def _correction(self, fix_msg: str):
         """ self-correction mechanism """
-        lgr.debug(f"self correction: {fix_msg}")
+        # lgr.debug(f"self correction: {fix_msg}")
         err = UserMessage(content=fix_msg, sender=RoleType.USER.val)
         self.rc.buffer.put_one_msg(err)
         self.rc.action_taken += 1
@@ -233,6 +233,7 @@ class Role(BaseModel):
                         message_pure.append(msg)
                 else:
                     message_pure.append(msg)
+
 
         message_pure = message if not message_pure else message_pure
 
@@ -311,7 +312,7 @@ class Role(BaseModel):
     async def _react(self) -> Optional[Message]:
         message = Message.from_any('no tools taken yet')
         for todo in self.rc.todos:
-            lgr.debug(f'{self} react `{todo[0].name}` with args {todo[1]}')
+            # lgr.debug(f'{self} react `{todo[0].name}` with args {todo[1]}')
             run = partial(todo[0].run, llm=self.agent_node)
             try:
                 resp = await run(**todo[1])
@@ -355,7 +356,7 @@ class Role(BaseModel):
                 self.publish_message()
                 return reply
             resp = await self._react()
-            lgr.debug(f'{self} react [{self.rc.action_taken}/{self.rc.max_react_loop}]')
+            # lgr.debug(f'{self} react [{self.rc.action_taken}/{self.rc.max_react_loop}]')
         self.rc.todos = []
         return resp
 
