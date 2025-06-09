@@ -4,7 +4,9 @@
 @Description:  
 """
 import asyncio
+import pytest
 
+from puti.llm.tools.project_analyzer import ProjectAnalyzer
 from puti.llm.tools.demo import GetFlightInfo
 from puti.llm.tools import toolkit
 from puti.llm.tools.common import GetTodayDate
@@ -114,3 +116,89 @@ def test_web_search():
     resp = alex.cp.invoke(alex.run, '帮我看看今天的股票行情概要')
     print(resp)
     print()
+
+@pytest.mark.asyncio
+async def test_project_analyzer_run():
+    """
+    Tests the basic functionality of the ProjectAnalyzer tool.
+    """
+    # 1. Initialize the tool
+    analyzer_tool = ProjectAnalyzer()
+
+    # 2. Run the tool with default parameters (root directory, depth=3)
+    response = await analyzer_tool.run()
+
+    # 3. Assert the response is successful and contains expected data
+    assert response.is_success(), f"Tool failed with message: {response.msg}"
+    assert isinstance(response.data, str)
+    assert len(response.data) > 0, "Tool returned an empty string."
+
+    # 4. Check for the presence of key project files/directories in the output
+    assert "README.md" in response.data, "README.md not found in project analysis."
+    assert "puti/" in response.data, "puti/ directory not found in project analysis."
+    assert "setup.py" in response.data, "setup.py not found in project analysis."
+    # assert ".git" not in response.data, ".git directory should be ignored."
+    assert "__pycache__" not in response.data, "__pycache__ directory should be ignored."
+
+    print("\\n--- Project Analyzer Output (Defaults) ---")
+    print(response.data)
+    print("------------------------------------------")
+
+
+@pytest.mark.asyncio
+async def test_project_analyzer_with_path_and_depth():
+    """
+    Tests the ProjectAnalyzer tool with a specific path and depth.
+    """
+    # 1. Initialize the tool
+    analyzer_tool = ProjectAnalyzer()
+
+    # 2. Run the tool with a specific path and a shallow depth
+    response = await analyzer_tool.run(path='puti', max_depth=1)
+
+    # 3. Assert the response is successful
+    assert response.is_success(), f"Tool failed with message: {response.msg}"
+    assert isinstance(response.data, str)
+
+    # 4. Check that the output reflects the specified path and depth
+    assert "Project structure analysis from 'puti'" in response.data
+    # Check for a file directly under 'puti'
+    assert "cli.py" in response.data
+    # Check for a directory under 'puti'
+    assert "llm/" in response.data
+    # A file deeper than max_depth=1 should not be present
+    assert "agents.py" not in response.data, "Analysis went deeper than max_depth."
+
+
+    print("\\n--- Project Analyzer Output (path='puti', max_depth=1) ---")
+    print(response.data)
+    print("---------------------------------------------------------")
+
+
+@pytest.mark.asyncio
+async def test_alex_runs_project_analyzer():
+    """
+    Integration test to ensure the Alex agent can use the ProjectAnalyzer tool.
+    """
+    # 1. Initialize the Alex agent
+    alex = Alex()
+
+    # 2. Create a prompt that should trigger the project analyzer tool
+    prompt = "Analyze the structure of this project and show me the file tree."
+
+    # 3. Run the agent
+    # The response here will be the final reply from the LLM, which should contain the tool's output.
+    response_message = await alex.run(prompt)
+
+    # 4. Assert that the response is valid and contains expected output
+    assert response_message is not None, "Agent did not return a message."
+    
+    # The final output is a string from the agent
+    final_answer = str(response_message)
+    assert "Project structure analysis" in final_answer, "Agent response did not contain the project analysis header."
+    assert "README.md" in final_answer, "Agent response did not contain 'README.md'."
+    assert "puti/" in final_answer, "Agent response did not contain 'puti/'."
+
+    print("\\n--- Alex Agent Response with Project Analysis ---")
+    print(final_answer)
+    print("--------------------------------------------------")

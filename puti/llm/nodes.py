@@ -48,6 +48,18 @@ class LLMNode(BaseModel, ABC):
     async def chat(self, msg: List[Dict], *args, **kwargs) -> str:
         """ Async chat """
 
+    @abstractmethod
+    async def stream_chat(self, message, **kwargs) -> AsyncStream[ChatCompletionChunk]:
+        pass
+
+    @abstractmethod
+    async def embedding(self, text: str, **kwargs) -> List[float]:
+        pass
+
+    @abstractmethod
+    async def get_embedding_dim(self) -> int:
+        pass
+
     async def chat_text(self, text: str, *args, **kwargs):
         messages = [{"role": "user", "content": text}]
         resp = await self.chat(messages, *args, **kwargs)
@@ -100,20 +112,32 @@ class OpenAINode(LLMNode):
                 # lgr.info(f"cost: {self.cost.total_cost}")
             return full_reply
 
+    async def stream_chat(self, message, **kwargs) -> AsyncStream[ChatCompletionChunk]:
+        return await self.acli.chat.completions.create(
+            model=self.conf.MODEL_NAME,
+            messages=message,
+            stream=True,
+            **kwargs
+        )
+
     async def embedding(self, text: str, **kwargs) -> List[float]:
-        try:
-            resp = self.cli.embeddings.create(
-                input=text,
-                model=self.conf.EMBEDDING_MODEL,
-                **kwargs
-            )
-            embedding = resp.data[0].embedding if hasattr(resp, 'data') and resp.data else None
-            if embedding is None:
-                raise ValueError(f'`{self.conf.EMBEDDING_MODEL}` embedding query `{text}`. Embedding result is empty...')
-            return embedding
-        except Exception as e:
-            lgr.error(f"Embedding failed detail: {e}")
-            raise
+        """Get the embedding for a text."""
+        response = await self.acli.embeddings.create(
+            model=self.conf.EMBEDDING_MODEL,
+            input=[text],
+            **kwargs
+        )
+        return response.data[0].embedding
+
+    async def get_embedding_dim(self) -> int:
+        """Get the embedding dimension for the model."""
+        if self.conf.EMBEDDING_DIM:
+            return self.conf.EMBEDDING_DIM
+        response = await self.acli.embeddings.create(
+            model=self.conf.EMBEDDING_MODEL,
+            input=["dim"]
+        )
+        return len(response.data[0].embedding)
 
 
 class OllamaNode(LLMNode):
@@ -146,3 +170,27 @@ class OllamaNode(LLMNode):
             print(full_reply)
             lgr.debug('ollama has not cost yet')
         return full_reply
+
+    async def stream_chat(self, message, **kwargs):
+        return await self.acli.chat(model=self.conf.MODEL_NAME, messages=message, stream=True, **kwargs)
+
+    async def embedding(self, text: str, **kwargs) -> List[float]:
+        """Get the embedding for a text from Ollama."""
+        response = await self.acli.embeddings(
+            model=self.conf.EMBEDDING_MODEL,
+            prompt=text,
+            **kwargs
+        )
+        return response["embedding"]
+
+    async def get_embedding_dim(self) -> int:
+        """Get the embedding dimension for the Ollama model."""
+        response = await self.acli.embeddings(
+            model=self.conf.EMBEDDING_MODEL,
+            prompt="dim"
+        )
+        return len(response["embedding"])
+
+
+class ClaudeNode(LLMNode):
+    pass

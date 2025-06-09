@@ -9,6 +9,7 @@ import argparse
 import json
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+from puti.llm.tools.project_analyzer import ProjectAnalyzer
 from puti.llm.tools.generate_tweet import GenerateCzTweet
 from puti.llm.tools.terminal import Terminal
 from puti.llm.tools.python import Python
@@ -110,5 +111,5 @@ class MCPServer(BaseModel):
 
 if __name__ == '__main__':
     mcp = MCPServer()
-    mcp.add_tools([GenerateCzTweet, Terminal, Python, File, WebSearch])
+    mcp.add_tools([Terminal, Python, File, WebSearch, ProjectAnalyzer])
     mcp.run()

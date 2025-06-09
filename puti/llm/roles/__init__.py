@@ -121,6 +121,14 @@ class Role(BaseModel):
 
     __hash__ = object.__hash__  # make sure hashable can be regarded as dict key
 
+    def model_post_init(self, __context: Any) -> None:
+        self._init_memory()
+
+    def _init_memory(self):
+        # Pass the LLM node to the memory for embedding purposes
+        self.rc.memory.llm = self.agent_node
+        self.rc.memory.top_k = self.agent_node.conf.FAISS_SEARCH_TOP_K
+
     @model_validator(mode='after')
     def check_address(self):
         if not self.address:
@@ -181,14 +189,14 @@ class Role(BaseModel):
         history = [] if ignore_history else self.rc.memory.get()
         new_list = []
         for n in news:
-            if n not in history:
-                self.rc.memory.add_one(n)
-
-            if (n.sender in self.rc.subscribe_sender
-                    or self.address & n.receiver
-                    or MessageRouter.ALL.val in n.receiver):
+            if (
+                n.sender in self.rc.subscribe_sender
+                or self.address & n.receiver
+                or MessageRouter.ALL.val in n.receiver
+            ):
                 if n not in history:
                     new_list.append(n)
+                    await self.rc.memory.add_one(n)
         self.rc.news = new_list
         if len(self.rc.news) == 0:
             lgr.debug(f'{self} no new messages, waiting.')
@@ -198,50 +206,28 @@ class Role(BaseModel):
         return True if len(self.rc.news) > 0 else False
 
     async def _think(self) -> Optional[Tuple[bool, str]]:
-        message = [self.sys_think_msg] + Message.to_message_list(self.rc.memory.get())
-        message_pure = []
+        base_system_prompt = self.sys_think_msg
+        newest_msg = self.rc.news[0]
 
-        # filter history part of tool call message
-        if len(message) > 2:
-            keep_line = {len(message) - 1, len(message)}
-            my_prefix = f'{self.name}({self.role_type.val}):'
-            my_tool_prefix = f'{self.name}({RoleType.TOOL.val}):'
+        if newest_msg:
+            relevant_history = await self.rc.memory.search(newest_msg.content)
+            if relevant_history:
+                context_str = "\n".join(relevant_history)
+                enhanced_prompt = (
+                    f"{base_system_prompt['content']}\n\n"
+                    f"--- Relevant Snippets from Past Conversation ---\n"
+                    f"{context_str}\n"
+                    f"--- End of Snippets ---"
+                )
+                base_system_prompt['content'] = enhanced_prompt
 
-            idx = len(message)
-            while idx > 0:
-                current = message[idx - 1]
-                prev = message[idx - 2]
+        message = [base_system_prompt] + [newest_msg.to_message_dict()]
 
-                is_my_tool_reply = isinstance(current, dict) and current.get('content').startswith(my_tool_prefix) and 'tool_call_id' in current
-                is_tool_call = isinstance(prev, ChatCompletionMessage) and getattr(prev, 'tool_calls', None)
-
-                if is_my_tool_reply and is_tool_call:
-                    keep_line.add(idx)
-                    keep_line.add(idx - 1)
-                    idx -= 2
-                else:
-                    break
-
-            for idx, msg in enumerate(message):
-                if isinstance(msg, ChatCompletionMessage):
-                    if idx + 1 in keep_line:
-                        message_pure.append(msg)
-                elif isinstance(msg, dict) and msg['content'].startswith(my_prefix):
-                    message_pure.append(msg)
-                elif isinstance(msg, dict) and msg['content'].startswith(my_tool_prefix):
-                    if idx + 1 in keep_line:
-                        message_pure.append(msg)
-                else:
-                    message_pure.append(msg)
-
-
-        message_pure = message if not message_pure else message_pure
-
-        think: Union[ChatCompletionMessage, str] = await self.agent_node.chat(message_pure, tools=self.toolkit.param_list)
+        think: Union[ChatCompletionMessage, str] = await self.agent_node.chat(message, tools=self.toolkit.param_list)
 
         # openai fc
         if isinstance(think, ChatCompletionMessage) and think.tool_calls:
-            think.tool_calls = think.tool_calls[:1]
+            think.tool_calls = think.tool_calls[:1]  # forbidden multiple tool call parallel
             todos = []
             for call_tool in think.tool_calls:
                 todo = self.toolkit.tools.get(call_tool.function.name)
@@ -252,10 +238,29 @@ class Role(BaseModel):
                 todos.append((todo, todo_args, tool_call_id))
 
             # TODO: multiple tools call for openai support
-            call_message = Message(non_standard=think)
-            self.rc.memory.add_one(call_message)
+            call_message = Message(non_standard=think, role=RoleType.TOOL)
+            await self.rc.memory.add_one(call_message)
             self.rc.todos = todos
             return True, ''
+        # Final answer, not tool call
+        elif isinstance(think, str):
+            final_answer = think
+            self.answer = AssistantMessage(
+                content=final_answer,
+                sender=self.name,
+                role=RoleType.ASSISTANT,
+                receiver=newest_msg.sender_address if newest_msg else set(),
+                # extend conversation rounds like tool call
+                tool_calls_one_round=self.tool_calls_one_round,
+                final_answer=final_answer
+            )
+            json_match = re.search(r'({.*})', message[-1]['content'], re.DOTALL)
+            think_process = ''
+            if json_match:
+                think_process = json.loads(json_match.group(1)).get('thought')
+            self.answer.think_process = think_process
+            self.publish_message()
+            return False, final_answer
         # ollama fc
         elif isinstance(think, OMessage) and think.tool_calls and all(isinstance(i, OMessage.ToolCall) for i in think.tool_calls):
             tool_calls: List[OMessage.ToolCall] = think.tool_calls[:1]
@@ -266,7 +271,7 @@ class Role(BaseModel):
                 todos.append((todo, todo_args, -1))
 
             call_message = Message(non_standard=think)
-            self.rc.memory.add_one(call_message)
+            await self.rc.memory.add_one(call_message)
             self.rc.todos = todos
             return True, ''
 
@@ -286,14 +291,14 @@ class Role(BaseModel):
                 return self._correction(fix_msg)
 
             if final_answer:
-                json_match = re.search(r'({.*})', message_pure[-1]['content'], re.DOTALL)
+                json_match = re.search(r'({.*})', message[-1]['content'], re.DOTALL)
                 think_process = ''
                 if json_match:
                     match_group = json_match.group()
                     if is_valid_json(match_group):
                         think_process = json.loads(match_group).get('think_process', '')
                 self.answer = AssistantMessage(content=final_answer, sender=self.name)
-                self.rc.memory.add_one(self.answer)
+                await self.rc.memory.add_one(self.answer)
                 return False, json.dumps({'final_answer': final_answer, 'think_process': think_process}, ensure_ascii=False)
             elif in_process_answer:
                 self.answer = AssistantMessage(content=in_process_answer, sender=self.name)
@@ -353,6 +358,8 @@ class Role(BaseModel):
             if not todo:
                 if reply == 'self-correction':
                     continue
+                # Storing the conversation turn is now handled automatically
+                # in memory.add_one when the assistant's reply is published.
                 self.publish_message()
                 return reply
             resp = await self._react()

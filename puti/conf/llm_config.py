@@ -20,6 +20,7 @@ class LLMConfig(Config):
     BASE_URL: Optional[str] = None
 
     EMBEDDING_MODEL: Optional[str] = None
+    EMBEDDING_DIM: Optional[int] = None
 
     # All fields need default value
     MAX_TOKEN: Optional[int] = None

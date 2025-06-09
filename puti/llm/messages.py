@@ -143,7 +143,24 @@ class SystemMessage(Message):
 
 class AssistantMessage(Message):
 
+    @property
+    def is_final_answer(self) -> bool:
+        """
+        Determines if this message represents a final answer,
+        typically by checking for a keyword in its content.
+        This is useful for interoperating with prompts that instruct the LLM
+        to include a specific keyword (e.g., 'FINAL_ANSWER') in its definitive response.
+        """
+        if not self.content:
+            return False
+        # The logic can be a simple keyword check or something more complex
+        # like checking for a JSON structure. For now, a keyword check.
+        return "FINAL_ANSWER" in self.content
+
     def __init__(self, content: str, **kwargs):
+        # The 'final_answer' kwarg is no longer a field, so we must remove it
+        # from kwargs if it exists to prevent errors in the parent Pydantic model.
+        kwargs.pop('final_answer', None)
         super(AssistantMessage, self).__init__(content=content, role=RoleType.ASSISTANT, **kwargs)
 
 
