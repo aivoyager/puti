@@ -194,7 +194,7 @@ class Role(BaseModel):
             lgr.debug(f'{self} no new messages, waiting.')
         else:
             new_texts = [f'{m.role.val}: {m.content[:80]}...' for m in self.rc.news]
-            lgr.debug(f'{self} perceive {new_texts}.')
+            # lgr.debug(f'{self} perceive {new_texts}.')
         return True if len(self.rc.news) > 0 else False
 
     async def _think(self) -> Optional[Tuple[bool, str]]:

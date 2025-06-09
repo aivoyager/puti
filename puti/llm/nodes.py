@@ -77,7 +77,7 @@ class OpenAINode(LLMNode):
                 collected_messages.append(chunk_message)
             full_reply = ''.join(collected_messages)
             self.cost.handle_chat_cost(msg, full_reply, self.conf.MODEL)
-            lgr.info(f"cost: {self.cost.total_cost}")
+            # lgr.info(f"cost: {self.cost.total_cost}")
             return full_reply
         else:
             resp: ChatCompletion = self.cli.chat.completions.create(
@@ -97,7 +97,7 @@ class OpenAINode(LLMNode):
             else:
                 full_reply = resp.choices[0].message.content if hasattr(resp.choices[0].message, 'content') else ''
                 self.cost.handle_chat_cost(msg, full_reply, self.conf.MODEL)
-                lgr.info(f"cost: {self.cost.total_cost}")
+                # lgr.info(f"cost: {self.cost.total_cost}")
             return full_reply
 
     async def embedding(self, text: str, **kwargs) -> List[float]:
