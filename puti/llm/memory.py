@@ -8,8 +8,9 @@ from typing import Optional, List, Iterable
 import faiss
 import numpy as np
 
-from puti.llm.messages import Message, AssistantMessage
+from puti.llm.messages import Message, AssistantMessage, UserMessage
 from puti.llm.nodes import LLMNode
+from puti.constant.llm import RoleType
 
 
 class Memory(BaseModel):
@@ -50,12 +51,12 @@ class Memory(BaseModel):
 
         # Also add to long-term vector memory
         if self.llm:
-            content_to_embed = ""
-            if message.role.val == 'user':
+            if message.is_user_message():
                 content_to_embed = f"User asked: {message.content}"
-            elif isinstance(message, AssistantMessage) and message.is_final_answer:
-                 content_to_embed = f"You responded: {message.content}"
-
+            elif message.is_assistant_message():
+                content_to_embed = f"You responded: {message.content}"
+            else:
+                content_to_embed = ''
             if content_to_embed:
                 await self._add_to_vector_store(content_to_embed)
 
@@ -92,7 +93,7 @@ class Memory(BaseModel):
         if num_to_retrieve == 0:
             return []
 
-        query_embedding = await self.llm.embedding(text=query)
+        query_embedding = await self.llm.embedding(text=query)  # TODO: Cache same query embedding
         vector = np.array([query_embedding], dtype="float32")
         distances, indices = self.index.search(vector, k=num_to_retrieve)
 

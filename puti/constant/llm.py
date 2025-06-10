@@ -20,8 +20,15 @@ class RoleType(Base):
     TOOL = ('tool', 'tool message type')
 
 
-class MessageRouter(Base):
+class MessageTag(Base):
     ALL = ('<all>', 'message to all people')
+    REFLECTION = ('<self-reflection>', 'reflection message tag')
+    THINK = ('THINK', 'think tag')
+
+
+class MessageType(Base):
+    FINAL_ANSWER = ('FINAL_ANSWER', 'final answer tag')
+    PROCESS_ANSWER = ('PROCESS_ANSWER', 'process answer tag')
 
 
 TOKEN_COSTS = {

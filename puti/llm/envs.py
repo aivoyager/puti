@@ -13,7 +13,7 @@ from puti.llm.messages import Message
 from logs import logger_factory
 from collections import defaultdict
 from typing import TYPE_CHECKING
-from puti.constant.llm import MessageRouter
+from puti.constant.llm import MessageTag
 from capture import Capture
 
 import asyncio
@@ -54,7 +54,7 @@ class Env(BaseModel):
         lgr.debug(f'Publishing message: {msg}')
         has_receiver = False
         for role, addr in self.members_addr.items():
-            if ((MessageRouter.ALL.val in msg.receiver or msg.receiver & role.address)
+            if ((MessageTag.ALL.val in msg.receiver or msg.receiver & role.address)
                     and msg.sender != role.name):
                 role.rc.buffer.put_one_msg(msg)
                 has_receiver = True

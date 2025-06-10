@@ -9,7 +9,7 @@ from puti.constant.llm import RoleType
 from typing import Dict, Tuple, Type, Any, Union
 from datetime import datetime
 from uuid import uuid4
-from puti.constant.llm import MessageRouter
+from puti.constant.llm import MessageTag, MessageTag
 from puti.utils.common import any_to_str, import_class
 from puti.llm.tools import BaseTool
 
@@ -18,7 +18,7 @@ class Message(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True, extra="allow")
 
     sender: str = Field(default='', validate_default=True, description='Sender role name')
-    receiver: set['str'] = Field(default={MessageRouter.ALL.val}, validate_default=True, description='Receiver role name')
+    receiver: set['str'] = Field(default={MessageTag.ALL.val}, validate_default=True, description='Receiver role name')
     reply_to: str = Field(default='', description='Message id reply to')
     id: str = Field(default_factory=lambda: str(uuid4())[:8], description='Unique code of messages')
     content: str = ''
@@ -29,6 +29,12 @@ class Message(BaseModel):
     tool_call_id: str = Field(default='', description='Tool call id')
 
     non_standard: Any = Field(default=None, description='Non-standard dic', exclude=True)
+
+    think_process: str = Field(default='', description='Thinking process for message')
+
+    def update_content(self, new_content: str):
+        """Updates the content of the message."""
+        self.content = new_content
 
     @classmethod
     def from_messages(cls, messages: List[dict]) -> List["Message"]:
@@ -118,11 +124,20 @@ class Message(BaseModel):
 
     @property
     def ample_content(self):
+        """ If other agent wish to see detail info """
         if self.non_standard:
             return self.non_standard
         reply_to_exp = f' reply_to:{self.reply_to}' if self.reply_to else ''
         return f"{self.sender}({self.role.val}): {self.content}"
-        # return self.content
+
+    def is_user_message(self):
+        return self.role == RoleType.USER
+
+    def is_assistant_message(self):
+        return self.role == RoleType.ASSISTANT
+
+    def is_tool_message(self):
+        return self.role == RoleType.TOOL
 
     def __str__(self):
         if self.non_standard:
@@ -143,24 +158,7 @@ class SystemMessage(Message):
 
 class AssistantMessage(Message):
 
-    @property
-    def is_final_answer(self) -> bool:
-        """
-        Determines if this message represents a final answer,
-        typically by checking for a keyword in its content.
-        This is useful for interoperating with prompts that instruct the LLM
-        to include a specific keyword (e.g., 'FINAL_ANSWER') in its definitive response.
-        """
-        if not self.content:
-            return False
-        # The logic can be a simple keyword check or something more complex
-        # like checking for a JSON structure. For now, a keyword check.
-        return "FINAL_ANSWER" in self.content
-
     def __init__(self, content: str, **kwargs):
-        # The 'final_answer' kwarg is no longer a field, so we must remove it
-        # from kwargs if it exists to prevent errors in the parent Pydantic model.
-        kwargs.pop('final_answer', None)
         super(AssistantMessage, self).__init__(content=content, role=RoleType.ASSISTANT, **kwargs)
 
 
@@ -172,6 +170,7 @@ class UserMessage(Message):
 
 class ToolMessage(Message):
 
-    def __init__(self, content: str, **kwargs):
-        super(ToolMessage, self).__init__(content=content, role=RoleType.TOOL, **kwargs)
+    def __init__(self, *, non_standard, **kwargs):
+        """We can use non_standard to store the tool message"""
+        super(ToolMessage, self).__init__(non_standard=non_standard, role=RoleType.TOOL, **kwargs)
 

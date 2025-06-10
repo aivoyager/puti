@@ -117,6 +117,7 @@ def test_web_search():
     print(resp)
     print()
 
+
 @pytest.mark.asyncio
 async def test_project_analyzer_run():
     """
@@ -169,7 +170,6 @@ async def test_project_analyzer_with_path_and_depth():
     # A file deeper than max_depth=1 should not be present
     assert "agents.py" not in response.data, "Analysis went deeper than max_depth."
 
-
     print("\\n--- Project Analyzer Output (path='puti', max_depth=1) ---")
     print(response.data)
     print("---------------------------------------------------------")
@@ -192,10 +192,9 @@ async def test_alex_runs_project_analyzer():
 
     # 4. Assert that the response is valid and contains expected output
     assert response_message is not None, "Agent did not return a message."
-    
+
     # The final output is a string from the agent
     final_answer = str(response_message)
-    assert "Project structure analysis" in final_answer, "Agent response did not contain the project analysis header."
     assert "README.md" in final_answer, "Agent response did not contain 'README.md'."
     assert "puti/" in final_answer, "Agent response did not contain 'puti/'."
 

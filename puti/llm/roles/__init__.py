@@ -13,7 +13,6 @@ import inspect
 import threading
 
 from puti.core.resp import ToolResponse
-from puti.db.faisss import FaissIndex
 from functools import partial
 from ollama._types import Message as OMessage
 from puti.llm.prompts import prompt_setting
@@ -23,7 +22,7 @@ from pydantic import BaseModel, Field, ConfigDict, PrivateAttr, model_validator,
 from typing import Optional, List, Iterable, Literal, Set, Dict, Tuple, Type, Any, Union
 from puti.constant.llm import RoleType
 from logs import logger_factory
-from puti.constant.llm import TOKEN_COSTS, MessageRouter
+from puti.constant.llm import TOKEN_COSTS, MessageTag
 from asyncio import Queue, QueueEmpty
 from puti.llm.nodes import LLMNode, OpenAINode
 from puti.llm.messages import Message, ToolMessage, AssistantMessage, UserMessage, SystemMessage
@@ -37,10 +36,11 @@ from contextlib import AsyncExitStack
 from puti.utils.path import root_dir
 from puti.constant.client import McpTransportMethod
 from typing import Annotated, Dict, TypedDict, Any, Required, NotRequired, ClassVar, cast
-from puti.llm.tools import ToolArgs
 from pydantic.fields import FieldInfo
-from puti.llm.tools import Toolkit
+from puti.llm.tools import Toolkit, ToolArgs
 from openai.types.chat.chat_completion_message import ChatCompletionMessage
+from puti.constant.llm import MessageTag, MessageType
+
 
 
 lgr = logger_factory.llm
@@ -110,14 +110,8 @@ class Role(BaseModel):
     answer: Optional[Message] = Field(default=None, description='assistant answer')
 
     tool_calls_one_round: List[str] = Field(default=[], description='tool calls one round contains tool call id')
-
     cp: SerializeAsAny[Capture] = Field(default_factory=Capture, validate_default=True, description='Capture exception')
-    faiss_db: SerializeAsAny[FaissIndex] = Field(
-        default_factory=lambda: FaissIndex(
-            from_file=str(root_dir() / 'data' / 'cz_filtered.json'),
-            to_file=str(root_dir() / 'data' / 'cz_filtered.index')
-        ),
-        validate_default=True, description='faiss vector database')
+    think_mode: bool = Field(default=False, description='return think proces')
 
     __hash__ = object.__hash__  # make sure hashable can be regarded as dict key
 
@@ -138,7 +132,10 @@ class Role(BaseModel):
     @property
     def sys_think_msg(self) -> Optional[Dict[str, str]]:
         if not self.rc.env:
-            sys_single_agent = prompt_setting.sys_single_agent.render(WORKING_DIRECTORY_PATH=self.rc.root)
+            sys_single_agent = prompt_setting.sys_single_agent.render(
+                WORKING_DIRECTORY_PATH=self.rc.root,
+                FINAL_ANSWER_KEYWORDS=MessageType.FINAL_ANSWER.val
+            )
             think_msg = SystemMessage.from_any(self.role_definition + sys_single_agent).to_message_dict()
         else:
             sys_multi_agent = prompt_setting.sys_multi_agent.render(
@@ -162,12 +159,18 @@ class Role(BaseModel):
         definition = ','.join([i for i in [name_exp, skill_exp, goal_exp] if i]) + '.'
         return definition
 
-    def publish_message(self):
+    async def publish_message(self):
         if not self.answer:
             return
-        if self.answer and self.rc.env:
+
+        # For multi angent
+        if self.rc.env:
             self.rc.env.publish_message(self.answer)
-            self.rc.memory.add_one(self.answer)  # this one won't be perceived
+            await self.rc.memory.add_one(self.answer)  # this one won't be perceived
+            self.answer = None
+        # For single angent
+        else:
+            await self.rc.memory.add_one(self.answer)
             self.answer = None
 
     def _reset(self):
@@ -192,36 +195,69 @@ class Role(BaseModel):
             if (
                 n.sender in self.rc.subscribe_sender
                 or self.address & n.receiver
-                or MessageRouter.ALL.val in n.receiver
+                or MessageTag.ALL.val in n.receiver
             ):
                 if n not in history:
                     new_list.append(n)
                     await self.rc.memory.add_one(n)
         self.rc.news = new_list
-        if len(self.rc.news) == 0:
-            lgr.debug(f'{self} no new messages, waiting.')
-        else:
-            new_texts = [f'{m.role.val}: {m.content[:80]}...' for m in self.rc.news]
-            # lgr.debug(f'{self} perceive {new_texts}.')
+        # if len(self.rc.news) == 0:
+        #     lgr.debug(f'{self} no new messages, waiting.')
+        # else:
+        #     new_texts = [f'{m.role.val}: {m.content[:80]}...' for m in self.rc.news]
+        #     # lgr.debug(f'{self} perceive {new_texts}.')
         return True if len(self.rc.news) > 0 else False
 
     async def _think(self) -> Optional[Tuple[bool, str]]:
+        """
+            return:
+                bool -> If have a tool call
+                str -> `answer` or `self reflection`
+        """
         base_system_prompt = self.sys_think_msg
-        newest_msg = self.rc.news[0]
+        newest_msg = self.rc.news[0] if self.rc.news else None
 
-        if newest_msg:
-            relevant_history = await self.rc.memory.search(newest_msg.content)
+        # --- Smart History Selection ---
+        # Get all messages from memory for this session.
+        all_messages = self.rc.memory.get()
+
+        # 1. Find the starting index of the current conversational chain.
+        # A chain is defined as everything following the most recent User message.
+        # This ensures the full context for the current operation, including tool calls, is preserved.
+        start_of_chain_idx = 0
+        for i in range(len(all_messages) - 1, -1, -1):
+            if all_messages[i].role == RoleType.USER:
+                start_of_chain_idx = i
+                break
+
+        # 2. The current chain is essential and must be preserved in full.
+        if prompt_setting.think_tips not in all_messages[start_of_chain_idx].content:
+            all_messages[start_of_chain_idx].update_content(all_messages[start_of_chain_idx].content + prompt_setting.think_tips)
+        current_chain_messages = all_messages[start_of_chain_idx:]
+
+        # 3. From the history before the current chain, select "key information"
+        #    to keep context in a multi-agent environment without making the prompt too long.
+        key_previous_messages = []
+        if self.rc.env:  # Only apply this filtering in a multi-agent environment
+            previous_messages = all_messages[:start_of_chain_idx]
+            for msg in previous_messages:
+                # Keep all messages from other agents to maintain situational awareness.
+                # Messages from the current agent are omitted as their content is represented
+                # by the RAG-based `relevant_history` search.
+                if msg.sender != self.name:
+                    key_previous_messages.append(msg)
+
+        # relevant history
+        if all_messages[start_of_chain_idx].content:
+            relevant_history = await self.rc.memory.search(all_messages[start_of_chain_idx].content)
             if relevant_history:
-                context_str = "\n".join(relevant_history)
-                enhanced_prompt = (
-                    f"{base_system_prompt['content']}\n\n"
-                    f"--- Relevant Snippets from Past Conversation ---\n"
-                    f"{context_str}\n"
-                    f"--- End of Snippets ---"
-                )
+                context_str = "\n".join(relevant_history) if relevant_history else '[no relevant history]'
+                enhanced_prompt = prompt_setting.enhanced_memory.render(context_str=context_str)
+                enhanced_prompt = base_system_prompt['content'] + enhanced_prompt
                 base_system_prompt['content'] = enhanced_prompt
 
-        message = [base_system_prompt] + [newest_msg.to_message_dict()]
+        history_messages = key_previous_messages + current_chain_messages
+        message = [base_system_prompt] + [msg.to_message_dict() for msg in history_messages]
 
         think: Union[ChatCompletionMessage, str] = await self.agent_node.chat(message, tools=self.toolkit.param_list)
 
@@ -238,28 +274,26 @@ class Role(BaseModel):
                 todos.append((todo, todo_args, tool_call_id))
 
             # TODO: multiple tools call for openai support
-            call_message = Message(non_standard=think, role=RoleType.TOOL)
+            call_message = ToolMessage(non_standard=think)
             await self.rc.memory.add_one(call_message)
             self.rc.todos = todos
             return True, ''
         # Final answer, not tool call
         elif isinstance(think, str):
-            final_answer = think
+            final_answer = await self.parse_final_answer(think)
+            if final_answer == MessageTag.REFLECTION.val:
+                fix_msg = prompt_setting.self_reflection_for_invalid_json.render(
+                    INVALID_DATA=think,
+                    KEYWORDS=MessageType.keys()
+                )
+                return self._correction(fix_msg)
             self.answer = AssistantMessage(
                 content=final_answer,
                 sender=self.name,
-                role=RoleType.ASSISTANT,
-                receiver=newest_msg.sender_address if newest_msg else set(),
+                receiver={MessageTag.ALL.val},
                 # extend conversation rounds like tool call
                 tool_calls_one_round=self.tool_calls_one_round,
-                final_answer=final_answer
             )
-            json_match = re.search(r'({.*})', message[-1]['content'], re.DOTALL)
-            think_process = ''
-            if json_match:
-                think_process = json.loads(json_match.group(1)).get('thought')
-            self.answer.think_process = think_process
-            self.publish_message()
             return False, final_answer
         # ollama fc
         elif isinstance(think, OMessage) and think.tool_calls and all(isinstance(i, OMessage.ToolCall) for i in think.tool_calls):
@@ -287,7 +321,7 @@ class Role(BaseModel):
                 in_process_answer = content.get('IN_PROCESS')
             except json.JSONDecodeError:
                 # send to self, no publish, no action
-                fix_msg = prompt_setting.self_reflection.render(INVALID_DATA=think)
+                fix_msg = prompt_setting.self_reflection_for_invalid_json.render(INVALID_DATA=think)
                 return self._correction(fix_msg)
 
             if final_answer:
@@ -313,6 +347,18 @@ class Role(BaseModel):
             err = f'Unexpected chat response: {type(think)}'
             lgr.error(err)
             raise RuntimeError(err)
+
+    @staticmethod
+    async def parse_final_answer(think: str) -> str:
+        if is_valid_json(think):
+            think = json.loads(think)
+            if think.get('FINAL_ANSWER'):
+                final_answer = think.get('FINAL_ANSWER')
+                return final_answer
+            else:
+                return MessageTag.REFLECTION.val
+        else:
+            return MessageTag.REFLECTION.val
 
     async def _react(self) -> Optional[Message]:
         message = Message.from_any('no tools taken yet')
@@ -352,7 +398,7 @@ class Role(BaseModel):
         while self.rc.action_taken < self.rc.max_react_loop:
             perceive = await self._perceive()
             if not perceive:
-                self.publish_message()
+                await self.publish_message()
                 break
             todo, reply = await self._think()
             if not todo:
@@ -360,7 +406,7 @@ class Role(BaseModel):
                     continue
                 # Storing the conversation turn is now handled automatically
                 # in memory.add_one when the assistant's reply is published.
-                self.publish_message()
+                await self.publish_message()
                 return reply
             resp = await self._react()
             # lgr.debug(f'{self} react [{self.rc.action_taken}/{self.rc.max_react_loop}]')

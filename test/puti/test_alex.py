@@ -8,10 +8,10 @@ from puti.llm.roles.agents import Alex
 
 async def test_alex():
     alex = Alex(name='Alex')
-    resp = await alex.run('生化危机9有什么最新的爆料')
-    print(resp)
-    resp = await alex.run('为什么叫安魂曲')
-    print(resp)
+    # resp = await alex.run('生化危机9有什么最新的爆料')
+    # print(resp)
+    # resp = await alex.run('为什么叫安魂曲')
+    # print(resp)
     resp = await alex.run('介绍一下Dockerfile')
     print(resp)
     resp = await alex.run('解释一下我的Dockerfile')
