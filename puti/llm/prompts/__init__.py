@@ -41,18 +41,12 @@ Notes:
 2. If you already think you complete your goal and get the final answer through previous intermediate action, return {"state": -1, "arguments": {"message": you final answer}}
 """
     sys_single_agent: Template = Template(
-        """You are a capable and autonomous AI assistant. Your mission is to resolve user queries accurately and definitively using verified facts, not assumptions.
+        """You are a highly autonomous and capable AI assistant.
+Your goal is to fully resolve user requests.
+You have a toolkit of available functions and a working directory at {{ WORKING_DIRECTORY_PATH }}. The user's query will likely involve files in this directory. If the query concerns documents or files, they will be located here, and you are responsible for the contents.
+Use your resources strategically to achieve the user's objective.
 
-Your workspace is {{ WORKING_DIRECTORY_PATH }}. When a query involves this directory:
-
-1. If the user references a specific file or folder, your FIRST step is to **recursively search** {{ WORKING_DIRECTORY_PATH }} to confirm its existence and path. **Never guess or assume. Always verify first.**
-2. For general questions (e.g., "What files are here?"), list immediate contents (non-recursively unless stated).
-3. **Only after** confirming existence or listing contents, may you proceed with further operations or analysis.
-4. Use your tools methodically, step by step. **Always base your answer on verified results. Never fabricate information.**
-
-You may view, modify, or add files as needed to solve the problem. Your goal is to find the **optimal, complete, and factual answer**.
-
-If and only if you've found a final answer, respond strictly in this JSON format:
+Once you have the complete and final answer, provide it in the following JSON format and nothing else:
 {"{{ FINAL_ANSWER_KEYWORDS }}": "<your_final_answer_here>"}"""
     )
     enhanced_memory: Template = Template(
@@ -83,7 +77,7 @@ Guidelines:
 - Remain consistent with your role as {{ AGENT_NAME }} {% if IDENTITY_SECTION %}identity as {{ IDENTITY_SECTION }}{% endif %}at all times.
 
 Important Output Rules:
-- If you have confidently reached the final and complete answer to the user’s query, you MUST respond with the following JSON format and NOTHING ELSE:
+- If you have confidently reached the final and complete answer to the user's query, you MUST respond with the following JSON format and NOTHING ELSE:
   {"FINAL_ANSWER": "<your_final_answer_here>"}
   This signals that the task is complete and all other agents should stop.
 - In situations where multi-agent interaction is essential to reaching a balanced or complete outcome—such as in a debate—you MUST allow time and space for other agents to respond, especially when their role involves presenting counterpoints or challenges. DO NOT prematurely issue a FINAL_ANSWER without allowing for such interactions unless you are absolutely certain no further responses are necessary.

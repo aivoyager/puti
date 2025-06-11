@@ -1,7 +1,15 @@
 import json
+import puti.bootstrap  # noqa: F401, must be the first import
+import click
+import asyncio
+import questionary
+from rich.console import Console
 import multiprocessing
 import sys
 import logging
+from rich.markdown import Markdown
+from puti.llm.roles.agents import Alex
+from puti.core.config_setup import ensure_config_is_present
 
 # --- Aggressive fix for stubborn logs and warnings on macOS ---
 
@@ -28,16 +36,6 @@ if sys.platform == 'darwin':
     except RuntimeError:
         # Guards against "context has already been set" errors.
         pass
-
-
-import puti.bootstrap  # noqa: F401, must be the first import
-import click
-import asyncio
-import questionary
-from rich.console import Console
-from rich.markdown import Markdown
-from puti.llm.roles.agents import Alex
-from puti.core.config_setup import ensure_config_is_present
 
 
 @click.group()
@@ -73,6 +71,7 @@ def alex_chat(name):
         while True:
             try:
                 user_input = await questionary.text("You:").ask_async()
+                # user_input = '你好呀'
 
                 if user_input is None or user_input.lower() in ['exit', 'quit']:
                     break
@@ -84,19 +83,9 @@ def alex_chat(name):
                 
                 # The agent returns a dictionary. We extract the final answer for the user.
                 final_answer = "Sorry, I encountered an issue and couldn't provide a response."
-                if isinstance(response, dict) and response.get("final_answer"):
-                    final_answer = response["final_answer"]
-                elif isinstance(response, dict) and response.get("FINAL_ANSWER"):
-                    final_answer = response["FINAL_ANSWER"]
-                elif isinstance(response, str):  # Handle plain string responses gracefully
-                    try:
-                        j_rp = json.loads(response)
-                        final_answer = j_rp.get('final_answer') if j_rp.get('final_answer') else j_rp.get('FINAL_ANSWER')
-                    except json.decoder.JSONDecodeError:
-                        final_answer = response
 
                 # Print the response as markdown, with a newline for spacing.
-                response_markdown = Markdown(final_answer, style="green")
+                response_markdown = Markdown(response, style="green")
                 console.print(f"\n[bold blue]{name}:[/bold blue]", response_markdown)
 
             except (KeyboardInterrupt, EOFError):

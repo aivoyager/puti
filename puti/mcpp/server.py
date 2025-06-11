@@ -7,6 +7,9 @@ import os
 import sys
 import argparse
 import json
+import logging
+
+logging.basicConfig(level=logging.ERROR)
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 from puti.llm.tools.project_analyzer import ProjectAnalyzer

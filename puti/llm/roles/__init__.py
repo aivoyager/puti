@@ -215,48 +215,55 @@ class Role(BaseModel):
                 str -> `answer` or `self reflection`
         """
         base_system_prompt = self.sys_think_msg
-        newest_msg = self.rc.news[0] if self.rc.news else None
 
-        # --- Smart History Selection ---
         # Get all messages from memory for this session.
         all_messages = self.rc.memory.get()
 
-        # 1. Find the starting index of the current conversational chain.
-        # A chain is defined as everything following the most recent User message.
-        # This ensures the full context for the current operation, including tool calls, is preserved.
-        start_of_chain_idx = 0
-        for i in range(len(all_messages) - 1, -1, -1):
-            if all_messages[i].role == RoleType.USER:
-                start_of_chain_idx = i
+        # --- New History Selection Logic ---
+
+        # 1. Get the last user message for the RAG query.
+        last_user_message = None
+        for msg in reversed(all_messages):
+            if msg.role == RoleType.USER:
+                last_user_message = msg
                 break
 
-        # 2. The current chain is essential and must be preserved in full.
-        if prompt_setting.think_tips not in all_messages[start_of_chain_idx].content:
-            all_messages[start_of_chain_idx].update_content(all_messages[start_of_chain_idx].content + prompt_setting.think_tips)
-        current_chain_messages = all_messages[start_of_chain_idx:]
+        # 2. Perform RAG search on the entire long-term memory.
+        relevant_history = []
+        if last_user_message and last_user_message.content:
+            relevant_history = await self.rc.memory.search(last_user_message.content)
 
-        # 3. From the history before the current chain, select "key information"
-        #    to keep context in a multi-agent environment without making the prompt too long.
-        key_previous_messages = []
-        if self.rc.env:  # Only apply this filtering in a multi-agent environment
-            previous_messages = all_messages[:start_of_chain_idx]
-            for msg in previous_messages:
-                # Keep all messages from other agents to maintain situational awareness.
-                # Messages from the current agent are omitted as their content is represented
-                # by the RAG-based `relevant_history` search.
-                if msg.sender != self.name:
-                    key_previous_messages.append(msg)
+        # 3. Identify the last 5 conversation rounds.
+        user_message_indices = [i for i, msg in enumerate(all_messages) if msg.role == RoleType.USER]
+        split_index = 0
+        if len(user_message_indices) > 5:
+            split_index = user_message_indices[-5]
+        recent_messages = all_messages[split_index:]
 
-        # relevant history
-        if all_messages[start_of_chain_idx].content:
-            relevant_history = await self.rc.memory.search(all_messages[start_of_chain_idx].content)
-            if relevant_history:
-                context_str = "\n".join(relevant_history) if relevant_history else '[no relevant history]'
-                enhanced_prompt = prompt_setting.enhanced_memory.render(context_str=context_str)
-                enhanced_prompt = base_system_prompt['content'] + enhanced_prompt
-                base_system_prompt['content'] = enhanced_prompt
+        # 4. Filter retrieved history to exclude items from the recent conversation.
+        recent_contents = set()
+        for msg in recent_messages:
+            if msg.role == RoleType.USER:
+                recent_contents.add(f"User asked: {msg.content}")
+            elif msg.role == RoleType.ASSISTANT:
+                recent_contents.add(f"You responded: {msg.content}")
 
-        history_messages = key_previous_messages + current_chain_messages
+        filtered_relevant_history = [text for text in relevant_history if text not in recent_contents]
+
+        # 5. Inject filtered relevant history into the system prompt.
+        if filtered_relevant_history:
+            context_str = "\n".join(filtered_relevant_history)
+            enhanced_prompt = prompt_setting.enhanced_memory.render(context_str=context_str)
+            enhanced_prompt = base_system_prompt['content'] + enhanced_prompt
+            base_system_prompt['content'] = enhanced_prompt
+
+        # 6. Add think tips to the last user message in the recent conversation.
+        # if last_user_message and last_user_message in recent_messages:
+        #     if prompt_setting.think_tips not in last_user_message.content:
+        #         last_user_message.update_content(last_user_message.content + prompt_setting.think_tips)
+
+        # 7. Construct the final message list for the LLM.
+        history_messages = recent_messages
         message = [base_system_prompt] + [msg.to_message_dict() for msg in history_messages]
 
         think: Union[ChatCompletionMessage, str] = await self.agent_node.chat(message, tools=self.toolkit.param_list)
@@ -473,12 +480,12 @@ class McpRole(Role):
             self.toolkit = Toolkit()
 
     async def run(self, *args, **kwargs):
-        try:
-            await self._initialize()
-            resp = await super().run(*args, **kwargs)
-            return resp
-        finally:
-            await self.disconnect()
+        # try:
+        await self._initialize()
+        resp = await super().run(*args, **kwargs)
+        return resp
+        # finally:
+        #     await self.disconnect()
 
     async def _initialize(self):
         if self.initialized:

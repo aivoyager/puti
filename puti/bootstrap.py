@@ -7,6 +7,8 @@ import os
 import sys
 from pathlib import Path
 from dotenv import load_dotenv, find_dotenv
+import multiprocessing
+import logging
 
 # --- CRITICAL: Load .env file BEFORE any other module code runs ---
 # This populates os.environ so that all subsequent imports and logic
@@ -34,6 +36,35 @@ if "TIKTOKEN_CACHE_DIR" not in os.environ:
 # Now, with the environment correctly set, we can import the config modules.
 from box import Box
 from puti.conf.config import conf, Config  # Import both the instance and the class
+
+# --- Aggressive fix for stubborn logs and warnings on macOS ---
+
+# 1. Globally suppress INFO and DEBUG logs.
+# This configures the root logger. Any library (like mcp) that tries to
+# configure logging after this will find it already configured, and its
+# settings for lower-level logs will be ignored.
+logging.basicConfig(level=logging.WARNING, format='%(asctime)s - %(levelname)s - %(message)s')
+
+# 2. Disable the resource_tracker to silence semaphore leak warnings.
+# This is a last-resort hack for when warnings persist despite all other fixes.
+# It prevents the tracker from ever registering resources, so it never warns.
+if sys.platform == 'darwin':
+    from multiprocessing import resource_tracker
+
+
+    def _noop(*args, **kwargs):
+        pass
+
+
+    resource_tracker.register = _noop
+    resource_tracker.unregister = _noop
+
+    # We still set the start method to 'fork' as it's more efficient for this app.
+    try:
+        multiprocessing.set_start_method('fork')
+    except RuntimeError:
+        # Guards against "context has already been set" errors.
+        pass
 
 
 def _substitute_env_vars(data):
@@ -79,7 +110,7 @@ def patch_config_and_loader():
                     if isinstance(config_item, dict) and sub_module_name in config_item:
                         # Return the patched sub-dictionary as a Box object
                         return Box(config_item[sub_module_name])
-        
+
         # Return an empty config if nothing is found
         return Box({})
 
