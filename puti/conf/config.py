@@ -18,14 +18,15 @@ from puti.utils.common import (check_module,
                           get_extra_config_path,
                           get_extra_config_dict,
                           get_mainly_config_dict)
-from puti.utils.path import root_dir
+from puti.utils.path import get_package_config_path
 from puti.constant.client import Client
 
 __all__ = ['Config', 'conf']
 
 system_name = platform.system()
 
-conf_path = root_dir() / 'conf' / 'config.yaml'
+conf_path = get_package_config_path()
+# conf_path = Path('/Users/wangshuang/PycharmProjects/data/config2.yaml')
 
 # Later priority is higher, storing your secret key in somewhere else
 DEFAULT_CONF_PATHS: List[Path] = [

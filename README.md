@@ -20,7 +20,14 @@
 
 ## ✨ Introduction
 
-Puti is a Multi-Agent framework designed to tackle complex tasks through collaborative autonomous agents. It provides a flexible environment for building, managing, and coordinating various agents to achieve specific goals.
+Puti is a versatile, multi-agent framework designed to simplify the development of applications powered by Large Language Models (LLMs). It provides a structured, extensible architecture for creating, managing, and coordinating intelligent agents that can collaborate to solve complex problems.
+
+### Alex-Chat
+[![Watch the Puti Demo Video](docs/puti_alex.png)](docs/puti_alex.mov)
+
+### Key Features
+* **Multi-Agent Collaboration**: Easily define and manage multiple agents that can communicate and work together.
+* **Extensible Tool System**: Equip agents with a wide range of tools, including web search, file management, and terminal access.
 
 ## 🚀 Features
 
