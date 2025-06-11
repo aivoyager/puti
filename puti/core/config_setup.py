@@ -13,7 +13,8 @@ from puti.utils.path import root_dir
 import puti.bootstrap  # noqa: F401
 
 # --- Configuration Constants ---
-CONFIG_FILE = str(root_dir() / '.env')
+CONFIG_DIR = Path.home() / 'puti'
+CONFIG_FILE = str(CONFIG_DIR / '.env')
 REQUIRED_VARS = ["OPENAI_API_KEY", "OPENAI_MODEL"]
 OPTIONAL_VARS = ["OPENAI_BASE_URL"]
 DEFAULTS = {
@@ -41,7 +42,7 @@ def ensure_config_is_present():
     # --- Prompt user for missing configurations ---
     console.print(Markdown(f"""
 # ⚙️ Welcome to Puti! Let's set up your OpenAI configuration.
-This information will be saved locally in a `.env` file in `{Path(CONFIG_FILE).parent}` for future use.
+This information will be saved locally in a `.env` file in `{CONFIG_DIR}` for future use.
 """))
 
     new_configs = {}
@@ -72,11 +73,14 @@ This information will be saved locally in a `.env` file in `{Path(CONFIG_FILE).p
         new_configs[var] = value
 
     # --- Save configurations to .env file ---
-    for key, value in new_configs.items():
-        # Only save if the value is not None (it can be an empty string)
-        if value is not None:
-            set_key(CONFIG_FILE, key, str(value))
-            os.environ[key] = str(value) # Update the current session's environment
+    if new_configs:
+        # Ensure the ~/.puti directory exists before writing to it.
+        CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+        for key, value in new_configs.items():
+            # Only save if the value is not None (it can be an empty string)
+            if value is not None:
+                set_key(CONFIG_FILE, key, str(value))
+                os.environ[key] = str(value) # Update the current session's environment
 
     console.print(Markdown(f"\n✅ Configuration saved successfully to `{CONFIG_FILE}`. Let's get started!"))
-    console.print("-" * 20) 
+    console.print("-" * 20)

@@ -4,7 +4,7 @@
 @Description:  
 """
 from pathlib import Path
-from loguru import logger
+import importlib.resources
 
 
 def root_dir():
@@ -16,3 +16,11 @@ def root_dir():
             package_root = Path.cwd()
     # logger.info(f'Package root set to {str(package_root)}')
     return package_root
+
+
+def get_package_config_path() -> Path:
+    """
+    Gets the path to config.yaml within the installed puti package.
+    This is the reliable way to find package data files.
+    """
+    return importlib.resources.files('puti') / 'conf' / 'config.yaml'

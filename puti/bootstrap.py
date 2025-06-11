@@ -13,24 +13,17 @@ import atexit
 # sys.stderr = open(os.devnull, "w")
 from pathlib import Path
 from dotenv import load_dotenv, find_dotenv
-# import multiprocessing
+from puti.core.config_setup import ensure_config_is_present, CONFIG_FILE
+ensure_config_is_present()
 import logging
 
 
 # --- CRITICAL: Load .env file BEFORE any other module code runs ---
 # This populates os.environ so that all subsequent imports and logic
 # (especially `puti.conf.config`) see the correct environment values from the start.
-dotenv_path = find_dotenv()
+dotenv_path = find_dotenv(CONFIG_FILE)
 if dotenv_path:
     load_dotenv(dotenv_path)
-
-# --- FIX for multiprocessing leaks on macOS (from tiktoken or other libs) ---
-# This is a known robust fix for stubborn multiprocessing issues on macOS,
-# often triggered by libraries like `tiktoken` or `numpy`. It tells the
-# Objective-C runtime to be less strict about safety checks when a process
-# forks, which can prevent hangs and resource leaks.
-if sys.platform == "darwin":
-    os.environ["OBJC_DISABLE_INITIALIZE_FORK_SAFETY"] = "YES"
 
 # Set a specific cache directory for tiktoken. This is good practice and can
 # also help prevent some caching-related concurrency issues.
@@ -43,39 +36,6 @@ if "TIKTOKEN_CACHE_DIR" not in os.environ:
 # Now, with the environment correctly set, we can import the config modules.
 from box import Box
 from puti.conf.config import conf, Config  # Import both the instance and the class
-
-# --- Aggressive fix for stubborn logs and warnings on macOS ---
-
-# 1. Globally suppress INFO and DEBUG logs.
-# This configures the root logger. Any library (like mcp) that tries to
-# configure logging after this will find it already configured, and its
-# settings for lower-level logs will be ignored.
-logging.basicConfig(level=logging.WARNING, format='%(asctime)s - %(levelname)s - %(message)s')
-
-# 2. Disable the resource_tracker to silence semaphore leak warnings.
-# This is a last-resort hack for when warnings persist despite all other fixes.
-# It prevents the tracker from ever registering resources, so it never warns.
-# if sys.platform == 'darwin':
-#     # Suppress the specific "No such file or directory" resource_tracker warning that
-#     # can occur during process shutdown on macOS.
-#     warnings.filterwarnings('ignore', message="resource_tracker:.*No such file or directory.*")
-#
-#     from multiprocessing import resource_tracker
-#
-#
-#     def _noop(*args, **kwargs):
-#         pass
-#
-#
-#     resource_tracker.register = _noop
-#     resource_tracker.unregister = _noop
-#
-#     # We still set the start method to 'fork' as it's more efficient for this app.
-#     try:
-#         multiprocessing.set_start_method('fork')
-#     except RuntimeError:
-#         # Guards against "context has already been set" errors.
-#         pass
 
 
 def _substitute_env_vars(data):

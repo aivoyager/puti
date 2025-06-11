@@ -105,7 +105,7 @@ class Role(BaseModel):
     address: set[str] = Field(default=set(), description='', validate_default=True)
     toolkit: Toolkit = Field(default_factory=Toolkit, validate_default=True)
     role_type: RoleType = Field(default=RoleType.ASSISTANT, description='Role identity')
-    agent_node: LLMNode = Field(default_factory=OpenAINode, description='LLM node')
+    agent_node: Optional[LLMNode] = Field(default=None, description='LLM node, lazily initialized.')
     rc: RoleContext = Field(default_factory=RoleContext)
     answer: Optional[Message] = Field(default=None, description='assistant answer')
 
@@ -120,14 +120,23 @@ class Role(BaseModel):
 
     def _init_memory(self):
         # Pass the LLM node to the memory for embedding purposes
-        self.rc.memory.llm = self.agent_node
-        self.rc.memory.top_k = self.agent_node.conf.FAISS_SEARCH_TOP_K
+        self.rc.memory.llm = self.llm
+        self.rc.memory.top_k = self.llm.conf.FAISS_SEARCH_TOP_K
 
     @model_validator(mode='after')
     def check_address(self):
         if not self.address:
             self.address = {f'{any_to_str(self)}.{self.name}'}
         return self  # return self for avoiding warning
+
+    @property
+    def llm(self) -> LLMNode:
+        """Lazily initialize and return the LLM node."""
+        if self.agent_node is None:
+            # VITAL: This ensures the node is only created when first needed,
+            # allowing the bootstrap process to load configs beforehand.
+            self.agent_node = OpenAINode()
+        return self.agent_node
 
     @property
     def sys_think_msg(self) -> Optional[Dict[str, str]]:
@@ -266,7 +275,7 @@ class Role(BaseModel):
         history_messages = recent_messages
         message = [base_system_prompt] + [msg.to_message_dict() for msg in history_messages]
 
-        think: Union[ChatCompletionMessage, str] = await self.agent_node.chat(message, tools=self.toolkit.param_list)
+        think: Union[ChatCompletionMessage, str] = await self.llm.chat(message, tools=self.toolkit.param_list)
 
         # openai fc
         if isinstance(think, ChatCompletionMessage) and think.tool_calls:
@@ -371,7 +380,7 @@ class Role(BaseModel):
         message = Message.from_any('no tools taken yet')
         for todo in self.rc.todos:
             # lgr.debug(f'{self} react `{todo[0].name}` with args {todo[1]}')
-            run = partial(todo[0].run, llm=self.agent_node)
+            run = partial(todo[0].run, llm=self.llm)
             try:
                 resp = await run(**todo[1])
                 if isinstance(resp, ToolResponse):
@@ -494,3 +503,22 @@ class McpRole(Role):
             await self._initialize_session()
             await self._initialize_tools()
             self.initialized = True
+
+
+class CZ(McpRole):
+    name: str = 'cz or 赵长鹏 or changpeng zhao'
+
+    def model_post_init(self, __context: Any) -> None:
+        self.llm.conf.MODEL = 'gemini-2.5-pro-preview-03-25'
+
+    async def run(self, text, *args, **kwargs):
+        self.llm.conf.STREAM = False
+        intention_prompt = """
+        Determine the user's intention, whether they want to post or receive a tweet. 
+        Only return 1 or 0. 1 indicates that the user wants you to give them a tweet; otherwise, it is 0.
+        Here is user input: {}
+        """.format(text)
+        judge_rsp = await self.llm.chat([UserMessage.from_any(intention_prompt).to_message_dict()])
+        lgr.debug(f'post tweet choice is {judge_rsp}')
+        if judge_rsp == '1':
+            resp = await super(CZ, self).run(text, *args, **kwargs)

@@ -6,7 +6,7 @@ with open(os.path.join(os.path.dirname(__file__), "README.md"), "r", encoding="u
 
 setup(
     name="ai_puti",
-    version="0.1.0b7",
+    version="0.1.0b11",
     description="puti: MultiAgent-based package for LLM",
     long_description=long_description,
     long_description_content_type="text/markdown",
@@ -16,6 +16,9 @@ setup(
     author_email="obstaclesws@qq.com",
     url="https://github.com/aivoyager/puti",
     packages=find_packages(exclude=["test*", "celery_queue*", "data", "docs", "api*"]),
+    package_data={
+        'puti': ['conf/config.yaml'],
+    },
     include_package_data=True,
     install_requires=[
         "wheel==0.45.1",
@@ -23,7 +26,6 @@ setup(
         "click==8.2.1",
         "pytest==8.4.0",
         "googlesearch-python==1.3.0",
-        "numpy==2.2.6",
         "scikit-learn==1.7.0",
         "tiktoken==0.9.0",
         "openai==1.84.0",
@@ -40,6 +42,8 @@ setup(
         "questionary==2.0.1",
         "rich==13.7.1",
         "python-dotenv==1.0.1",
+        "numpy==2.3.0",
+        "numexpr==2.11.0",
     ],
     python_requires=">=3.10",
     classifiers=[

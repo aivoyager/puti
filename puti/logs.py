@@ -32,6 +32,30 @@ class LoggerFactory(object):
         _logger.add(sys.stderr, level=print_level, enqueue=True, backtrace=True, diagnose=True)
         _logger.level("OBSTACLES", no=38, color="<green>", icon="😋")
 
+        # Define named loggers that write to the console stream instead of files.
+        # This prevents the automatic creation of log directories.
+
+        # Default logger
+        cls.loggers['default'] = _logger.bind(name='default')
+
+        # Client logger
+        cls.loggers['client'] = _logger.bind(name='client')
+
+        # LLM logger
+        cls.loggers['llm'] = _logger.bind(name='llm')
+
+        return cls
+
+    @classmethod
+    def _define_loggers2(cls, print_level=_print_level, logfile_level=_logfile_level):
+        """
+        Original file-based logging implementation, preserved for reference.
+        This method is not actively used.
+        """
+        _logger.remove()
+        _logger.add(sys.stderr, level=print_level, enqueue=True, backtrace=True, diagnose=True)
+        _logger.level("OBSTACLES", no=38, color="<green>", icon="😋")
+
         name_default = 'default'
         _logger.add(
             str(PuTi.ROOT_DIR.val / 'logs' / name_default / f'{formatted_date}.txt'),
@@ -46,7 +70,7 @@ class LoggerFactory(object):
 
         name_client = 'client'
         _logger.add(
-            str(PuTi.ROOT_DIR.val / 'test' / 'logs' / name_client / f'{formatted_date}.txt'),
+            str(PuTi.ROOT_DIR.val / 'logs' / name_client / f'{formatted_date}.txt'),
             filter=lambda record: record['extra'].get('name') == name_client,
             level=logfile_level,
             enqueue=True,
@@ -58,7 +82,7 @@ class LoggerFactory(object):
 
         name_client = 'llm'
         _logger.add(
-            str(PuTi.ROOT_DIR.val / 'test' / 'logs' / name_client / f'{formatted_date}.txt'),
+            str(PuTi.ROOT_DIR.val / 'logs' / name_client / f'{formatted_date}.txt'),
             filter=lambda record: record['extra'].get('name') == name_client,
             level=logfile_level,
             enqueue=True,

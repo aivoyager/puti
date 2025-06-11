@@ -12,7 +12,7 @@ from puti.core.config_setup import ensure_config_is_present
 @click.group()
 def main():
     """Puti CLI Tool: An interactive AI assistant."""
-    ensure_config_is_present()
+    # ensure_config_is_present()
     pass
 
 
@@ -43,7 +43,7 @@ def alex_chat(name):
         while True:
             try:
                 user_input = await questionary.text("👤 You:", qmark="").ask_async()
-                # user_input = 'exit'
+                # user_input = 'hi'
                 if user_input is None or user_input.lower() in ['exit', 'quit']:
                     break
 
