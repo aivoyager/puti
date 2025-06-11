@@ -12,7 +12,7 @@ from httpx import ConnectTimeout, ConnectError
 from inspect import iscoroutinefunction
 from typing import Union, Dict
 from pydantic import BaseModel, ConfigDict
-from logs import logger_factory
+from puti.logs import logger_factory
 from puti.utils.common import get_structured_exception, is_valid_json
 from puti.core.resp import Response
 from puti.constant.base import Resp

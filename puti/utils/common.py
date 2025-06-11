@@ -19,7 +19,7 @@ from typing import List, Dict, Any, get_origin, get_args
 from typing import Dict, Iterable, Callable, List, Tuple, Any, Union, Optional
 from collections import defaultdict
 from puti.constant.base import Modules
-from logs import logger_factory
+from puti.logs import logger_factory
 from pathlib import Path
 from box import Box
 from typing import Annotated, Dict, TypedDict, Any, Required, NotRequired, ClassVar, cast, Type

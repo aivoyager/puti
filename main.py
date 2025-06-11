@@ -17,7 +17,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from fastapi import FastAPI, Request
 from contextlib import asynccontextmanager
-from logs import logger_factory
+from puti.logs import logger_factory
 from api.chat import chat_router
 
 lgr = logger_factory.default

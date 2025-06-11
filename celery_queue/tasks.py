@@ -10,7 +10,7 @@ import requests
 
 from urllib.parse import quote
 from datetime import datetime
-from logs import logger_factory
+from puti.logs import logger_factory
 from celery import shared_task
 from tenacity import retry, stop_after_attempt, wait_fixed, RetryCallState
 

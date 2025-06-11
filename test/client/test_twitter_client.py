@@ -9,7 +9,7 @@ import re
 import csv
 import json
 
-from logs import logger_factory
+from puti.logs import logger_factory
 from puti.client.twitter.twitter_client import TwikitClient
 from puti.utils.path import root_dir
 

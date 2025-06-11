@@ -9,7 +9,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from puti.db.model import Model
 from pathlib import Path
 from puti.constant.base import PuTi
-from logs import logger_factory
+from puti.logs import logger_factory
 
 lgr = logger_factory.default
 

@@ -21,7 +21,7 @@ from puti.llm.tools import BaseTool
 from pydantic import BaseModel, Field, ConfigDict, PrivateAttr, model_validator, field_validator, SerializeAsAny
 from typing import Optional, List, Iterable, Literal, Set, Dict, Tuple, Type, Any, Union
 from puti.constant.llm import RoleType
-from logs import logger_factory
+from puti.logs import logger_factory
 from puti.constant.llm import TOKEN_COSTS, MessageTag
 from asyncio import Queue, QueueEmpty
 from puti.llm.nodes import LLMNode, OpenAINode
@@ -29,7 +29,7 @@ from puti.llm.messages import Message, ToolMessage, AssistantMessage, UserMessag
 from puti.llm.envs import Env
 from puti.llm.memory import Memory
 from puti.utils.common import any_to_str, is_valid_json
-from capture import Capture
+from puti.capture import Capture
 from mcp.client.stdio import stdio_client
 from mcp import ClientSession, StdioServerParameters
 from contextlib import AsyncExitStack

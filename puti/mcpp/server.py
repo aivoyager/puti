@@ -23,7 +23,7 @@ from pydantic import BaseModel, Field, ConfigDict
 from typing import Literal, List, Type, Any
 from puti.llm.tools import BaseTool
 from mcp.server.fastmcp import FastMCP
-from logs import logger_factory
+from puti.logs import logger_factory
 from puti.constant.client import McpTransportMethod
 
 

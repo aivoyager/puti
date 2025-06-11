@@ -13,7 +13,7 @@ from typing import Optional, Literal, Type
 from pydantic import ConfigDict, Field
 from puti.conf.client_config import TwitterConfig
 from puti.conf.celery_private_conf import CeleryPrivateConfig
-from logs import logger_factory
+from puti.logs import logger_factory
 from puti.client.client import Client
 from abc import ABC
 from puti.utils.path import root_dir

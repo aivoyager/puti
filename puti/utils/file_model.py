@@ -10,7 +10,7 @@ import yaml
 from pydantic import BaseModel, Field
 from typing import List, Union, Literal, Optional
 from pathlib import Path
-from logs import logger_factory
+from puti.logs import logger_factory
 from puti.utils.common import has_decorator
 from functools import wraps
 

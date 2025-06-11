@@ -9,7 +9,7 @@ from puti.utils.common import tool_args_to_fc_schema
 from typing import Annotated, Dict, TypedDict, Any, Required, NotRequired, List, Type, Set, cast, Optional
 from pydantic import BaseModel, Field, ConfigDict
 from abc import ABC, abstractmethod
-from logs import logger_factory
+from puti.logs import logger_factory
 from pydantic.fields import FieldInfo
 
 

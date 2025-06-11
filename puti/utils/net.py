@@ -5,7 +5,7 @@
 """
 import traceback
 
-from logs import logger_factory
+from puti.logs import logger_factory
 
 logger = logger_factory.default
 

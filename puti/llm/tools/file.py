@@ -20,7 +20,7 @@ from typing import Optional, Literal, List, Union, DefaultDict, get_args
 from puti.core.resp import ToolResponse, Response
 from puti.constant.base import Resp
 from pathlib import Path
-from logs import logger_factory
+from puti.logs import logger_factory
 from puti.core.exception import ToolError
 
 lgr = logger_factory.llm

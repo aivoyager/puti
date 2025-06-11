@@ -7,7 +7,7 @@
 from pydantic import Field, BaseModel, ConfigDict, SerializeAsAny
 from abc import abstractmethod
 from puti.conf.config import Config
-from capture import Capture
+from puti.capture import Capture
 from typing import Type
 from puti.db import DBM
 from puti.db.model.client.twitter import UserModel

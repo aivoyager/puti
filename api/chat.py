@@ -14,7 +14,7 @@ from puti.llm.nodes import OpenAINode, OllamaNode
 from puti.conf.llm_config import LlamaConfig
 from puti.llm.messages import UserMessage, SystemMessage, Message
 from pydantic import BaseModel, Field
-from logs import logger_factory
+from puti.logs import logger_factory
 from tenacity import retry, stop_after_attempt, wait_fixed
 
 chat_router = APIRouter()

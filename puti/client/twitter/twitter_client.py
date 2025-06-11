@@ -14,7 +14,7 @@ from httpx import ConnectTimeout
 from typing import Optional, Type, Union, List, Literal
 from pydantic import Field, ConfigDict, PrivateAttr
 from twikit.client.client import Client as TwitterClient
-from logs import logger_factory
+from puti.logs import logger_factory
 from puti.client.client import Client
 from puti.conf.client_config import TwitterConfig
 from puti.utils.common import parse_cookies, filter_fields

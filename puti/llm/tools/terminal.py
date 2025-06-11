@@ -13,7 +13,7 @@ from pydantic import ConfigDict, Field
 from typing import Optional
 from puti.core.resp import ToolResponse, Response
 from puti.constant.base import Resp
-from logs import logger_factory
+from puti.logs import logger_factory
 
 lgr = logger_factory.llm
 

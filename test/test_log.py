@@ -3,7 +3,7 @@
 @Time: 16/01/25 15:58
 @Description:  
 """
-from logs import logger_factory
+from puti.logs import logger_factory
 
 
 def test_lgr():

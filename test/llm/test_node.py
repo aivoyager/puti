@@ -9,7 +9,7 @@ from datetime import date
 import openai
 import time
 
-from logs import logger_factory
+from puti.logs import logger_factory
 from puti.conf.llm_config import OpenaiConfig
 from puti.llm.nodes import OpenAINode
 from puti.llm.nodes import OllamaNode

@@ -24,7 +24,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from puti.core.resp import Response, ToolResponse
 from puti.llm.nodes import LLMNode, OpenAINode
 from puti.llm.tools import BaseTool, ToolArgs
-from logs import logger_factory
+from puti.logs import logger_factory
 from puti.utils.path import root_dir
 # from llama_index.core import SimpleDirectoryReader, Document, VectorStoreIndex
 

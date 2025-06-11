@@ -13,7 +13,7 @@ from puti.conf.llm_config import LLMConfig, OpenaiConfig
 from openai import AsyncOpenAI, OpenAI
 from abc import ABC, abstractmethod
 from puti.llm.cost import CostManager
-from logs import logger_factory
+from puti.logs import logger_factory
 from openai import AsyncStream
 from openai.types.chat import ChatCompletionChunk
 from openai.types.chat.chat_completion import ChatCompletion

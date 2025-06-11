@@ -14,7 +14,7 @@ from pydantic import ConfigDict, Field
 from puti.llm.nodes import OllamaNode, LLMNode
 from puti.conf.llm_config import LlamaConfig, OpenaiConfig
 from puti.llm.nodes import OpenAINode
-from logs import logger_factory
+from puti.logs import logger_factory
 from puti.constant.llm import RoleType
 from puti.llm.messages import Message, SystemMessage, UserMessage
 
