@@ -1,41 +1,12 @@
-import json
 import puti.bootstrap  # noqa: F401, must be the first import
 import click
 import asyncio
 import questionary
 from rich.console import Console
-import multiprocessing
-import sys
-import logging
 from rich.markdown import Markdown
+from rich.panel import Panel
 from puti.llm.roles.agents import Alex
 from puti.core.config_setup import ensure_config_is_present
-
-# --- Aggressive fix for stubborn logs and warnings on macOS ---
-
-# 1. Globally suppress INFO and DEBUG logs.
-# This configures the root logger. Any library (like mcp) that tries to
-# configure logging after this will find it already configured, and its
-# settings for lower-level logs will be ignored.
-logging.basicConfig(level=logging.WARNING, format='%(asctime)s - %(levelname)s - %(message)s')
-
-
-# 2. Disable the resource_tracker to silence semaphore leak warnings.
-# This is a last-resort hack for when warnings persist despite all other fixes.
-# It prevents the tracker from ever registering resources, so it never warns.
-if sys.platform == 'darwin':
-    from multiprocessing import resource_tracker
-    def _noop(*args, **kwargs):
-        pass
-    resource_tracker.register = _noop
-    resource_tracker.unregister = _noop
-    
-    # We still set the start method to 'fork' as it's more efficient for this app.
-    try:
-        multiprocessing.set_start_method('fork')
-    except RuntimeError:
-        # Guards against "context has already been set" errors.
-        pass
 
 
 @click.group()
@@ -55,7 +26,7 @@ def hello(name):
 @main.command()
 @click.option('--name', default='Alex', help='Name of the Alex agent.')
 def alex_chat(name):
-    """Starts an interactive chat with Alex agent using questionary."""
+    """Starts an interactive chat with Alex agent."""
     console = Console()
     welcome_message = Markdown(f"""
 # 💬 Chat with {name}
@@ -68,25 +39,28 @@ def alex_chat(name):
     alex_agent = Alex(name=name)
 
     async def chat_loop():
+
         while True:
             try:
-                user_input = await questionary.text("You:").ask_async()
-                # user_input = '你好呀'
-
+                user_input = await questionary.text("👤 You:", qmark="").ask_async()
+                # user_input = 'exit'
                 if user_input is None or user_input.lower() in ['exit', 'quit']:
                     break
 
-                # Show a thinking indicator
-                with console.status("[bold cyan]Alex is thinking...", spinner="dots"):
-                    user_input += '\n [System: Reply in the specified json format.]'
-                    response = await alex_agent.run(user_input)
-                
-                # The agent returns a dictionary. We extract the final answer for the user.
-                final_answer = "Sorry, I encountered an issue and couldn't provide a response."
+                console.print(Panel(user_input, title="👤 You", border_style="blue"))
 
-                # Print the response as markdown, with a newline for spacing.
-                response_markdown = Markdown(response, style="green")
-                console.print(f"\n[bold blue]{name}:[/bold blue]", response_markdown)
+                # Show a thinking indicator
+                with console.status(f"[bold cyan]{name} is thinking...", spinner="dots"):
+                    response = await alex_agent.run(user_input)
+
+                # Print the response in a styled panel
+                response_panel = Panel(
+                    Markdown(response),
+                    title=f"🤖 {name}",
+                    border_style="green",
+                    title_align="left"
+                )
+                console.print(response_panel)
 
             except (KeyboardInterrupt, EOFError):
                 # Handle Ctrl+C and Ctrl+D

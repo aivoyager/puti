@@ -449,7 +449,7 @@ class McpRole(Role):
 
     async def _initialize_session(self):
         if self.session:
-            await self.disconnect()
+            return  # Already initialized
         server_params = StdioServerParameters(command=sys.executable, args=[self.server_script])
         stdio_transport = await self.exit_stack.enter_async_context(stdio_client(server_params))
         read, write = stdio_transport
@@ -474,18 +474,16 @@ class McpRole(Role):
         self.toolkit.intersection_with(mcp_server_tools, inplace=True)
 
     async def disconnect(self):
-        if self.session and self.exit_stack:
+        if self.initialized and self.exit_stack:
             await self.exit_stack.aclose()
             self.session = None
             self.toolkit = Toolkit()
+            self.initialized = False
 
     async def run(self, *args, **kwargs):
-        # try:
         await self._initialize()
         resp = await super().run(*args, **kwargs)
         return resp
-        # finally:
-        #     await self.disconnect()
 
     async def _initialize(self):
         if self.initialized:

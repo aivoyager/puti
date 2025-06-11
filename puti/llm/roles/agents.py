@@ -10,6 +10,10 @@ from logs import logger_factory
 from puti.llm.prompts import PromptSetting
 from puti.llm.roles import Role
 from puti.llm.tools.web_search import WebSearch
+from puti.llm.tools.project_analyzer import ProjectAnalyzer
+from puti.llm.tools.terminal import Terminal
+from puti.llm.tools.python import Python
+from puti.llm.tools.file import File
 
 
 lgr = logger_factory.llm
@@ -17,8 +21,11 @@ lgr = logger_factory.llm
 __all__ = ['Alex', 'CZ', 'Debater']
 
 
-class Alex(McpRole):
+class Alex(Role):
     name: str = 'alex'
+
+    def model_post_init(self, __context: Any) -> None:
+        self.set_tools([WebSearch, Terminal, ProjectAnalyzer, Python, File])
 
 
 class CZ(McpRole):

@@ -3,12 +3,19 @@
 @Time: 2024-07-28 12:00
 @Description: Bootstrapping script to patch config with environment variables.
 """
-import os
+import warnings
 import sys
+import os
+import atexit
+
+# warnings.filterwarnings("ignore", category=UserWarning, module='multiprocessing.resource_tracker')
+# # warnings.filterwarnings("ignore")
+# sys.stderr = open(os.devnull, "w")
 from pathlib import Path
 from dotenv import load_dotenv, find_dotenv
-import multiprocessing
+# import multiprocessing
 import logging
+
 
 # --- CRITICAL: Load .env file BEFORE any other module code runs ---
 # This populates os.environ so that all subsequent imports and logic
@@ -48,23 +55,27 @@ logging.basicConfig(level=logging.WARNING, format='%(asctime)s - %(levelname)s -
 # 2. Disable the resource_tracker to silence semaphore leak warnings.
 # This is a last-resort hack for when warnings persist despite all other fixes.
 # It prevents the tracker from ever registering resources, so it never warns.
-if sys.platform == 'darwin':
-    from multiprocessing import resource_tracker
-
-
-    def _noop(*args, **kwargs):
-        pass
-
-
-    resource_tracker.register = _noop
-    resource_tracker.unregister = _noop
-
-    # We still set the start method to 'fork' as it's more efficient for this app.
-    try:
-        multiprocessing.set_start_method('fork')
-    except RuntimeError:
-        # Guards against "context has already been set" errors.
-        pass
+# if sys.platform == 'darwin':
+#     # Suppress the specific "No such file or directory" resource_tracker warning that
+#     # can occur during process shutdown on macOS.
+#     warnings.filterwarnings('ignore', message="resource_tracker:.*No such file or directory.*")
+#
+#     from multiprocessing import resource_tracker
+#
+#
+#     def _noop(*args, **kwargs):
+#         pass
+#
+#
+#     resource_tracker.register = _noop
+#     resource_tracker.unregister = _noop
+#
+#     # We still set the start method to 'fork' as it's more efficient for this app.
+#     try:
+#         multiprocessing.set_start_method('fork')
+#     except RuntimeError:
+#         # Guards against "context has already been set" errors.
+#         pass
 
 
 def _substitute_env_vars(data):

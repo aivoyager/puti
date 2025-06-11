@@ -12,11 +12,13 @@ from puti.utils.path import root_dir
 
 import puti.bootstrap  # noqa: F401
 
-# --- Constants ---
-ENV_FILE_PATH = str(root_dir() / '.env')
-REQUIRED_VARS = ["OPENAI_API_KEY", "OPENAI_BASE_URL", "OPENAI_MODEL"]
+# --- Configuration Constants ---
+CONFIG_FILE = str(root_dir() / '.env')
+REQUIRED_VARS = ["OPENAI_API_KEY", "OPENAI_MODEL"]
+OPTIONAL_VARS = ["OPENAI_BASE_URL"]
 DEFAULTS = {
-    "OPENAI_BASE_URL": "https://api.openai.com/v1",
+    "OPENAI_API_KEY": "YOUR_API_KEY_HERE",
+    "OPENAI_BASE_URL": "",  # Default to empty so user can just press Enter
     "OPENAI_MODEL": "o4-mini",
 }
 
@@ -24,27 +26,29 @@ DEFAULTS = {
 def ensure_config_is_present():
     """
     Checks if the required environment variables are set. If not, it prompts
-    the user for them and saves them to the .env file.
+    the user for them and saves them to the .env file. It will also prompt
+    for optional variables if they aren't set.
     """
     console = Console()
-    load_dotenv(ENV_FILE_PATH)
+    load_dotenv(CONFIG_FILE)
 
-    missing_vars = [var for var in REQUIRED_VARS if not os.getenv(var)]
+    missing_required = [var for var in REQUIRED_VARS if not os.getenv(var)]
+    missing_optional = [var for var in OPTIONAL_VARS if not os.getenv(var)]
 
-    if not missing_vars:
+    if not missing_required and not missing_optional:
         return  # All configurations are present.
 
     # --- Prompt user for missing configurations ---
     console.print(Markdown(f"""
 # ⚙️ Welcome to Puti! Let's set up your OpenAI configuration.
-This information will be saved locally in a `.env` file in `{Path(ENV_FILE_PATH).parent}` for future use.
+This information will be saved locally in a `.env` file in `{Path(CONFIG_FILE).parent}` for future use.
 """))
 
     new_configs = {}
     questions = {
         "OPENAI_API_KEY": lambda: questionary.password("🔑 Please enter your OpenAI API Key:").ask(),
         "OPENAI_BASE_URL": lambda: questionary.text(
-            "🌐 Enter the OpenAI API Base URL:",
+            "🌐 Enter the OpenAI API Base URL (optional, press Enter to skip):",
             default=DEFAULTS["OPENAI_BASE_URL"]
         ).ask(),
         "OPENAI_MODEL": lambda: questionary.text(
@@ -53,8 +57,8 @@ This information will be saved locally in a `.env` file in `{Path(ENV_FILE_PATH)
         ).ask(),
     }
 
-    for var in missing_vars:
-        # Loop until a valid (non-empty) value is provided
+    # Prompt for required variables, ensuring they are not empty
+    for var in missing_required:
         value = ""
         while not value:
             value = questions[var]()
@@ -62,10 +66,17 @@ This information will be saved locally in a `.env` file in `{Path(ENV_FILE_PATH)
                 console.print("[bold red]This field cannot be empty. Please provide a value.[/bold red]")
         new_configs[var] = value
 
+    # Prompt for optional variables, allowing them to be empty
+    for var in missing_optional:
+        value = questions[var]()
+        new_configs[var] = value
+
     # --- Save configurations to .env file ---
     for key, value in new_configs.items():
-        set_key(ENV_FILE_PATH, key, value)
-        os.environ[key] = value # Update the current session's environment
+        # Only save if the value is not None (it can be an empty string)
+        if value is not None:
+            set_key(CONFIG_FILE, key, str(value))
+            os.environ[key] = str(value) # Update the current session's environment
 
-    console.print(Markdown(f"\n✅ Configuration saved successfully to `{ENV_FILE_PATH}`. Let's get started!"))
+    console.print(Markdown(f"\n✅ Configuration saved successfully to `{CONFIG_FILE}`. Let's get started!"))
     console.print("-" * 20) 
