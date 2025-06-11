@@ -6,7 +6,7 @@ with open(os.path.join(os.path.dirname(__file__), "README.md"), "r", encoding="u
 
 setup(
     name="ai_puti",
-    version="0.1.0b6",
+    version="0.1.0b7",
     description="puti: MultiAgent-based package for LLM",
     long_description=long_description,
     long_description_content_type="text/markdown",
