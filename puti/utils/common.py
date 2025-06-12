@@ -16,7 +16,7 @@ from urllib3 import Retry
 from pydantic.fields import FieldInfo
 from pydantic import BaseModel, Field
 from typing import List, Dict, Any, get_origin, get_args
-from typing import Dict, Iterable, Callable, List, Tuple, Any, Union, Optional
+from typing import Dict, Iterable, Callable, List, Tuple, Any, Union, Optional, Literal
 from collections import defaultdict
 from puti.constant.base import Modules
 from puti.logs import logger_factory
@@ -226,9 +226,23 @@ def parse_type(field_type: Any, field_desc: str = "", constraints: List[Any] = N
     origin = get_origin(field_type)  # 获取泛型的原始类型 (List, Dict 等)
     args = get_args(field_type)  # 获取泛型参数 (例如 List[int] -> int)
 
+    # Handle Optional[T] as Union[T, None]
+    if origin is Union and len(args) == 2 and args[1] is type(None):
+        # This is an Optional type, parse the inner type
+        return parse_type(args[0], field_desc, constraints)
+
     schema = {}
 
-    if origin is list and args:
+    if origin is Literal:
+        if args:
+            first_arg_type = type(args[0])
+            type_mapping = {str: "string", int: "integer", bool: "boolean", float: "number"}
+            schema_type = type_mapping.get(first_arg_type, "string")
+        else:
+            schema_type = "string"
+        schema = {"type": schema_type, "enum": list(args), "description": field_desc}
+
+    elif origin is list and args:
         schema = {
             "type": "array",
             "description": field_desc,
@@ -285,12 +299,15 @@ def tool_args_to_fc_schema(model_cls: Type['BaseModel']):
         "properties": {},
         "required": []
     }
+    
+    if not hasattr(model_cls, 'model_fields'):
+        lgr.warning(f"Cannot get model_fields from {model_cls}, schema will be empty.")
+        return schema
 
-    for field_name, field_info in model_cls.__annotations__.items():
-        pydf: FieldInfo = model_cls.__fields__.get(field_name)
-        field_desc = pydf.description if pydf else "No description provided"
-        schema["properties"][field_name] = parse_type(field_info, field_desc)
-        if pydf.is_required():
+    for field_name, field_info in model_cls.model_fields.items():
+        field_desc = field_info.description or "No description provided"
+        schema["properties"][field_name] = parse_type(field_info.annotation, field_desc)
+        if field_info.is_required():
             schema["required"].append(field_name)
 
     return schema
@@ -342,3 +359,11 @@ def is_valid_json(s: str) -> bool:
         return True
     except json.JSONDecodeError:
         return False
+
+
+def print_green(text):
+    print(f"\033[92m{text}\033[0m")
+
+
+def print_blue(text):
+    print(f"\033[94m{text}\033[0m")

@@ -14,6 +14,7 @@ from puti.llm.tools.project_analyzer import ProjectAnalyzer
 from puti.llm.tools.terminal import Terminal
 from puti.llm.tools.python import Python
 from puti.llm.tools.file import File
+from puti.llm.tools.twikitt import Twikitt
 
 
 lgr = logger_factory.llm
@@ -25,7 +26,15 @@ class Alex(Role):
     name: str = 'alex'
 
     def model_post_init(self, __context: Any) -> None:
-        self.set_tools([WebSearch, Terminal, ProjectAnalyzer, Python, File])
+        self.set_tools([WebSearch, Terminal, ProjectAnalyzer, Python, File, Twikitt])
+
+
+class Ethan(Role):
+    name: str = 'ethan'
+    identity: str = 'x bot'
+
+    def model_post_init(self, __context: Any) -> None:
+        self.set_tools([Twikitt])
 
 
 class CZ(McpRole):

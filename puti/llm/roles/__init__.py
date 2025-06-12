@@ -11,6 +11,7 @@ import importlib
 import pkgutil
 import inspect
 import threading
+import puti.bootstrap
 
 from puti.core.resp import ToolResponse
 from functools import partial
@@ -143,7 +144,8 @@ class Role(BaseModel):
         if not self.rc.env:
             sys_single_agent = prompt_setting.sys_single_agent.render(
                 WORKING_DIRECTORY_PATH=self.rc.root,
-                FINAL_ANSWER_KEYWORDS=MessageType.FINAL_ANSWER.val
+                FINAL_ANSWER_KEYWORDS=MessageType.FINAL_ANSWER.val,
+                IDENTITY=self.identity
             )
             think_msg = SystemMessage.from_any(self.role_definition + sys_single_agent).to_message_dict()
         else:

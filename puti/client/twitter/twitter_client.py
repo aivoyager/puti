@@ -22,7 +22,7 @@ from puti.constant.client import LoginMethod, TwikitSearchMethod
 from puti.constant.base import Resp
 from puti.client.client_resp import CliResp
 from puti.constant.client import Client as Cli
-from puti.db.mysql_operator import MysqlOperator
+from puti.db.sqlite_operator import SqliteOperator
 
 lgr = logger_factory.client
 
@@ -40,7 +40,7 @@ class TwikitClient(Client, ABC):
     async def save_my_tweet(self) -> None:
 
         rs = await self.get_tweets_by_user(self.conf.MY_ID)
-        db = MysqlOperator()
+        db = SqliteOperator()
         for tweet in rs.data:
             text = re.sub(r' https://t\.co/\S+', '', tweet.text)
             author_id = self.conf.MY_ID
@@ -49,8 +49,8 @@ class TwikitClient(Client, ABC):
             data_time = datetime.datetime.now()
             replied = False
             sql = """
-                INSERT INTO twitter_mentions (text, author_id, mention_id, parent_id, data_time, replied)
-                VALUES (%s, %s, %s, %s, %s, %s)
+                INSERT OR IGNORE INTO twitter_mentions (text, author_id, mention_id, parent_id, data_time, replied)
+                VALUES (?, ?, ?, ?, ?, ?)
             """
             params = (text, author_id, mention_id, parent_id, data_time, replied)
             db.insert(sql, params)
@@ -89,26 +89,28 @@ class TwikitClient(Client, ABC):
     async def reply_to_tweet(self, text: str, media_path: list[str], tweet_id: int, author_id: int = None) -> CliResp:
         lgr.info(
             f"reply to tweet text :{text} author_id: {author_id} link = https://twitter.com/i/web/status/{tweet_id}")
-        # if author_id == self.conf.my_id:
-        #     return CliResp(code=Resp.OK, msg="don't reply myself")
-        db = MysqlOperator()
-        # 检查是否已回复
-        sql_check = "SELECT replied FROM twitter_mentions WHERE mention_id = %s"
-        result = db.fetchone(sql_check, (tweet_id,))
-        if result is not None and result[0]:
+        db = SqliteOperator()
+        try:
+            # 检查是否已回复
+            sql_check = "SELECT replied FROM twitter_mentions WHERE mention_id = ?"
+            result = db.fetchone(sql_check, (str(tweet_id),))
+            
+            # If the mention exists and has been replied to, do nothing.
+            if result and result['replied']:
+                return CliResp(code=Resp.OK.val, msg="该推文已回复，无需重复操作")
+
+            # Execute the reply by calling post_tweet
+            rs = await self.post_tweet(text, media_path, reply_tweet_id=tweet_id)
+            if rs.code != Resp.OK.val:
+                return CliResp(code=Resp.POST_TWEET_ERR.val, msg=rs.message, cli=Cli.TWITTER)
+
+            # After successfully replying, update the original mention's status to replied=TRUE
+            sql_update = "UPDATE twitter_mentions SET replied = 1 WHERE mention_id = ?"
+            db.update(sql_update, (str(tweet_id),))
+
+            return CliResp.default(msg="reply success")
+        finally:
             db.close()
-            return CliResp(code=Resp.OK.val, msg="该推文已回复，无需重复操作")
-        # 执行回复
-        rs = await self.post_tweet(text, media_path, reply_tweet_id=tweet_id)
-        if rs.code != Resp.OK.val:
-            db.close()
-            return CliResp(code=Resp.POST_TWEET_ERR.val, msg=rs.message, cli=Cli.TWITTER)
-        # 回复成功，更新replied字段并保存记录
-        sql_update = "UPDATE twitter_mentions SET replied = TRUE WHERE mention_id = %s"
-        db.update(sql_update, (tweet_id,))
-        # 如需保存回复记录，可在此插入新记录（如业务需要）
-        db.close()
-        return CliResp.default(msg="reply success")
 
     async def post_tweet(self, text: str, image_path: Optional[List[str]] = None,
                          reply_tweet_id: int = None) -> CliResp:
@@ -126,15 +128,18 @@ class TwikitClient(Client, ABC):
             mention_id = tweet.id
             parent_id = str(reply_tweet_id) if reply_tweet_id else None
             data_time = datetime.datetime.now()
-            replied = True
+            # 1. When creating/posting a tweet, save it with replied = False.
+            replied = False
             sql = """
-                INSERT INTO twitter_mentions (text, author_id, mention_id, parent_id, data_time, replied)
-                VALUES (%s, %s, %s, %s, %s, %s)
+                INSERT OR IGNORE INTO twitter_mentions (text, author_id, mention_id, parent_id, data_time, replied)
+                VALUES (?, ?, ?, ?, ?, ?)
             """
             params = (text, author_id, mention_id, parent_id, data_time, replied)
-            db = MysqlOperator()
-            db.insert(sql, params)
-            db.close()
+            db = SqliteOperator()
+            try:
+                db.insert(sql, params)
+            finally:
+                db.close()
         else:
             lgr.info(
                 f"Post id is {tweet.id} translatable is None | link = https://twitter.com/i/web/status/{reply_tweet_id}")
@@ -157,14 +162,29 @@ class TwikitClient(Client, ABC):
                                                       count=reply_count)
         lgr.debug(tweets_replies)
         all_replies = []
-        db = MysqlOperator()
+        db = SqliteOperator()
 
         async def _save_replies_recursion(_tweet: Union[Tweet, Result, List[Tweet]]):
-            for i in _tweet:
+            tweet_list = list(_tweet)
+            if not tweet_list:
+                return
+
+            mention_ids = [str(i.id) for i in tweet_list]
+            placeholders = ','.join('?' for _ in mention_ids)
+            sql_existing = f"SELECT mention_id FROM twitter_mentions WHERE mention_id IN ({placeholders})"
+            existing_ids_tuples = db.fetchall(sql_existing, mention_ids)
+            existing_ids = {row['mention_id'] for row in existing_ids_tuples}
+
+
+            for i in tweet_list:
                 if start_time and start_time.replace(tzinfo=pytz.UTC) > i.created_at_datetime:
                     continue
+                
+                if str(i.id) in existing_ids:
+                    continue
+
                 plaintext = re.sub(r'@\S+ ', '', i.full_text)
-                replied = True if i.reply_count != 0 or i.id == self.conf.MY_ID else False
+                replied = True if i.reply_count != 0 or i.user.id == self.conf.MY_ID else False
                 info = {
                     'text': plaintext,
                     'author_id': i.user.id,
@@ -173,20 +193,17 @@ class TwikitClient(Client, ABC):
                     'data_time': datetime.datetime.now(),
                     'replied': replied,
                 }
-                sql_existing = "SELECT mention_id FROM twitter_mentions WHERE mention_id IN %s"
-                existing_ids = set(row[0] for row in db.fetchall(sql_existing, ([str(i.id) for i in _tweet],)))
-
-                if i.id not in existing_ids:
-                    sql = """
-                        INSERT INTO twitter_mentions (text, author_id, mention_id, parent_id, data_time, replied)
-                        VALUES (%s, %s, %s, %s, %s, %s)
-                    """
-                    params = (plaintext, i.user.id, i.id, i.in_reply_to, datetime.datetime.now(), replied)
-                    db.insert(sql, params)
+                
+                sql = """
+                    INSERT OR IGNORE INTO twitter_mentions (text, author_id, mention_id, parent_id, data_time, replied)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                """
+                params = (plaintext, i.user.id, i.id, i.in_reply_to, datetime.datetime.now(), replied)
+                db.insert(sql, params)
 
                 all_replies.append(info)
 
-            if _tweet.next_cursor:
+            if hasattr(_tweet, 'next_cursor') and _tweet.next_cursor:
                 try:
                     tweets_reply_next = await self._cli.search_tweet(
                         f'@{query_name}',

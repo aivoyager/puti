@@ -44,6 +44,9 @@ class LoggerFactory(object):
         # LLM logger
         cls.loggers['llm'] = _logger.bind(name='llm')
 
+        # DB logger
+        cls.loggers['db'] = _logger.bind(name='db')
+
         return cls
 
     @classmethod
@@ -105,6 +108,10 @@ class LoggerFactory(object):
     @property
     def llm(self):
         return self.loggers['llm']
+
+    @property
+    def db(self):
+        return self.loggers['db']
 
 
 logger_factory = LoggerFactory()
