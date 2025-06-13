@@ -8,7 +8,7 @@ from puti.db.db_sqlite import dbm_maker, SQLiteModelHandlerWithPool, SQLiteManag
 from pydantic import BaseModel, ConfigDict, Field
 from puti.db.model import Model
 from pathlib import Path
-from puti.constant.base import PuTi
+from puti.constant.base import Pathh
 from puti.logs import logger_factory
 
 lgr = logger_factory.default
@@ -18,8 +18,8 @@ class DBM(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     pool: SQLiteConnectionPool = Field(None, description='conn pool', validate_default=False)
-    pool_size: int = Field(default=PuTi.POOL_SIZE.val)
-    db_path: Path = Field(default=PuTi.ROOT_DIR.val / 'db' / 'puti.db')
+    pool_size: int = Field(default=Pathh.POOL_SIZE.val)
+    db_path: Path = Field(default=Pathh.ROOT_DIR.val / 'db' / 'puti.db')
     dbh: SQLiteModelHandlerWithPool = Field(None, description='database handler', validate_default=False)
     dbm: SQLiteManagerWithPool = Field(None, description='database manager', validate_default=False)
 

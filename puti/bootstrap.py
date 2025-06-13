@@ -13,7 +13,8 @@ import atexit
 # sys.stderr = open(os.devnull, "w")
 from pathlib import Path
 from dotenv import load_dotenv, find_dotenv
-from puti.core.config_setup import ensure_config_is_present, CONFIG_FILE
+from puti.core.config_setup import ensure_config_is_present
+from puti.constant.base import Pathh
 ensure_config_is_present()
 import logging
 
@@ -21,7 +22,8 @@ import logging
 # --- CRITICAL: Load .env file BEFORE any other module code runs ---
 # This populates os.environ so that all subsequent imports and logic
 # (especially `puti.conf.config`) see the correct environment values from the start.
-dotenv_path = find_dotenv(CONFIG_FILE)
+
+dotenv_path = find_dotenv(Pathh.CONFIG_FILE.val)
 if dotenv_path:
     load_dotenv(dotenv_path)
 

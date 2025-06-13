@@ -6,7 +6,7 @@ from rich.console import Console
 from rich.markdown import Markdown
 from rich.panel import Panel
 from puti.llm.roles.agents import Alex, Ethan
-from puti.core.config_setup import ensure_config_is_present, ensure_twikit_config_is_present
+from puti.core.config_setup import ensure_twikit_config_is_present
 
 
 @click.group()

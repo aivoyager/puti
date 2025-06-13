@@ -106,7 +106,10 @@ class Role(BaseModel):
     address: set[str] = Field(default=set(), description='', validate_default=True)
     toolkit: Toolkit = Field(default_factory=Toolkit, validate_default=True)
     role_type: RoleType = Field(default=RoleType.ASSISTANT, description='Role identity')
-    agent_node: Optional[LLMNode] = Field(default=None, description='LLM node, lazily initialized.')
+    agent_node: Optional[LLMNode] = Field(
+        default=None,
+        description='LLM node, lazily initialized. Use `self.llm` to access it.'
+    )
     rc: RoleContext = Field(default_factory=RoleContext)
     answer: Optional[Message] = Field(default=None, description='assistant answer')
 

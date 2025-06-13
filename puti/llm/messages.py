@@ -12,6 +12,7 @@ from uuid import uuid4
 from puti.constant.llm import MessageTag, MessageTag
 from puti.utils.common import any_to_str, import_class
 from puti.llm.tools import BaseTool
+from puti.utils.files import encode_image
 
 
 class Message(BaseModel):
@@ -49,7 +50,7 @@ class Message(BaseModel):
         ]
 
     @classmethod
-    def from_any(cls, msg: Optional[Union[str, Dict, 'Message']], **kwargs) -> 'Message':
+    def from_any(cls, msg: Optional[Union[str, Dict, 'Message', List]], **kwargs) -> 'Message':
         """
             For Dict:
                 {'role': 'user', 'content': 'xxxx...'}
@@ -61,6 +62,9 @@ class Message(BaseModel):
                 role_type = msg['role']
                 content = msg['content']
                 msg = cls(content=content, sender=RoleType.elem_from_str(role_type), **kwargs)
+            # for image format
+            elif isinstance(msg, List):
+                msg = cls(non_standard=msg, **kwargs)
         except Exception as e:
             raise NotImplementedError('Message type error: {}'.format(e))
         else:
@@ -114,9 +118,40 @@ class Message(BaseModel):
         prompt += "<|start_header_id|>assistant<|end_header_id|>"
         return prompt
 
+    @classmethod
+    def image(cls, text: str = '', image_url: str = None) -> 'Message':
+        b64 = encode_image(image_url)
+        message_list = [
+            {"type": "text", "text": text},
+            {
+                "type": "image_url",
+                "image_url": {
+                    "url": b64
+                }
+            }
+        ]
+        # image input must come from user
+        message = cls.from_any(msg=message_list, role=RoleType.USER)
+        return message
+
+    @classmethod
+    def is_image(cls, msg: dict) -> bool:
+        content = msg.get("content", [])
+        if isinstance(content, list):
+            has_image = any(item.get("type") == "image_url" for item in content)
+        else:
+            has_image = False  # 或根据你需求保留为 None 或其他逻辑
+        return has_image
+
     def to_message_dict(self, ample: bool = True) -> dict:
         if self.non_standard:
-            return self.non_standard
+            # image request
+            if isinstance(self.non_standard, list):
+                return {'role': self.role.val, 'content': self.non_standard}
+            # ChatCompletion Message
+            else:
+                return self.non_standard
+
         resp = {'role': self.role.val, 'content': self.ample_content if ample else self.content}
         if self.tool_call_id:
             resp['tool_call_id'] = self.tool_call_id

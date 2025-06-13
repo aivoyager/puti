@@ -5,7 +5,7 @@
 """
 from typing import Any
 from puti.llm.roles import McpRole
-from puti.llm.messages import UserMessage
+from puti.llm.messages import UserMessage, Message
 from puti.logs import logger_factory
 from puti.llm.prompts import PromptSetting
 from puti.llm.roles import Role
@@ -15,11 +15,12 @@ from puti.llm.tools.terminal import Terminal
 from puti.llm.tools.python import Python
 from puti.llm.tools.file import File
 from puti.llm.tools.twikitt import Twikitt
+from puti.constant.llm import RoleType
 
 
 lgr = logger_factory.llm
 
-__all__ = ['Alex', 'CZ', 'Debater']
+__all__ = ['Alex', 'CZ', 'Debater', 'Vision', 'Ethan']
 
 
 class Alex(Role):
@@ -27,6 +28,14 @@ class Alex(Role):
 
     def model_post_init(self, __context: Any) -> None:
         self.set_tools([WebSearch, Terminal, ProjectAnalyzer, Python, File, Twikitt])
+
+
+class Vision(Role):
+    name: str = 'vision'
+    identity: str = 'visionary assistant'
+
+    def model_post_init(self, __context: Any) -> None:
+        self.llm.conf.MODEL = "gpt-4o"
 
 
 class Ethan(Role):

@@ -13,7 +13,7 @@ from pathlib import Path
 from collections import defaultdict
 from pydantic.v1 import ConfigError
 from puti.utils.file_model import FileModel
-from puti.constant.base import PuTi, Modules
+from puti.constant.base import Pathh, Modules
 from puti.utils.common import (check_module,
                           get_extra_config_path,
                           get_extra_config_dict,

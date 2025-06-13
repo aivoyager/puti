@@ -8,13 +8,13 @@ from pathlib import Path
 from rich.console import Console
 from rich.markdown import Markdown
 from dotenv import load_dotenv, find_dotenv, set_key
-from puti.utils.path import root_dir
+from puti.constant.base import Pathh
 
 import puti.bootstrap  # noqa: F401
 
 # --- Configuration Constants ---
-CONFIG_DIR = Path.home() / 'puti'
-CONFIG_FILE = str(CONFIG_DIR / '.env')
+CONFIG_DIR = Pathh.CONFIG_DIR.val
+CONFIG_FILE = Pathh.CONFIG_FILE.val
 REQUIRED_VARS = ["OPENAI_API_KEY", "OPENAI_MODEL"]
 OPTIONAL_VARS = ["OPENAI_BASE_URL"]
 DEFAULTS = {

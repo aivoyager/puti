@@ -3,7 +3,7 @@
 @Time:  2025-03-10 17:08
 @Description:  
 """
-from ollama._types import Message
+from ollama._types import Message as OMessage
 from ollama import Client
 from pydantic import BaseModel, Field, ConfigDict, create_model, model_validator
 from typing import Optional, List
@@ -18,6 +18,8 @@ from openai import AsyncStream
 from openai.types.chat import ChatCompletionChunk
 from openai.types.chat.chat_completion import ChatCompletion
 from openai.types.chat.chat_completion_message import ChatCompletionMessage
+from puti.utils.files import encode_image
+from puti.llm.messages import Message
 
 
 lgr = logger_factory.llm
@@ -88,7 +90,9 @@ class OpenAINode(LLMNode):
                 # print(chunk_message, end='')
                 collected_messages.append(chunk_message)
             full_reply = ''.join(collected_messages)
-            self.cost.handle_chat_cost(msg, full_reply, self.conf.MODEL)
+            # TODO: add cost for image message
+            if not Message.is_image(msg[-1]):
+                self.cost.handle_chat_cost(msg, full_reply, self.conf.MODEL)
             # lgr.info(f"cost: {self.cost.total_cost}")
             return full_reply
         else:
@@ -103,12 +107,14 @@ class OpenAINode(LLMNode):
             )
             if resp.choices[0].message.tool_calls:
                 completion_text = resp.choices[0].message.content if hasattr(resp.choices[0].message, 'content') else ''
-                self.cost.handle_chat_cost(msg, completion_text, self.conf.MODEL)
+                if not Message.is_image(msg[-1]):
+                    self.cost.handle_chat_cost(msg, completion_text, self.conf.MODEL)
                 # lgr.info(f"cost: {self.cost.total_cost}")
                 return resp.choices[0].message
             else:
                 full_reply = resp.choices[0].message.content if hasattr(resp.choices[0].message, 'content') else ''
-                self.cost.handle_chat_cost(msg, full_reply, self.conf.MODEL)
+                if not Message.is_image(msg[-1]):
+                    self.cost.handle_chat_cost(msg, full_reply, self.conf.MODEL)
                 # lgr.info(f"cost: {self.cost.total_cost}")
             return full_reply
 

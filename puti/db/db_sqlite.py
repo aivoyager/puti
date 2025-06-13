@@ -10,7 +10,7 @@ from queue import Queue, Empty
 from typing import Any, List, Optional, Type
 from pydantic import BaseModel
 from pydantic_core import PydanticUndefined
-from puti.constant.base import PuTi
+from puti.constant.base import Pathh
 
 # __all__ = ['SQLiteModelHandlerWithPool', 'dbm_maker']
 
@@ -246,9 +246,9 @@ class   SQLiteModelHandlerWithPool:
 
 def dbm_maker(db_path: str = None, pool_size: int = None) -> SQLiteManagerWithPool:
     if not db_path:
-        db_path = str((PuTi.ROOT_DIR.val / 'puti' / 'db' / 'alpha.db'))
+        db_path = str((Pathh.ROOT_DIR.val / 'puti' / 'db' / 'alpha.db'))
     if not pool_size:
-        pool_size = PuTi.POOL_SIZE.val
+        pool_size = Pathh.POOL_SIZE.val
     pool = SQLiteConnectionPool(
         db_path=db_path,
         pool_size=pool_size

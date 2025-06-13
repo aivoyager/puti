@@ -3,6 +3,8 @@
 @Time:  2025-03-04 15:50
 @Description:  
 """
+import puti.bootstrap
+
 import re
 import asyncio
 from datetime import date
@@ -15,6 +17,7 @@ from puti.llm.nodes import OpenAINode
 from puti.llm.nodes import OllamaNode
 from puti.conf.llm_config import LlamaConfig
 from puti.utils.path import root_dir
+
 
 lgr = logger_factory.default
 
@@ -172,3 +175,12 @@ async def test_concurrent_instances():
 
     results = await asyncio.gather(*[create_instance() for _ in range(5)])
     assert all(r is results[0] for r in results)
+
+
+async def test_image_invoke():
+    from puti.llm.messages import Message
+    node = OpenAINode()
+    msg = Message.image('解释一下图像中的内容', str(root_dir() / 'docs' / 'puti_alex.png'))
+    resp = await node.chat(Message.to_message_list([msg]))
+    print(resp)
+

@@ -3,6 +3,7 @@
 @Time: 10/01/25 11:52
 @Description:  
 """
+from pathlib import Path
 from enum import Enum
 from puti.utils.path import root_dir
 from typing import Type, TypeVar
@@ -32,11 +33,14 @@ class Base(Enum):
         return {item.val for item in cls}
 
 
-class PuTi(Base):
+class Pathh(Base):
     PROJ_NAME = ('PuTi', '')
     ROOT_DIR = (root_dir(), 'PuTi')
 
     POOL_SIZE = (3, 'db connection pool size')
+
+    CONFIG_DIR = (str(Path.home() / 'puti'), 'PuTi config dir')
+    CONFIG_FILE = (str(Path.home() / 'puti' / '.env'), 'PuTi config file')
 
 
 class Modules(Base):

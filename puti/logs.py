@@ -7,7 +7,7 @@ import sys
 
 from datetime import datetime
 from loguru import logger as _logger
-from puti.constant.base import PuTi
+from puti.constant.base import Pathh
 
 _print_level = 'DEBUG'
 _logfile_level = 'DEBUG'
@@ -61,7 +61,7 @@ class LoggerFactory(object):
 
         name_default = 'default'
         _logger.add(
-            str(PuTi.ROOT_DIR.val / 'logs' / name_default / f'{formatted_date}.txt'),
+            str(Pathh.ROOT_DIR.val / 'logs' / name_default / f'{formatted_date}.txt'),
             filter=lambda record: record['extra'].get('name') == name_default,
             level=logfile_level,
             enqueue=True,
@@ -73,7 +73,7 @@ class LoggerFactory(object):
 
         name_client = 'client'
         _logger.add(
-            str(PuTi.ROOT_DIR.val / 'logs' / name_client / f'{formatted_date}.txt'),
+            str(Pathh.ROOT_DIR.val / 'logs' / name_client / f'{formatted_date}.txt'),
             filter=lambda record: record['extra'].get('name') == name_client,
             level=logfile_level,
             enqueue=True,
@@ -85,7 +85,7 @@ class LoggerFactory(object):
 
         name_client = 'llm'
         _logger.add(
-            str(PuTi.ROOT_DIR.val / 'logs' / name_client / f'{formatted_date}.txt'),
+            str(Pathh.ROOT_DIR.val / 'logs' / name_client / f'{formatted_date}.txt'),
             filter=lambda record: record['extra'].get('name') == name_client,
             level=logfile_level,
             enqueue=True,
