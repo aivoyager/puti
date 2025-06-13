@@ -25,6 +25,9 @@ Puti is a versatile, multi-agent framework designed to simplify the development 
 ### Alex-Chat
 ![Alex Chat Demo](docs/puti_alex.gif)
 
+### Ethan-Chat
+![Ethan Chat Demo](docs/ethan.png)
+
 ### Key Features
 * **Multi-Agent Collaboration**: Easily define and manage multiple agents that can communicate and work together.
 * **Extensible Tool System**: Equip agents with a wide range of tools, including web search, file management, and terminal access.
@@ -52,13 +55,28 @@ cd puti
 pip install -e .
 ```
 
-## 🚀 Quick Start: Chat with Alex
+## 🚀 Quick Start
 
-Get started immediately with Puti's interactive, all-purpose AI assistant, Alex.
+### Chat with Alex
+Get started immediately with Puti's interactive, all-purpose AI assistant, Alex. Alex is an all-purpose bot with multiple integrated tools to help you with a wide range of tasks.
 
 ```bash
 puti alex-chat
 ```
+
+### Chat with Ethan (Twikit Integration)
+Interact with Ethan, an agent specialized in Twitter interactions using the `twikit` library. Ethan is a Twitter bot designed to help you manage your daily Twitter activities.
+
+```bash
+puti ethan-chat
+```
+
+**On your first run with Ethan**, Puti ensures your `twikit` is ready:
+1.  **Cookie Path Check**: The app looks for the `TWIKIT_COOKIE_PATH` environment variable.
+2.  **Guided Setup**: If the path is not found, you'll be prompted to enter the file path to your `cookies.json`.
+3.  **Validation**: It checks if the file exists at the provided path.
+4.  **Secure Storage**: The path is saved to your local `.env` file for future sessions.
+
 
 **On your first run**, Puti provides a guided setup experience:
 1.  🕵️ **Auto-detection**: The app checks if your OpenAI credentials are set up.
@@ -82,6 +100,7 @@ You can also configure Puti by manually creating a `.env` file in your project's
 OPENAI_API_KEY="sk-..."
 OPENAI_BASE_URL="https://api.openai.com/v1"
 OPENAI_MODEL="gpt-4o-mini"
+TWIKIT_COOKIE_PATH="/path/to/your/cookies.json"
 ```
 The application will automatically load these variables on startup. System-level environment variables will also work and will override the `.env` file.
 

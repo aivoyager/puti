@@ -1,6 +1,6 @@
 import pytest
 from click.testing import CliRunner
-from puti.cli import alex_chat, main
+from puti.cli import main
 from unittest.mock import AsyncMock
 
 
@@ -9,20 +9,20 @@ def runner():
     return CliRunner()
 
 
-def test_alex_chat_exit(runner, monkeypatch):
+def test_ehan_chat_exit(runner, monkeypatch):
     # Simulate user typing 'exit'
     mock_question = AsyncMock()
     mock_question.ask_async.return_value = 'exit'
     monkeypatch.setattr('questionary.text', lambda message, qmark: mock_question)
 
-    result = runner.invoke(main, ['alex-chat'])
+    result = runner.invoke(main, ['ethan-chat'])
 
     assert result.exit_code == 0
-    assert "Chat with Alex" in result.output
+    assert "Chat with Ethan" in result.output
 
 
 @pytest.mark.asyncio
-async def test_alex_chat_interaction(runner, monkeypatch):
+async def test_ehan_chat_interaction(runner, monkeypatch):
     inputs = ['hello', 'how are you?', 'exit']
     input_iter = iter(inputs)
 
@@ -34,9 +34,8 @@ async def test_alex_chat_interaction(runner, monkeypatch):
     mock_question.ask_async.side_effect = mock_ask_async
     monkeypatch.setattr('questionary.text', lambda message, qmark: mock_question)
 
-    result = runner.invoke(main, ['alex-chat'])
+    result = runner.invoke(main, ['ethan-chat'])
 
     assert result.exit_code == 0
-    assert "Chat with Alex" in result.output
-    # The first "You:" is from the prompt, subsequent ones are from the panel
-    assert result.output.count("👤 You:") >= 1
+    assert "Chat with Ethan" in result.output
+    assert result.output.count("👤 You:") >= 1 

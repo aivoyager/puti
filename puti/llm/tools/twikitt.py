@@ -28,16 +28,52 @@ class TwikittClientManager:
             cls._instance = super(TwikittClientManager, cls).__new__(cls)
         return cls._instance
 
-    async def get_client(self) -> Client:
+    async def login(self):
+        """
+        Logs in the client if not already logged in. Then, verifies the
+        connection by fetching user info, and retries on failure.
+        """
         async with self._lock:
+            # Step 1: One-time login if client does not exist
             if self._client is None:
+                # lgr.info("No active Twikit client. Performing initial login.")
                 cookie_path = os.getenv("TWIKIT_COOKIE_PATH")
                 if not cookie_path or not os.path.exists(cookie_path):
                     raise ValueError("TWIKIT_COOKIE_PATH environment variable not set or file not found.")
-                
-                self._client = Client()
-                self._client.load_cookies(cookie_path)
-                lgr.info("Twikit client initialized and logged in with cookies.")
+
+                client = Client()
+                client.load_cookies(cookie_path)
+                self._client = client
+                # lgr.info("Twikit client initialized.")
+
+            # Step 2: Verify session by fetching user info, with retries.
+            max_retries = 3
+            last_exception = None
+            for attempt in range(max_retries):
+                try:
+                    user_info = await self._client.user()
+                    # lgr.info(
+                    #     f"Twikit login successful. Logged in as: "
+                    #     f"{user_info.name} (@{user_info.screen_name})"
+                    # )
+                    return  # Success
+                except Exception as e:
+                    last_exception = e
+                    lgr.error(f"Verification attempt {attempt + 1}/{max_retries} failed: {e}")
+                    if attempt < max_retries - 1:
+                        await asyncio.sleep(1)
+
+            # If loop finishes, all retries have failed.
+            self._client = None  # Invalidate the client for the next run.
+            raise Exception(
+                "Failed to verify session after 3 attempts. "
+                f"Your cookie may be expired. Last error: {last_exception}"
+            )
+
+    async def get_client(self) -> Client:
+        if self._client is None:
+            # This should ideally be called by a login method first
+            raise RuntimeError("Client not initialized. Please call login() first.")
         return self._client
 
 
@@ -72,6 +108,17 @@ class Twikitt(BaseTool, ABC):
 
     client_manager: TwikittClientManager = TwikittClientManager()
 
+    async def login(self) -> Optional[ToolResponse]:
+        """
+        Ensures the client is logged in before performing any action.
+        Returns a ToolResponse on failure, None on success.
+        """
+        try:
+            await self.client_manager.login()
+            return None
+        except Exception as e:
+            return ToolResponse.fail(str(e))
+
     async def _check_my_replies_to_tweets(
         self, client: Client, tweet_ids_to_check: List[str], my_tweets_count: int
     ) -> set:
@@ -89,9 +136,14 @@ class Twikitt(BaseTool, ABC):
         return found_replied_ids
 
     async def run(self, *args, **kwargs) -> ToolResponse:
+        lgr.debug(f'{self.name} using...')
+        login_response = await self.login()
+        if login_response:
+            return login_response
+
         try:
             client = await self.client_manager.get_client()
-        except ValueError as e:
+        except Exception as e:
             return ToolResponse.fail(str(e))
 
         command = kwargs.get('command')

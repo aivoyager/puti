@@ -24,6 +24,39 @@ DEFAULTS = {
 }
 
 
+def ensure_twikit_config_is_present():
+    """
+    Checks if the TWIKIT_COOKIE_PATH environment variable is set. If not,
+    it prompts the user for the path and saves it to the .env file.
+    """
+    console = Console()
+    load_dotenv(CONFIG_FILE)
+
+    if os.getenv("TWIKIT_COOKIE_PATH"):
+        return  # Configuration is present.
+
+    console.print(Markdown("""
+# 🍪 Twikit Configuration
+We need the path to your `cookies.json` file for Twikit to work.
+"""))
+
+    cookie_path = ""
+    while not cookie_path:
+        cookie_path = questionary.text("📁 Please enter the path to your `cookies.json` file:").ask()
+        if not cookie_path:
+            console.print("[bold red]This field cannot be empty. Please provide a path.[/bold red]")
+        elif not Path(cookie_path).is_file():
+            console.print(f"[bold red]The file at `{cookie_path}` does not exist. Please check the path.[/bold red]")
+            cookie_path = "" # Reset to re-trigger the loop
+
+    # --- Save configuration to .env file ---
+    CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+    set_key(CONFIG_FILE, "TWIKIT_COOKIE_PATH", cookie_path)
+    os.environ["TWIKIT_COOKIE_PATH"] = cookie_path  # Update current session's environment
+
+    console.print(Markdown(f"✅ Twikit cookie path saved successfully to `{CONFIG_FILE}`."))
+
+
 def ensure_config_is_present():
     """
     Checks if the required environment variables are set. If not, it prompts

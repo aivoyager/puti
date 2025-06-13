@@ -30,7 +30,7 @@ async def test_alex_real_conversation_with_twikitt():
         print_green(f"\\n--- User Prompt ---")
         print_green(prompt)
         response = await ethan.run(prompt)
-        print_blue(f"--- Alex Response ---")
+        print_blue(f"--- Ethan Response ---")
         print_blue(response)
         conversation_history.append({"prompt": prompt, "response": response})
         return response
@@ -39,7 +39,7 @@ async def test_alex_real_conversation_with_twikitt():
     await run_and_log("Can you get my Twitter profile information?")
 
     # --- Turn 2: Post a tweet ---
-    tweet_content = f"Hello from a real integration test with my AI assistant Alex! Timestamp: {int(time.time())}"
+    tweet_content = f"Hello from a real integration test with my AI assistant Ethan! Timestamp: {int(time.time())}"
     await run_and_log(f"Please post a tweet for me with the content: '{tweet_content}'")
 
     # --- Turn 3: Get my tweets (to find the one we just posted) ---
@@ -76,7 +76,7 @@ async def test_alex_real_conversation_with_twikitt():
     # --- Turn 8: Get mentions ---
     await run_and_log("Can you check my latest mentions on Twitter?")
 
-    print(f"\\n--- Alex Integration Test Conversation History ---")
+    print(f"\\n--- Ethan Integration Test Conversation History ---")
     for turn in conversation_history:
         print(f"Prompt: {turn['prompt']}")
         print(f"Response: {turn['response']}\\n")
