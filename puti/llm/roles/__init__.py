@@ -13,17 +13,17 @@ import inspect
 import threading
 import puti.bootstrap
 
-from puti.core.resp import ToolResponse
+from puti.core.resp import ToolResponse, ChatResponse
 from functools import partial
 from ollama._types import Message as OMessage
-from puti.llm.prompts import prompt_setting
+from puti.llm.prompts import promptt
 from puti.llm import tools
 from puti.llm.tools import BaseTool
 from pydantic import BaseModel, Field, ConfigDict, PrivateAttr, model_validator, field_validator, SerializeAsAny
 from typing import Optional, List, Iterable, Literal, Set, Dict, Tuple, Type, Any, Union
-from puti.constant.llm import RoleType
+from puti.constant.llm import RoleType, ChatState
 from puti.logs import logger_factory
-from puti.constant.llm import TOKEN_COSTS, MessageTag
+from puti.constant.llm import TOKEN_COSTS, MessageRouter
 from asyncio import Queue, QueueEmpty
 from puti.llm.nodes import LLMNode, OpenAINode
 from puti.llm.messages import Message, ToolMessage, AssistantMessage, UserMessage, SystemMessage
@@ -40,8 +40,7 @@ from typing import Annotated, Dict, TypedDict, Any, Required, NotRequired, Class
 from pydantic.fields import FieldInfo
 from puti.llm.tools import Toolkit, ToolArgs
 from openai.types.chat.chat_completion_message import ChatCompletionMessage
-from puti.constant.llm import MessageTag, MessageType
-
+from puti.constant.llm import MessageRouter, MessageType
 
 
 lgr = logger_factory.llm
@@ -90,7 +89,7 @@ class RoleContext(BaseModel):
     subscribe_sender: set[str] = Field(default={}, description='Subscribe role name for solution-subscription mechanism')
     max_react_loop: int = Field(default=10, description='Max react loop number')
     state: int = Field(default=-1, description='State of the action')
-    todos: List[Tuple] = Field(default=None, exclude=True, description='tools waited to call and arguments dict')
+    todos: List[Message] = Field(default=None, exclude=True, description='Message contains fc information')
     action_taken: int = 0
     root: str = str(root_dir())
 
@@ -145,14 +144,16 @@ class Role(BaseModel):
     @property
     def sys_think_msg(self) -> Optional[Dict[str, str]]:
         if not self.rc.env:
-            sys_single_agent = prompt_setting.sys_single_agent.render(
+            sys_single_agent = promptt.sys_single_agent.render(
                 WORKING_DIRECTORY_PATH=self.rc.root,
                 FINAL_ANSWER_KEYWORDS=MessageType.FINAL_ANSWER.val,
-                IDENTITY=self.identity
+                IDENTITY=self.identity,
+                NAME=self.name,
+                GOAL=self.goal
             )
             think_msg = SystemMessage.from_any(self.role_definition + sys_single_agent).to_message_dict()
         else:
-            sys_multi_agent = prompt_setting.sys_multi_agent.render(
+            sys_multi_agent = promptt.sys_multi_agent.render(
                 ENVIRONMENT_NAME=self.rc.env.name,
                 ENVIRONMENT_DESCRIPTION=self.rc.env.desc,
                 AGENT_NAME=self.name,
@@ -174,6 +175,7 @@ class Role(BaseModel):
         return definition
 
     async def publish_message(self):
+        """ publish `self.answer` """
         if not self.answer:
             return
 
@@ -202,32 +204,25 @@ class Role(BaseModel):
         return False, 'self-correction'
 
     async def _perceive(self, ignore_history: bool = False) -> bool:
+        """If have new message to handle with"""
         news = self.rc.buffer.pop_all()
         history = [] if ignore_history else self.rc.memory.get()
         new_list = []
+
         for n in news:
             if (
                 n.sender in self.rc.subscribe_sender
                 or self.address & n.receiver
-                or MessageTag.ALL.val in n.receiver
+                or MessageRouter.ALL.val in n.receiver
             ):
                 if n not in history:
                     new_list.append(n)
                     await self.rc.memory.add_one(n)
         self.rc.news = new_list
-        # if len(self.rc.news) == 0:
-        #     lgr.debug(f'{self} no new messages, waiting.')
-        # else:
-        #     new_texts = [f'{m.role.val}: {m.content[:80]}...' for m in self.rc.news]
-        #     # lgr.debug(f'{self} perceive {new_texts}.')
+
         return True if len(self.rc.news) > 0 else False
 
-    async def _think(self) -> Optional[Tuple[bool, str]]:
-        """
-            return:
-                bool -> If have a tool call
-                str -> `answer` or `self reflection`
-        """
+    async def _think(self) -> tuple[Annotated[bool, 'if call tool'], Annotated[Message, 'message to return']]:
         base_system_prompt = self.sys_think_msg
 
         # Get all messages from memory for this session.
@@ -260,134 +255,62 @@ class Role(BaseModel):
             if msg.role == RoleType.USER:
                 recent_contents.add(f"User asked: {msg.content}")
             elif msg.role == RoleType.ASSISTANT:
-                recent_contents.add(f"You responded: {msg.content}")
+                recent_contents.add(f"{self.name} responded: {msg.content}")
 
         filtered_relevant_history = [text for text in relevant_history if text not in recent_contents]
 
         # 5. Inject filtered relevant history into the system prompt.
         if filtered_relevant_history:
             context_str = "\n".join(filtered_relevant_history)
-            enhanced_prompt = prompt_setting.enhanced_memory.render(context_str=context_str)
+            enhanced_prompt = promptt.enhanced_memory.render(context_str=context_str)
             enhanced_prompt = base_system_prompt['content'] + enhanced_prompt
             base_system_prompt['content'] = enhanced_prompt
-
-        # 6. Add think tips to the last user message in the recent conversation.
-        # if last_user_message and last_user_message in recent_messages:
-        #     if prompt_setting.think_tips not in last_user_message.content:
-        #         last_user_message.update_content(last_user_message.content + prompt_setting.think_tips)
 
         # 7. Construct the final message list for the LLM.
         history_messages = recent_messages
         message = [base_system_prompt] + [msg.to_message_dict() for msg in history_messages]
 
-        think: Union[ChatCompletionMessage, str] = await self.llm.chat(message, tools=self.toolkit.param_list)
+        think: Any = await self.llm.chat(message, tools=self.toolkit.param_list)
 
-        # openai fc
-        if isinstance(think, ChatCompletionMessage) and think.tool_calls:
-            think.tool_calls = think.tool_calls[:1]  # forbidden multiple tool call parallel
-            todos = []
-            for call_tool in think.tool_calls:
-                todo = self.toolkit.tools.get(call_tool.function.name)
-                todo_args = call_tool.function.arguments if call_tool.function.arguments else {}
-                todo_args = json.loads(todo_args) if isinstance(todo_args, str) else todo_args
-                tool_call_id = call_tool.id
-                self.tool_calls_one_round.append(tool_call_id)  # a queue storage multiple calls and counter i
-                todos.append((todo, todo_args, tool_call_id))
+        chat_response = await self.llm.parse_chat_result(think)
 
-            # TODO: multiple tools call for openai support
-            call_message = ToolMessage(non_standard=think)
-            await self.rc.memory.add_one(call_message)
-            self.rc.todos = todos
-            return True, ''
-        # Final answer, not tool call
-        elif isinstance(think, str):
-            final_answer = await self.parse_final_answer(think)
-            if final_answer == MessageTag.REFLECTION.val:
-                fix_msg = prompt_setting.self_reflection_for_invalid_json.render(
-                    INVALID_DATA=think,
-                    KEYWORDS=MessageType.keys()
-                )
-                return self._correction(fix_msg)
+        if chat_response.chat_state == ChatState.FINAL_ANSWER:
             self.answer = AssistantMessage(
-                content=final_answer,
+                content=chat_response.msg,
                 sender=self.name,
-                receiver={MessageTag.ALL.val},
-                # extend conversation rounds like tool call
-                tool_calls_one_round=self.tool_calls_one_round,
+                receiver={MessageRouter.ALL.val},
             )
-            return False, final_answer
-        # ollama fc
-        elif isinstance(think, OMessage) and think.tool_calls and all(isinstance(i, OMessage.ToolCall) for i in think.tool_calls):
-            tool_calls: List[OMessage.ToolCall] = think.tool_calls[:1]
-            todos = []
-            for fc in tool_calls:
-                todo = self.toolkit.tools.get(fc.function.name)
-                todo_args = fc.function.arguments if fc.function.arguments else {}
-                todos.append((todo, todo_args, -1))
-
-            call_message = Message(non_standard=think)
+            return False, self.answer
+        elif chat_response.chat_state == ChatState.IN_PROCESS_ANSWER:
+            self.answer = AssistantMessage(
+                content=chat_response.msg,
+                sender=self.name,
+                receiver={MessageRouter.ALL.val},
+            )
+            return False, self.answer
+        elif chat_response.chat_state == ChatState.SELF_REFLECTION:
+            reflection_msg = AssistantMessage(
+                content=chat_response.msg,
+                sender=self.name,
+                receiver={self.address},
+                self_reflection=True
+            )
+            self.rc.buffer.put_one_msg(reflection_msg)
+            return False, reflection_msg
+        elif chat_response.chat_state == ChatState.FC_CALL:
+            call_message = ToolMessage(non_standard=chat_response)
             await self.rc.memory.add_one(call_message)
-            self.rc.todos = todos
-            return True, ''
+            self.rc.todos.append(call_message)
+            return True, call_message
 
-        # from openai、ollama, different data structure.
-        # llm reply directly
-        elif (isinstance(think, ChatCompletionMessage) and think.content) or isinstance(think, str):  # think resp
-            try:
-                if isinstance(think, str):
-                    content = json.loads(think)
-                else:
-                    content = json.loads(think.content)
-                final_answer = content.get('FINAL_ANSWER')
-                in_process_answer = content.get('IN_PROCESS')
-            except json.JSONDecodeError:
-                # send to self, no publish, no action
-                fix_msg = prompt_setting.self_reflection_for_invalid_json.render(INVALID_DATA=think)
-                return self._correction(fix_msg)
-
-            if final_answer:
-                json_match = re.search(r'({.*})', message[-1]['content'], re.DOTALL)
-                think_process = ''
-                if json_match:
-                    match_group = json_match.group()
-                    if is_valid_json(match_group):
-                        think_process = json.loads(match_group).get('think_process', '')
-                self.answer = AssistantMessage(content=final_answer, sender=self.name)
-                await self.rc.memory.add_one(self.answer)
-                return False, json.dumps({'final_answer': final_answer, 'think_process': think_process}, ensure_ascii=False)
-            elif in_process_answer:
-                self.answer = AssistantMessage(content=in_process_answer, sender=self.name)
-                # will publish message in multi-agent env, so there are no need add message to memory
-                return False, in_process_answer
-            else:
-                fix_msg = f'Your returned json data does not have a "FINAL ANSWER" key. Please check you answer:\n{final_answer}'
-                return self._correction(fix_msg)
-
-        # unexpected think format
-        else:
-            err = f'Unexpected chat response: {type(think)}'
-            lgr.error(err)
-            raise RuntimeError(err)
-
-    @staticmethod
-    async def parse_final_answer(think: str) -> str:
-        if is_valid_json(think):
-            think = json.loads(think)
-            if think.get('FINAL_ANSWER'):
-                final_answer = think.get('FINAL_ANSWER')
-                return final_answer
-            else:
-                return MessageTag.REFLECTION.val
-        else:
-            return MessageTag.REFLECTION.val
-
-    async def _react(self) -> Optional[Message]:
+    async def _react(self) -> Message:
         message = Message.from_any('no tools taken yet')
         for todo in self.rc.todos:
-            # lgr.debug(f'{self} react `{todo[0].name}` with args {todo[1]}')
-            run = partial(todo[0].run, llm=self.llm)
+            chat_response: ChatResponse = todo.non_standard
+
+            run = partial(chat_response.tool_to_call.run, llm=self.llm)
             try:
-                resp = await run(**todo[1])
+                resp = await run(**chat_response.tool_args)
                 if isinstance(resp, ToolResponse):
                     if resp.is_success():
                         resp = resp.info
@@ -397,40 +320,41 @@ class Role(BaseModel):
             except Exception as e:
                 message = Message(non_standard_dic={
                     'type': 'function_call_output',
-                    'call_id': todo[2],
+                    'call_id': chat_response.tool_call_id,
                     'output': str(e)
                 })
-                message = Message(content=str(e), sender=self.name, role=RoleType.TOOL, tool_call_id=todo[2])
+                message = Message(content=str(e), sender=self.name, role=RoleType.TOOL, tool_call_id=chat_response.tool_call_id)
             else:
-                message = Message.from_any(resp, role=RoleType.TOOL, sender=self.name, tool_call_id=todo[2])
+                message = Message.from_any(resp, role=RoleType.TOOL, sender=self.name, tool_call_id=chat_response.tool_call_id)
             finally:
                 self.rc.buffer.put_one_msg(message)
                 self.rc.action_taken += 1
                 self.answer = message
         return message
 
-    async def run(self, with_message: Optional[Union[str, Dict, Message]] = None, ignore_history: bool = False) -> Optional[Union[Message, str]]:
+    async def run(self, with_message: Optional[Union[str, Dict, Message]] = None, ignore_history: bool = False, *args, **kwargs) -> Optional[Union[Message, str]]:
         if with_message:
             msg = Message.from_any(with_message)
             self.rc.buffer.put_one_msg(msg)
 
         self.rc.action_taken = 0
         resp = Message(content='No action taken yet', role=RoleType.SYSTEM)
+
         while self.rc.action_taken < self.rc.max_react_loop:
             perceive = await self._perceive()
             if not perceive:
                 await self.publish_message()
                 break
+
             todo, reply = await self._think()
-            if not todo:
-                if reply == 'self-correction':
-                    continue
-                # Storing the conversation turn is now handled automatically
-                # in memory.add_one when the assistant's reply is published.
+            if not todo:  # if have tool to call
+                if isinstance(reply, AssistantMessage) and reply.self_reflection:
+                    continue  # in next round handle issue
                 await self.publish_message()
                 return reply
+
             resp = await self._react()
-            # lgr.debug(f'{self} react [{self.rc.action_taken}/{self.rc.max_react_loop}]')
+
         self.rc.todos = []
         return resp
 
@@ -508,6 +432,12 @@ class McpRole(Role):
             await self._initialize_session()
             await self._initialize_tools()
             self.initialized = True
+
+
+class GraphRole(Role):
+
+    def run(self, *args, **kwargs):
+        super(GraphRole, self).run(*args, **kwargs)
 
 
 class CZ(McpRole):

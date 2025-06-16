@@ -4,8 +4,9 @@
 @Description:  
 """
 from pydantic import BaseModel, Field, SerializeAsAny, ConfigDict
-from typing import Any, Dict, Union, Iterable
+from typing import Any, Dict, Union, Iterable, Tuple
 from puti.constant.base import Resp
+from puti.constant.llm import MessageRouter, MessageType, ChatState, ReflectionType
 
 
 class Response(BaseModel):
@@ -41,7 +42,8 @@ class Response(BaseModel):
 
 class ToolResponse(Response):
     """ Tool Response """
-    data: Union[str, dict, list] = Field(default='', validate_default=True, description='tool execution successfully result')
+    data: Union[str, dict, list] = Field(default='', validate_default=True,
+                                         description='tool execution successfully result')
     msg: str = Field(default=Resp.TOOL_OK.dsp, validate_default=True, description='tool execution failed result')
     code: int = Field(default=Resp.TOOL_OK.val, validate_default=True, description='tool execution result code')
 
@@ -52,3 +54,17 @@ class ToolResponse(Response):
     @classmethod
     def success(cls, data: Union[str, dict, list] = None) -> 'ToolResponse':
         return ToolResponse(code=Resp.TOOL_OK.val, msg=Resp.TOOL_OK.dsp, data=data)
+
+
+class ChatResponse(Response):
+    chat_state: ChatState = Field(default=ChatState.FINAL_ANSWER, description='chat state')
+
+    msg: str = Field(default='', description='chat response, if final answer or in process answer then `msg` has value.')
+
+    tool_to_call: 'BaseTool' = Field(default=None, description='actions to do')
+    tool_args: dict = Field(default=None, description='tool arguments')
+    tool_call_id: int = Field(default=None, description='tool call id')
+
+    reflection_type: ReflectionType = Field(default=None, description='reflection type')
+
+    code: int = Field(default=Resp.CHAT_RESPONSE_OK.val, description='status code')

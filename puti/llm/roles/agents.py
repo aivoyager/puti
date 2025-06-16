@@ -7,7 +7,7 @@ from typing import Any
 from puti.llm.roles import McpRole
 from puti.llm.messages import UserMessage, Message
 from puti.logs import logger_factory
-from puti.llm.prompts import PromptSetting
+from puti.llm.prompts import Prompt
 from puti.llm.roles import Role
 from puti.llm.tools.web_search import WebSearch
 from puti.llm.tools.project_analyzer import ProjectAnalyzer
@@ -69,7 +69,7 @@ class CZ(McpRole):
             for i, j in enumerate(search_rsp, start=1):
                 numbered_rsp.append(f'{i}. {j}')
             his_rsp = '\n'.join(numbered_rsp)
-            prompt = PromptSetting.rag_template.format(his_rsp, text)
+            prompt = Prompt.rag_template.format(his_rsp, text)
             resp = await super(CZ, self).run(prompt, *args, **kwargs)
         return resp
 

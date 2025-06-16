@@ -9,17 +9,18 @@ from puti.constant.llm import RoleType
 from typing import Dict, Tuple, Type, Any, Union
 from datetime import datetime
 from uuid import uuid4
-from puti.constant.llm import MessageTag, MessageTag
+from puti.constant.llm import MessageRouter, MessageRouter
 from puti.utils.common import any_to_str, import_class
 from puti.llm.tools import BaseTool
 from puti.utils.files import encode_image
+from puti.constant.llm import MessageRouter, MessageType, ChatState, ReflectionType
 
 
 class Message(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True, extra="allow")
 
     sender: str = Field(default='', validate_default=True, description='Sender role name')
-    receiver: set['str'] = Field(default={MessageTag.ALL.val}, validate_default=True, description='Receiver role name')
+    receiver: set['str'] = Field(default={MessageRouter.ALL.val}, validate_default=True, description='Receiver role name')
     reply_to: str = Field(default='', description='Message id reply to')
     id: str = Field(default_factory=lambda: str(uuid4())[:8], description='Unique code of messages')
     content: str = ''
@@ -192,6 +193,9 @@ class SystemMessage(Message):
 
 
 class AssistantMessage(Message):
+
+    self_reflection: bool = Field(default=False, description='self reflection')
+    reflection_type: ReflectionType = Field(default=None, description='reflection type')
 
     def __init__(self, content: str, **kwargs):
         super(AssistantMessage, self).__init__(content=content, role=RoleType.ASSISTANT, **kwargs)

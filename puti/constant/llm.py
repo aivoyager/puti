@@ -20,10 +20,20 @@ class RoleType(Base):
     TOOL = ('tool', 'tool message type')
 
 
-class MessageTag(Base):
+class MessageRouter(Base):
     ALL = ('<all>', 'message to all people')
-    REFLECTION = ('<self-reflection>', 'reflection message tag')
-    THINK = ('THINK', 'think tag')
+
+
+class ChatState(Base):
+    """ When chat over in node, result contains several states """
+    FC_CALL = ('FC_CALL', 'function call perform')
+    FINAL_ANSWER = ('FINAL_ANSWER', 'final answer')
+    IN_PROCESS_ANSWER = ('IN_PROCESS_ANSWER', 'process answer')
+    SELF_REFLECTION = ('SELF_REFLECTION', 'self reflection')
+
+
+class ReflectionType(Base):
+    INVALID_JSON = ('INVALID_JSON', 'reflection for invalid json')
 
 
 class MessageType(Base):
@@ -65,14 +75,17 @@ TOKEN_COSTS = {
     "o1-mini": {"prompt": 0.003, "completion": 0.012},
     "o1-mini-2024-09-12": {"prompt": 0.003, "completion": 0.012},
     "text-embedding-ada-002": {"prompt": 0.0004, "completion": 0.0},
+
     "glm-3-turbo": {"prompt": 0.0007, "completion": 0.0007},  # 128k version, prompt + completion tokens=0.005￥/k-tokens
     "glm-4": {"prompt": 0.014, "completion": 0.014},  # 128k version, prompt + completion tokens=0.1￥/k-tokens
     "glm-4-flash": {"prompt": 0, "completion": 0},
     "glm-4-plus": {"prompt": 0.007, "completion": 0.007},
+
     "gemini-1.5-flash": {"prompt": 0.000075, "completion": 0.0003},
     "gemini-1.5-pro": {"prompt": 0.0035, "completion": 0.0105},
     "gemini-1.0-pro": {"prompt": 0.0005, "completion": 0.0015},
     'gemini-2.5-pro-preview-03-25': {'prompt': 0.00125, "completion": 0.010},
+
     "moonshot-v1-8k": {"prompt": 0.012, "completion": 0.012},  # prompt + completion tokens=0.012￥/k-tokens
     "moonshot-v1-32k": {"prompt": 0.024, "completion": 0.024},
     "moonshot-v1-128k": {"prompt": 0.06, "completion": 0.06},
@@ -81,6 +94,7 @@ TOKEN_COSTS = {
     "mistral-small-latest": {"prompt": 0.002, "completion": 0.006},
     "mistral-medium-latest": {"prompt": 0.0027, "completion": 0.0081},
     "mistral-large-latest": {"prompt": 0.008, "completion": 0.024},
+
     "claude-instant-1.2": {"prompt": 0.0008, "completion": 0.0024},
     "claude-2.0": {"prompt": 0.008, "completion": 0.024},
     "claude-2.1": {"prompt": 0.008, "completion": 0.024},
@@ -90,6 +104,7 @@ TOKEN_COSTS = {
     "claude-3-5-sonnet-20240620": {"prompt": 0.003, "completion": 0.015},
     "claude-3-opus-20240229": {"prompt": 0.015, "completion": 0.075},
     "claude-3-haiku-20240307": {"prompt": 0.00025, "completion": 0.00125},
+
     "yi-34b-chat-0205": {"prompt": 0.0003, "completion": 0.0003},
     "yi-34b-chat-200k": {"prompt": 0.0017, "completion": 0.0017},
     "yi-large": {"prompt": 0.0028, "completion": 0.0028},

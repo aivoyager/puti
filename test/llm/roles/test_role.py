@@ -3,15 +3,12 @@
 @Time:  2025-03-27 14:15
 @Description:  
 """
-from puti.llm.roles.tour_guide import TourGuide
-from puti.llm.nodes import OllamaNode
-from puti.conf.llm_config import LlamaConfig
-
-ollama_node = OllamaNode(conf=LlamaConfig())
+from puti.llm.roles.agents import Alex
 
 
-def test_mcp_role():
-    tour_guide = TourGuide(agent_node=ollama_node)
-    text = '从纽约到洛杉矶的航班要持续多久'
-    resp = tour_guide.cp.invoke(tour_guide.run, with_message=text)
-    print('')
+async def test_mcp_role():
+    alex = Alex()
+    resp = await alex.run('你好呀')
+    print(resp)
+    resp = await alex.run('针对我项目目录下的Dockerfile进行分析')
+    print(resp)

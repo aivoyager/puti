@@ -53,6 +53,7 @@ class Modules(Base):
 class Resp(Base):
     OK = (200, 'ok')
     TOOL_OK = (201, 'tool ok')
+    CHAT_RESPONSE_OK = (202, 'react ok')
 
     UNAUTHORIZED_ERR = (401, 'unauthorized error from tweet')
 
@@ -63,6 +64,7 @@ class Resp(Base):
 
     TOOL_FAIL = (504, 'tool fail')
     TOOL_TIMEOUT = (505, 'tool timeout')
+    CHAT_RESPONSE_FAIL = (506, 'chat response fail')
 
 
 class TaskType(Base):

@@ -98,13 +98,13 @@ class Memory(BaseModel):
         distances, indices = self.index.search(vector, k=num_to_retrieve)
 
         # Filter out results that are too similar to the query (i.e., the query itself)
+        # and only include results with a distance less than 0.5 for high relevance.
         results = []
         if len(indices) > 0:
             for i, dist in zip(indices[0], distances[0]):
-                # A very small distance indicates an exact or near-exact match.
-                # This is likely the query itself that was just added to memory.
-                # We should skip it to avoid redundancy.
-                if dist > 1e-5:  # Using a small epsilon for floating point comparison
+                # A very small distance (e.g., < 1e-5) indicates an exact match to the query.
+                # A distance > 0.5 indicates low semantic relevance.
+                if 1e-5 < dist < 0.5:
                     results.append(self.texts[i])
         return results
 

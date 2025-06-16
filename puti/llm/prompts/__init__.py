@@ -8,7 +8,8 @@ from pydantic_settings import BaseSettings
 from pydantic import BaseModel
 
 
-class PromptSetting(BaseSettings):
+class Prompt(BaseSettings):
+    # For cz
     rag_template: str = """"
 Here is some reference information that you can use to answer the user's question:
 
@@ -24,24 +25,15 @@ Based on the above provided information (Just a reference.), please answer the u
  There is no need to mention the content you referred to in the reply.
     """
 
-    THINK_TEMPLATE: str = """
-Conversation History
-===
-{history}
-===
-Your previous choose : {previous_state}, based on conversation history choose one of the following stages you need to go in the next step.
-No matter what, only return fixed JSON format(all double quotes) {"state": a number between -1 ~ {n_states}, "arguments": {argument name if action have arguments else leave an empty: argument value}}, don't reply anything else.
-You have the following tools to choose from, please fully understand these tools and its arguments, select the most appropriate action state.
-～～～
--1. Based on extra demands in system message if you have, if you think you have completed your goal, return {"state": -1, "arguments": {}} directly
-{states}
-～～～
-Notes: 
-1. You are forbidden to choose {previous_state} stage
-2. If you already think you complete your goal and get the final answer through previous intermediate action, return {"state": -1, "arguments": {"message": you final answer}}
-"""
+    # for graph
+    sys_single_agent_graph: Template = Template(
+        """
+        
+        """
+    )
+
     sys_single_agent: Template = Template(
-        """You are a highly autonomous and capable AI assistant. {% if IDENTITY %}Your identity: {{ IDENTITY }}{% endif %}
+        """You are a highly autonomous and capable AI assistant.{% if NAME %} Name:{{ NAME }}.{% endif %}{% if IDENTITY %} Identity: {{ IDENTITY }}.{% endif %}{% if GOAL %} Goal: {{ GOAL }}.{% endif %}
 Your goal is to fully resolve user requests.
 You have a toolkit of available functions and a working directory at {{ WORKING_DIRECTORY_PATH }}. The user's query will likely involve files in this directory. If the query concerns documents or files, they will be located here, and you are responsible for the contents.
 Use your resources strategically to achieve the user's objective.
@@ -49,6 +41,7 @@ Use your resources strategically to achieve the user's objective.
 Once you have the complete and final answer, provide it in the following JSON format and nothing else:
 {"{{ FINAL_ANSWER_KEYWORDS }}": "<your_final_answer_here>"}"""
     )
+
     enhanced_memory: Template = Template(
         """\n
 --- Relevant Snippets from Past Conversation ---
@@ -108,4 +101,4 @@ Here is your invalid json data between `===`:
     think_tips: str = "\n【system hint: Tools can be used. Return target json format】"
 
 
-prompt_setting = PromptSetting()
+promptt = Prompt()

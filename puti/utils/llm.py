@@ -16,7 +16,7 @@ from httpx import Client
 from langchain.prompts import ChatPromptTemplate
 from langchain.prompts.chat import ChatMessagePromptTemplate
 from puti.conf.config import conf
-from puti.llm.prompts import prompt_setting
+from puti.llm.prompts import promptt
 from langchain import hub
 
 
@@ -106,7 +106,7 @@ def create_model_chain(
         {'role': 'ai', 'content': 'I am Stitch, thank you! How about you?'}
     ]
     role_maps = {"ai": "assistant", "human": "user"}
-    input_text = prompt_setting.llm_model[model_name]
+    input_text = promptt.llm_model[model_name]
     input_text = ChatMessagePromptTemplate.from_template(
         template=input_text,
         role=role_maps['human'],
