@@ -89,7 +89,7 @@ class RoleContext(BaseModel):
     subscribe_sender: set[str] = Field(default={}, description='Subscribe role name for solution-subscription mechanism')
     max_react_loop: int = Field(default=10, description='Max react loop number')
     state: int = Field(default=-1, description='State of the action')
-    todos: List[Message] = Field(default=None, exclude=True, description='Message contains fc information')
+    todos: List[Message] = Field(default=[], exclude=True, description='Message contains fc information')
     action_taken: int = 0
     root: str = str(root_dir())
 
@@ -186,7 +186,7 @@ class Role(BaseModel):
             self.answer = None
         # For single angent
         else:
-            await self.rc.memory.add_one(self.answer)
+            await self.rc.memory.add_one(self.answer, role=self)
             self.answer = None
 
     def _reset(self):
@@ -217,7 +217,7 @@ class Role(BaseModel):
             ):
                 if n not in history:
                     new_list.append(n)
-                    await self.rc.memory.add_one(n)
+                    await self.rc.memory.add_one(n, role=self)
         self.rc.news = new_list
 
         return True if len(self.rc.news) > 0 else False
@@ -255,7 +255,7 @@ class Role(BaseModel):
             if msg.role == RoleType.USER:
                 recent_contents.add(f"User asked: {msg.content}")
             elif msg.role == RoleType.ASSISTANT:
-                recent_contents.add(f"{self.name} responded: {msg.content}")
+                recent_contents.add(f"{self} responded: {msg.content}")
 
         filtered_relevant_history = [text for text in relevant_history if text not in recent_contents]
 
@@ -272,7 +272,7 @@ class Role(BaseModel):
 
         think: Any = await self.llm.chat(message, tools=self.toolkit.param_list)
 
-        chat_response = await self.llm.parse_chat_result(think)
+        chat_response = await self.llm.parse_chat_result(resp=think, toolkit=self.toolkit)
 
         if chat_response.chat_state == ChatState.FINAL_ANSWER:
             self.answer = AssistantMessage(
@@ -292,16 +292,20 @@ class Role(BaseModel):
             reflection_msg = AssistantMessage(
                 content=chat_response.msg,
                 sender=self.name,
-                receiver={self.address},
+                receiver=self.address,
                 self_reflection=True
             )
             self.rc.buffer.put_one_msg(reflection_msg)
             return False, reflection_msg
         elif chat_response.chat_state == ChatState.FC_CALL:
-            call_message = ToolMessage(non_standard=chat_response)
+            if chat_response.tool_call_id:
+                self.tool_calls_one_round.append(chat_response.tool_call_id)
+            call_message = ToolMessage(non_standard=think)
             await self.rc.memory.add_one(call_message)
-            self.rc.todos.append(call_message)
-            return True, call_message
+
+            call_info_message = ToolMessage(non_standard=chat_response)
+            self.rc.todos.append(call_info_message)
+            return True, call_info_message
 
     async def _react(self) -> Message:
         message = Message.from_any('no tools taken yet')
@@ -328,13 +332,14 @@ class Role(BaseModel):
                 message = Message.from_any(resp, role=RoleType.TOOL, sender=self.name, tool_call_id=chat_response.tool_call_id)
             finally:
                 self.rc.buffer.put_one_msg(message)
+                self.rc.todos = []
                 self.rc.action_taken += 1
                 self.answer = message
         return message
 
-    async def run(self, with_message: Optional[Union[str, Dict, Message]] = None, ignore_history: bool = False, *args, **kwargs) -> Optional[Union[Message, str]]:
-        if with_message:
-            msg = Message.from_any(with_message)
+    async def run(self, msg: Optional[Union[str, Dict, Message]] = None, ignore_history: bool = False, *args, **kwargs) -> Optional[Union[Message, str]]:
+        if msg:
+            msg = Message.from_any(msg)
             self.rc.buffer.put_one_msg(msg)
 
         self.rc.action_taken = 0
@@ -435,9 +440,48 @@ class McpRole(Role):
 
 
 class GraphRole(Role):
+    """
+    A specialized role designed specifically for use within a Graph workflow.
+    This role is optimized for node-based execution in a graph context.
+    """
+    is_in_graph: bool = Field(default=True, description="Flag indicating this role is part of a graph")
+    node_id: Optional[str] = Field(default=None, description="ID of the node this role is associated with")
+    graph_context: Dict[str, Any] = Field(default_factory=dict, description="Shared context within the graph")
 
-    def run(self, *args, **kwargs):
-        super(GraphRole, self).run(*args, **kwargs)
+    async def run(self, msg: Optional[Union[str, Dict, Message]] = None, 
+                 previous_result: Optional[Any] = None, 
+                 *args, **kwargs) -> Optional[Union[Message, str]]:
+        """
+        Execute the role within a graph context, handling previous node results automatically
+        
+        Args:
+            msg: Input message to the role
+            previous_result: Result from the previous node in the graph
+            args: Additional arguments
+            kwargs: Additional keyword arguments
+            
+        Returns:
+            The result of role execution
+        """
+        # If we have a previous result and no explicit message, use the previous result as the message
+        if previous_result is not None and msg is None:
+            msg = previous_result
+            
+        result = await super().run(msg=msg, *args, **kwargs)
+        
+        # Store result in graph context if we have a node_id
+        if self.node_id:
+            self.graph_context[self.node_id] = result
+            
+        return result
+        
+    def set_node_id(self, node_id: str):
+        """Set the node ID this role is associated with"""
+        self.node_id = node_id
+        
+    def set_graph_context(self, context: Dict[str, Any]):
+        """Set the shared graph context"""
+        self.graph_context = context
 
 
 class CZ(McpRole):

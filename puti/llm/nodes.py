@@ -43,6 +43,12 @@ class LLMNode(BaseModel, ABC):
     cli: Optional[Union[OpenAI, Client]] = Field(None, description='Cli connect with llm.', exclude=True)
     cost: Optional[CostManager] = None
 
+    def __str__(self):
+        return self.llm_name
+
+    def __repr__(self):
+        return self.llm_name
+
     def model_post_init(self, __context):
         if self.llm_name == 'openai':
             if not self.conf.API_KEY:
@@ -188,10 +194,9 @@ class OpenAINode(LLMNode):
                 todo_args = call_tool.function.arguments if call_tool.function.arguments else {}
                 todo_args = json.loads(todo_args) if isinstance(todo_args, str) else todo_args
                 tool_call_id = call_tool.id
-                self.tool_calls_one_round.append(tool_call_id)  # a queue storage multiple calls and counter i
                 todos.append((todo, todo_args, tool_call_id))
 
-            todos = todos[0]
+            todos = todos[0]  # multiple tool call
             return ChatResponse(
                 chat_state=ChatState.FC_CALL,
                 tool_to_call=todos[0],
@@ -208,6 +213,7 @@ class OpenAINode(LLMNode):
                     INVALID_DATA=resp,
                     KEYWORDS=MessageType.keys()
                 )
+
                 return ChatResponse(
                     chat_state=ChatState.SELF_REFLECTION,
                     reflection_type=ReflectionType.INVALID_JSON,

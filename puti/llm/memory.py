@@ -3,14 +3,20 @@
 @Time:  2025-03-10 17:22
 @Description:  
 """
-from pydantic import BaseModel, Field, ConfigDict
-from typing import Optional, List, Iterable
+import asyncio
+import threading
+
+from pydantic import BaseModel, Field, ConfigDict, field_validator
+from typing import Optional, List, Iterable, Any
 import faiss
 import numpy as np
 
+from pathlib import Path
 from puti.llm.messages import Message, AssistantMessage, UserMessage
-from puti.llm.nodes import LLMNode
+from puti.llm.nodes import LLMNode, OpenAINode
 from puti.constant.llm import RoleType
+from puti.constant.base import Pathh
+from puti.utils.files import save_texts_to_file, load_texts_from_file
 
 
 class Memory(BaseModel):
@@ -20,9 +26,9 @@ class Memory(BaseModel):
     storage: List[Message] = Field(default_factory=list)
 
     # Long-term memory using Faiss
-    llm: Optional[LLMNode] = Field(None, exclude=True)
+    llm: Optional[LLMNode] = Field(default_factory=OpenAINode, exclude=True)
     top_k: int = 3
-    index: Optional[faiss.Index] = Field(None, exclude=True)
+    index: Optional[faiss.Index] = Field(None, exclude=True, validate_default=True)
     texts: List[str] = Field(default_factory=list, exclude=True)
     _embedding_dim: Optional[int] = None
 
@@ -45,19 +51,23 @@ class Memory(BaseModel):
         """ Gets the most recent message from short-term memory. """
         return self.storage[-1] if self.storage else None
 
-    async def add_one(self, message: Message):
+    async def add_one(self, message: Message, *args, **kwargs):
         """ Adds a message to both short-term and long-term memory. """
         self.storage.append(message)
 
         # Also add to long-term vector memory
         if self.llm:
             if message.is_user_message():
+                # Image message won't be embedded cause it store in `message.non_standard`
                 content_to_embed = f"User asked: {message.content}"
             elif message.is_assistant_message():
-                content_to_embed = f"You responded: {message.content}"
+                if kwargs.get('role'):
+                    content_to_embed = f"{kwargs['role']} responded: {message.content}"
+                else:
+                    content_to_embed = f"You responded: {message.content}"
             else:
                 content_to_embed = ''
-            if content_to_embed:
+            if content_to_embed and content_to_embed not in self.texts:
                 await self._add_to_vector_store(content_to_embed)
 
     async def add_batch(self, messages: Iterable[Message]):
@@ -68,19 +78,31 @@ class Memory(BaseModel):
 
     async def _initialize_index(self):
         if self.index is None:
-            if not self.llm:
-                raise ValueError("LLMNode must be provided for vector memory operations.")
-            dim = await self.llm.get_embedding_dim()
-            self.index = faiss.IndexFlatL2(dim)
+            index_file_path = Path(Pathh.INDEX_FILE.val)
+            texts_file_path = Path(Pathh.INDEX_TEXT.val)
+
+            if index_file_path.exists():
+                self.index = faiss.read_index(str(index_file_path))
+                self.texts = load_texts_from_file(texts_file_path)
+            else:
+                if not self.llm:
+                    raise ValueError("LLMNode must be provided for vector memory operations.")
+                dim = await self.llm.get_embedding_dim()
+                self.index = faiss.IndexFlatL2(dim)
+                # Ensure the directory exists before saving
+                index_file_path.parent.mkdir(parents=True, exist_ok=True)
+                faiss.write_index(self.index, str(index_file_path))
+                save_texts_to_file(self.texts, texts_file_path)
 
     async def _add_to_vector_store(self, text: str):
-        if self.index is None:
-            await self._initialize_index()
-
         embedding = await self.llm.embedding(text=text)
         vector = np.array([embedding], dtype="float32")
         self.index.add(vector)
         self.texts.append(text)
+
+        # Save index and texts after adding new data
+        faiss.write_index(self.index, Pathh.INDEX_FILE.val)
+        save_texts_to_file(self.texts, Path(Pathh.INDEX_TEXT.val))
 
     async def search(self, query: str, top_k: Optional[int] = None) -> List[str]:
         """ Searches long-term memory for texts relevant to the query. """
@@ -103,7 +125,7 @@ class Memory(BaseModel):
         if len(indices) > 0:
             for i, dist in zip(indices[0], distances[0]):
                 # A very small distance (e.g., < 1e-5) indicates an exact match to the query.
-                # A distance > 0.5 indicates low semantic relevance.
+                # A distance > 0.5 indicates low semantic relevance. [0 - 2 distance]
                 if 1e-5 < dist < 0.5:
                     results.append(self.texts[i])
         return results
@@ -113,3 +135,26 @@ class Memory(BaseModel):
         self.storage.clear()
         self.index = None
         self.texts.clear()
+        index_file_path = Path(Pathh.INDEX_FILE.val)
+        texts_file_path = index_file_path.with_suffix('.txt')
+        if index_file_path.exists():
+            index_file_path.unlink()
+        if texts_file_path.exists():
+            texts_file_path.unlink()
+
+    def model_post_init(self, __context: Any) -> None:
+        if not self.index:
+            def _run_async_init():
+                new_loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(new_loop)
+                try:
+                    new_loop.run_until_complete(self._initialize_index())
+                finally:
+                    new_loop.close()
+                    asyncio.set_event_loop(None)
+
+            thread = threading.Thread(target=_run_async_init)
+            thread.start()
+            thread.join()  # 阻塞当前线程直到初始化完成
+
+

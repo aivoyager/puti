@@ -16,6 +16,7 @@ from puti.logs import logger_factory
 from puti.utils.common import get_structured_exception, is_valid_json
 from puti.core.resp import Response
 from puti.constant.base import Resp
+from puti.llm.messages import Message
 
 
 lgr = logger_factory.default
@@ -29,7 +30,7 @@ class Capture(BaseModel):
     desc: str = None
     max_retries: int = 1
 
-    def invoke(self, func, *args, **kwargs) -> Response:
+    async def invoke(self, func, *args, **kwargs) -> Response:
         if 'retries' in kwargs:
             retries = kwargs.pop('retries')
         else:
@@ -37,14 +38,7 @@ class Capture(BaseModel):
 
         try:
             if iscoroutinefunction(func):
-                loop = asyncio.get_event_loop()
-                try:
-                    if loop.is_running():
-                        rs = loop.run_until_complete(func(*args, **kwargs))
-                    else:
-                        rs = asyncio.run(func(*args, **kwargs))
-                except RuntimeError:
-                    rs = loop.run_until_complete(func(*args, **kwargs))
+                rs = await func(*args, **kwargs)
             else:
                 rs = func(*args, **kwargs)
         except Unauthorized as e:
@@ -65,6 +59,8 @@ class Capture(BaseModel):
             structured_e = self._e_handled(e)
             return Response.default(code=Resp.CP_ERR.val, msg=Resp.CP_ERR.dsp, data=structured_e)
         else:
+            if isinstance(rs, Message):
+                rs = rs.content
             data = json.loads(rs) if is_valid_json(rs) else rs
             return Response.default(data=data)
 

@@ -60,7 +60,7 @@ def alex_chat(name):
 
                 # Print the response in a styled panel
                 response_panel = Panel(
-                    Markdown(response),
+                    Markdown(response.content),
                     title=f"🤖 {name}",
                     border_style="green",
                     title_align="left"

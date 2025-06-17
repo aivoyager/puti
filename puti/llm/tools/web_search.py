@@ -137,9 +137,11 @@ class WebSearch(BaseTool, ABC):
                     script.decompose()
 
                 try:
-                    text = soup.get_text(separator='\n').encode('latin1').decode('utf-8')
+                    text = soup.get_text(separator='\n').encode('latin1').decode('utf-8', errors='ignore')
                 except UnicodeEncodeError:
-                    text = soup.get_text()
+                    text = soup.get_text(separator='\n')
+                except UnicodeDecodeError:
+                    text = soup.get_text(separator='\n')
                 text = re.sub(r'\t+', '\t', text)  # Replace multiple tabs with a single tab
                 text = re.sub(r'\n+', ' ', text).strip()  # Replace multiple newlines with a single space and strip
                 # Further clean up multiple spaces that might have resulted from replacements
@@ -174,17 +176,14 @@ class WebSearch(BaseTool, ABC):
         retrieval_url_count = num_results * 2
 
         self.chunk_storage.clear()
-        st = time.time()
         loop = asyncio.get_event_loop()
         search_resp = await loop.run_in_executor(
-            None,
+            None,  # default thread pool
             lambda: self._search_engine['google'].search(query, retrieval_url_count=retrieval_url_count)
         )
-        # lgr.debug(f'google web search started with `{query}`.')
         urls = search_resp[:num_results]
 
         responses = await asyncio.gather(*[self.fetch_text_from_url(url) for url in urls])
-        # lgr.debug(f'fetch text from urls done. cost time: {time.time() - st}.')
 
         total_content = []
         for url, resp in zip(urls, responses):
@@ -192,9 +191,6 @@ class WebSearch(BaseTool, ABC):
                 if len(resp.data) > 100:  # we think this is not a valid content
                     continue
                 total_content.append(resp.data)
-            else:
-                # lgr.warning(f"Failed to fetch content from URL: {url}. Error: {resp.msg}")
-                pass
         total_content = list(itertools.chain.from_iterable(total_content))
         if not total_content:
             return ToolResponse.fail(msg=f"Failed to fetch content from URL: {search_resp}")

@@ -1,6 +1,9 @@
 import base64
 import mimetypes
 
+from typing import List
+from pathlib import Path
+
 
 def encode_image(image_path: str) -> str:
     """
@@ -25,3 +28,16 @@ def encode_image(image_path: str) -> str:
         base64_string = base64.b64encode(image_file.read()).decode('utf-8')
     
     return f"data:{mime_type};base64,{base64_string}"
+
+
+def save_texts_to_file(texts: List[str], file_path: Path):
+    with open(file_path, 'w', encoding='utf-8') as f:
+        for text in texts:
+            f.write(text + '\n')
+
+
+def load_texts_from_file(file_path: Path) -> List[str]:
+    if not file_path.exists():
+        return []
+    with open(file_path, 'r', encoding='utf-8') as f:
+        return [line.strip() for line in f if line.strip()]

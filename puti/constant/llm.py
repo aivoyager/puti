@@ -41,6 +41,13 @@ class MessageType(Base):
     PROCESS_ANSWER = ('PROCESS_ANSWER', 'process answer tag')
 
 
+class NodeState(Base):
+    PENDING = ("PENDING", 'pending state')
+    RUNNING = ("RUNNING", 'running state')
+    SUCCESS = ("SUCCESS", 'success state')
+    FAILED = ("FAILED", 'failed state')
+
+
 TOKEN_COSTS = {
     "gpt-3.5-turbo": {"prompt": 0.0015, "completion": 0.002},
     "gpt-3.5-turbo-0301": {"prompt": 0.0015, "completion": 0.002},

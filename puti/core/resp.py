@@ -4,7 +4,10 @@
 @Description:  
 """
 from pydantic import BaseModel, Field, SerializeAsAny, ConfigDict
-from typing import Any, Dict, Union, Iterable, Tuple
+from typing import Any, Dict, Union, Iterable, Tuple, Optional, Callable
+
+from pydantic._internal._namespace_utils import MappingNamespace
+
 from puti.constant.base import Resp
 from puti.constant.llm import MessageRouter, MessageType, ChatState, ReflectionType
 
@@ -63,8 +66,36 @@ class ChatResponse(Response):
 
     tool_to_call: 'BaseTool' = Field(default=None, description='actions to do')
     tool_args: dict = Field(default=None, description='tool arguments')
-    tool_call_id: int = Field(default=None, description='tool call id')
+    tool_call_id: str = Field(default=None, description='tool call id')
 
     reflection_type: ReflectionType = Field(default=None, description='reflection type')
 
     code: int = Field(default=Resp.CHAT_RESPONSE_OK.val, description='status code')
+
+    def __str__(self):
+        return f"code: {self.code}, state: {self.chat_state.val}, msg: {self.msg}"
+
+    def __repr__(self):
+        return self.__str__()
+
+    @classmethod
+    def model_rebuild(
+        cls,
+        *,
+        force: bool = False,
+        raise_errors: bool = True,
+        _parent_namespace_depth: int = 2,
+        _types_namespace: MappingNamespace | None = None,
+    ) -> bool | None:
+        from puti.llm.tools import BaseTool  # noqa: F401
+
+        return super(ChatResponse, cls).model_rebuild(
+            force=force,
+            raise_errors=raise_errors,
+            _parent_namespace_depth=_parent_namespace_depth,
+            _types_namespace=_types_namespace,
+        )
+
+
+ChatResponse.model_rebuild()
+

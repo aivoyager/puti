@@ -42,6 +42,9 @@ class Pathh(Base):
     CONFIG_DIR = (str(Path.home() / 'puti'), 'PuTi config dir')
     CONFIG_FILE = (str(Path.home() / 'puti' / '.env'), 'PuTi config file')
 
+    INDEX_FILE = (str(Path.home() / 'puti' / 'index.faiss'), 'PuTi index file')
+    INDEX_TEXT = (str(Path.home() / 'puti' / 'index.txt'), 'PuTi index text file')
+
 
 class Modules(Base):
     CLIENT = ('client', 'client module')
