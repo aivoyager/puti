@@ -19,7 +19,7 @@ class Workflow(BaseModel):
     Manages the execution of a graph-based workflow.
 
     This class encapsulates a graph and provides methods to run it in various ways,
-    such as running the full graph, a subgraph, or until a specific node is reached.
+    such as running the full graph, a subgraph, or until a specific vertex is reached.
     """
     graph: Graph = Field(..., description="The graph to be executed")
     results: Optional[Dict[str, Any]] = Field(default=None, description="The results of the last workflow run")
@@ -33,7 +33,7 @@ class Workflow(BaseModel):
             kwargs: Additional keyword arguments to pass to the graph's run method.
 
         Returns:
-            A dictionary mapping node IDs to their results.
+            A dictionary mapping vertex IDs to their results.
         """
         try:
             self.results = await self.graph.run(max_steps=max_steps, **kwargs)
@@ -42,59 +42,59 @@ class Workflow(BaseModel):
             lgr.error(f"Error running graph: {str(e)}")
             raise
 
-    async def run_until_node(self, target_node_id: str, max_steps: int = 10, **kwargs) -> Dict[str, Any]:
+    async def run_until_vertex(self, target_vertex_id: str, max_steps: int = 10, **kwargs) -> Dict[str, Any]:
         """
-        Run the graph until a specific node is reached, including the target node.
-        Execution stops after the target node is completed.
+        Run the graph until a specific vertex is reached, including the target vertex.
+        Execution stops after the target vertex is completed.
 
         Args:
-            target_node_id: The ID of the node to stop at.
+            target_vertex_id: The ID of the vertex to stop at.
             max_steps: The maximum number of steps to execute.
             kwargs: Additional keyword arguments to pass to the graph's run method.
 
         Returns:
-            A dictionary mapping the executed node IDs to their results.
+            A dictionary mapping the executed vertex IDs to their results.
         """
-        if target_node_id not in self.graph.nodes:
-            raise ValueError(f"Target node '{target_node_id}' not in self.graph.nodes")
+        if target_vertex_id not in self.graph.vertices:
+            raise ValueError(f"Target vertex '{target_vertex_id}' not in self.graph.vertices")
 
         modified_graph = Graph(
-            nodes=self.graph.nodes.copy(),
-            edges=[edge for edge in self.graph.edges if edge.source != target_node_id],
-            start_node_id=self.graph.start_node_id
+            vertices=self.graph.vertices.copy(),
+            edges=[edge for edge in self.graph.edges if edge.source != target_vertex_id],
+            start_vertex_id=self.graph.start_vertex_id
         )
         
         workflow = Workflow(graph=modified_graph)
         self.results = await workflow.run(max_steps=max_steps, **kwargs)
         return self.results
 
-    async def run_subgraph(self, start_node_id: str, end_node_ids: List[str], max_steps: int = 10, **kwargs) -> Dict[str, Any]:
+    async def run_subgraph(self, start_vertex_id: str, end_vertex_ids: List[str], max_steps: int = 10, **kwargs) -> Dict[str, Any]:
         """
-        Run a portion of a graph (a "subgraph") from a specified start node
-        until it is about to transition to one of the specified end nodes.
+        Run a portion of a graph (a "subgraph") from a specified start vertex
+        until it is about to transition to one of the specified end vertices.
         
-        Note: The end nodes themselves will not be executed.
+        Note: The end vertices themselves will not be executed.
 
         Args:
-            start_node_id: The ID of the node where the execution should begin.
-            end_node_ids: A list of node IDs that should act as termination points.
+            start_vertex_id: The ID of the vertex where the execution should begin.
+            end_vertex_ids: A list of vertex IDs that should act as termination points.
             max_steps: The maximum number of steps to execute.
             kwargs: Additional keyword arguments to pass to the graph's run method.
 
         Returns:
-            A dictionary mapping the executed node IDs to their results.
+            A dictionary mapping the executed vertex IDs to their results.
         """
-        if start_node_id not in self.graph.nodes:
-            raise ValueError(f"Start node '{start_node_id}' not in self.graph.nodes")
+        if start_vertex_id not in self.graph.vertices:
+            raise ValueError(f"Start vertex '{start_vertex_id}' not in self.graph.vertices")
 
-        for node_id in end_node_ids:
-            if node_id not in self.graph.nodes:
-                raise ValueError(f"End node '{node_id}' not in self.graph.nodes")
+        for vertex_id in end_vertex_ids:
+            if vertex_id not in self.graph.vertices:
+                raise ValueError(f"End vertex '{vertex_id}' not in self.graph.vertices")
 
         subgraph = Graph(
-            nodes={k: v for k, v in self.graph.nodes.items()},
-            edges=[edge for edge in self.graph.edges if edge.target not in end_node_ids],
-            start_node_id=start_node_id
+            vertices={k: v for k, v in self.graph.vertices.items()},
+            edges=[edge for edge in self.graph.edges if edge.target not in end_vertex_ids],
+            start_vertex_id=start_vertex_id
         )
         
         workflow = Workflow(graph=subgraph)
@@ -112,9 +112,9 @@ class Workflow(BaseModel):
             raise ValueError("No results to save. Run the workflow first.")
 
         serializable_results = {}
-        for node_id, result in self.results.items():
+        for vertex_id, result in self.results.items():
             if isinstance(result, Exception):
-                serializable_results[node_id] = {
+                serializable_results[vertex_id] = {
                     "type": "error",
                     "message": str(result),
                     "class": result.__class__.__name__
@@ -122,9 +122,9 @@ class Workflow(BaseModel):
             else:
                 try:
                     json.dumps(result)
-                    serializable_results[node_id] = result
+                    serializable_results[vertex_id] = result
                 except (TypeError, OverflowError):
-                    serializable_results[node_id] = str(result)
+                    serializable_results[vertex_id] = str(result)
 
         output_path = Path(file_path)
         output_path.parent.mkdir(parents=True, exist_ok=True)

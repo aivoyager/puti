@@ -44,6 +44,8 @@ setup(
         "python-dotenv==1.0.1",
         "numpy==2.3.0",
         "numexpr==2.11.0",
+        "celery==5.5.3",
+        "tenacity==9.1.2"
     ],
     python_requires=">=3.10",
     classifiers=[

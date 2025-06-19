@@ -41,11 +41,15 @@ class MessageType(Base):
     PROCESS_ANSWER = ('PROCESS_ANSWER', 'process answer tag')
 
 
-class NodeState(Base):
+class VertexState(Base):
     PENDING = ("PENDING", 'pending state')
     RUNNING = ("RUNNING", 'running state')
     SUCCESS = ("SUCCESS", 'success state')
     FAILED = ("FAILED", 'failed state')
+
+
+# Alias for backward compatibility
+NodeState = VertexState
 
 
 TOKEN_COSTS = {

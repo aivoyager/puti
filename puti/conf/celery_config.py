@@ -4,8 +4,12 @@
 @Description:  
 """
 import platform
-
+from datetime import timedelta
+import os
 from celery.schedules import crontab
+from kombu import Queue, Exchange
+from typing import Dict, Any, List
+
 from puti.conf.celery_private_conf import CeleryPrivateConfig
 
 c = CeleryPrivateConfig()
@@ -33,23 +37,59 @@ retry_delay = 3
 worker_log_level = 'INFO'
 beat_log_level = 'INFO'
 
-beat_schedule = {
-    'periodic-post-tweet': {
-        'task': 'celery_queue.tasks.periodic_post_tweet',
-        'schedule': crontab(hour=8, minute=0),
-        'args': ()
-    },
-    'periodic-get-mentions': {
-        'task': 'celery_queue.tasks.periodic_get_mentions',
-        'schedule': crontab(minute='*/5'),
-        'args': ()
-    },
-    'periodic-reply-to-tweet': {
-        'task': 'celery_queue.tasks.periodic_reply_to_tweet',
-        'schedule': crontab(minute='*/5'),
-        'args': ()
-    }
+# Celery Beat Settings
+beat_scheduler = 'django_celery_beat.schedulers:DatabaseScheduler'
+
+# Queue settings
+task_default_queue = 'default'
+task_create_missing_queues = True
+
+task_queues = (
+    Queue('default', Exchange('default'), routing_key='default'),
+    Queue('high_priority', Exchange('high_priority'), routing_key='high_priority'),
+    Queue('low_priority', Exchange('low_priority'), routing_key='low_priority'),
+)
+
+task_routes = {
+    'celery_queue.tasks.add': {'queue': 'default'},
+    'celery_queue.tasks.periodic_reply_to_tweet': {'queue': 'default'},
+    'celery_queue.tasks.RunEthanTweetingTask': {'queue': 'high_priority'},
 }
+
+# Schedule settings
+beat_schedule = {
+    'add-every-30-seconds': {
+        'task': 'celery_queue.tasks.add',
+        'schedule': timedelta(seconds=3000),
+        'args': (16, 16),
+        'options': {'queue': 'low_priority'}
+    },
+    'reply-every-24-hours': {
+        'task': 'celery_queue.tasks.periodic_reply_to_tweet',
+        'schedule': crontab(minute=0, hour='*/24'),
+        'args': (),
+        'options': {'queue': 'low_priority'}
+    },
+    'ethan-daily-tweet': {
+        'task': 'celery_queue.tasks.RunEthanTweetingTask',
+        'schedule': crontab(hour=10, minute=0),  # Run daily at 10:00 AM
+        'args': (),
+        'kwargs': {'save_results': True},
+        'options': {'queue': 'high_priority'}
+    },
+}
+
+# Worker settings
+worker_prefetch_multiplier = 1
+worker_max_tasks_per_child = 1000
+
+# Other settings
+task_time_limit = 600  # 10 minutes
+task_soft_time_limit = 500  # 8.33 minutes
+
+# Logging settings
+worker_hijack_root_logger = False
+
 broker_transport_options = {
     'visibility_timeout': 600,
     'max_retries': 3,

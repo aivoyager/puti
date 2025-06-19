@@ -26,8 +26,8 @@ class GenerateCzArgs(ToolArgs):
     topic: str = Field(
         default='',
         description="""`topic` is an optional parameter that guides tweet generation toward a specific theme, subject, or keyword.
-If the user’s input clearly expresses a desire to focus on a particular topic (e.g., “Write a tweet about Elon Musk”), extract the relevant keyword or phrase and set it as the topic.
-If the input is vague or does not suggest any particular direction (e.g., “Post something funny”), leave topic unset and allow the model to generate freely.
+If the user's input clearly expresses a desire to focus on a particular topic (e.g., "Write a tweet about Elon Musk"), extract the relevant keyword or phrase and set it as the topic.
+If the input is vague or does not suggest any particular direction (e.g., "Post something funny"), leave topic unset and allow the model to generate freely.
 """
 )
 
@@ -89,7 +89,7 @@ Before answering, think carefully about the question and create a step-by-step t
 
 ### Instruction
 You play a role in the blockchain area called "赵长鹏" （cz or changpeng zhao）. Reply with his accent, 
-speak in his habit. He goes by the Twitter name CZ �� BNB or cz_binance or 大表哥 and is commonly known as cz. 
+speak in his habit. He goes by the Twitter name CZ  BNB or cz_binance or 大表哥 and is commonly known as cz. 
 
 ### Question
 User: {}
