@@ -56,6 +56,11 @@ class Node(BaseModel):
             
         return self.result
 
+    @property
+    def is_successful(self) -> bool:
+        """Check if the node executed successfully."""
+        return self.state == NodeState.SUCCESS
+
 
 class Edge(BaseModel):
     """Connection between two nodes with an optional condition"""
@@ -66,6 +71,8 @@ class Edge(BaseModel):
     
     def matches(self, value: Any) -> bool:
         """Check if the value satisfies the condition"""
+        if isinstance(value, Message):
+            value = value.content
         if self.condition is None:
             return True
         try:
@@ -155,16 +162,17 @@ class Graph(BaseModel):
             return False
             
         if self.start_node_id and has_cycle(self.start_node_id, set()):
-            lgr.warning("Graph contains cycles, which may cause infinite loops")
+            lgr.warning("Graph contains cycles, which may cause infinite loops. Use 'max_steps' in the run method.")
             
         return self
 
-    async def run(self, *args, **kwargs):
+    async def run(self, *args, max_steps: int = 10, **kwargs):
         """
         Execute the graph workflow starting from the start node.
         
         Args:
             args: Positional arguments to pass to the first node
+            max_steps: The maximum number of nodes/steps to execute to prevent infinite loops. Defaults to 10.
             kwargs: Keyword arguments to pass to all nodes
             
         Returns:
@@ -182,7 +190,7 @@ class Graph(BaseModel):
         last_node_result = Message.from_any(initial_msg) if initial_msg else None
         results_map = {}
 
-        while current_node_id:
+        while current_node_id and len(self.execution_history) < max_steps:
             current_node = self.nodes[current_node_id]
             self.execution_history.append(current_node_id)
             
@@ -195,6 +203,12 @@ class Graph(BaseModel):
             # Execute the node
             await current_node.run(**node_kwargs)
             
+            # If node failed, store the exception and stop
+            if not current_node.is_successful:
+                results_map[current_node_id] = current_node.result
+                lgr.error(f"Stopping graph execution due to failure in node '{current_node.id}'.")
+                break
+                
             # Store the result, ensuring it's a Message object for consistency
             if isinstance(current_node.result, Message):
                 results_map[current_node_id] = current_node.result.content  # Store content for results_map
@@ -207,11 +221,6 @@ class Graph(BaseModel):
             
             # Update shared context
             self.shared_context[current_node_id] = last_node_result
-
-            # Stop if the node failed
-            if current_node.state == NodeState.FAILED:
-                lgr.error(f"Node {current_node.id} failed with result: {current_node.result}")
-                break
 
             # Find the next node based on edges and conditions
             next_node_id = None
