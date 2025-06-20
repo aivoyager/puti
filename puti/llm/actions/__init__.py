@@ -9,6 +9,10 @@ from typing import Union, Callable, Any, Dict, Optional
 import re
 import jinja2
 from jinja2 import Template
+from puti.logs import logger_factory
+from puti.llm.messages import Message
+
+lgr = logger_factory.llm
 
 
 # Define a type hint for the callable placeholder
@@ -24,7 +28,7 @@ class Action(BaseModel):
     description: str = Field('', description="A brief description of the action")
     prompt: Optional[Union['Action', str, Template, MsgPlaceholder]] = Field(default=None, description="The prompt to be sent to the role. Can be a plain string, a Jinja2 Template, or a callable.")
 
-    async def run(self, role: Role, *args, **kwargs):
+    async def run(self, role: Role, *args, **kwargs) -> Union[str, Message]:
         """
         Execute the action using the provided role.
         
@@ -36,6 +40,8 @@ class Action(BaseModel):
         Returns:
             The response from the role.
         """
+        lgr.debug(f'`{self.name}` Action is running...')
+
         if role is None:
             raise ValueError("Role must be provided to run an action.")
         
@@ -57,16 +63,17 @@ class Action(BaseModel):
         elif isinstance(resolved_prompt, Template):
             try:
                 resolved_prompt = resolved_prompt.render(**kwargs)
-                print(f"[DEBUG] Action {self.name}: Rendered prompt: {resolved_prompt}")
+                # lgr.debug(f"Action {self.name}: Rendered prompt: {resolved_prompt}")
             except jinja2.exceptions.TemplateError as e:
-                print(f"[ERROR] Action {self.name}: Jinja2 templating error: {e}")
+                lgr.error(f"Action {self.name}: Jinja2 templating error: {e}")
                 raise
         # If it's a plain string, it's used as-is
         elif isinstance(resolved_prompt, str):
-            print(f"[DEBUG] Action {self.name}: Using prompt as-is: {resolved_prompt}")
+            pass
+            # lgr.debug(f"Action {self.name}: Using prompt as-is: {resolved_prompt}")
 
         resp = await role.run(
-            prompt=resolved_prompt,  # Pass the resolved prompt
+            msg=resolved_prompt,  # Pass the resolved prompt
             action_name=self.name,
             action_description=self.description,
             *args,

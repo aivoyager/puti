@@ -8,13 +8,14 @@ from typing import Callable, Any, Dict, List, Optional, Set, Union, Tuple
 import asyncio
 import logging
 from datetime import datetime
-
 from pydantic import BaseModel, Field, ConfigDict, model_validator
 from puti.llm.roles import Role, GraphRole
 from puti.llm.actions import Action
 from puti.constant.llm import NodeState as VertexState
 from puti.logs import logger_factory
 from puti.llm.messages import Message
+from puti.llm.roles.agents import Anonym
+from puti.constant.llm import RoleType
 
 lgr = logger_factory.llm
 
@@ -24,14 +25,18 @@ class Vertex(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
     
     id: str = Field(..., description="Unique identifier for the vertex")
-    role: Role = Field(..., description="Role that executes the vertex's action")
+    role: Role = Field(
+        default_factory=Anonym,
+        description="Role that executes the vertex's action. "
+                    "If action doesn't need role's ability, default set to `Anonym`."
+    )
     action: Action = Field(..., description="The action to be executed by the vertex")
     state: VertexState = Field(default=VertexState.PENDING, description="The current state of the vertex")
     result: Any = Field(default=None, description="The result of the vertex's action")
     execution_time: Optional[float] = Field(default=None, description="Execution time in seconds")
     error: Optional[Exception] = Field(default=None, description="Error that occurred during execution")
     
-    async def run(self, *args, **kwargs):
+    async def run(self, *args, **kwargs) -> Union[str, Message]:
         """Execute the vertex's action and record the result"""
         self.state = VertexState.RUNNING
         start_time = datetime.now()
@@ -102,8 +107,18 @@ class Graph(BaseModel):
         if isinstance(vertex.role, GraphRole):
             vertex.role.set_graph_context(self.shared_context)
 
-    def add_edge(self, source_id: str, target_id: str, condition: Optional[Callable[[Any], bool]] = None, 
-                metadata: Optional[Dict[str, Any]] = None):
+    def add_vertices(self, *vertices: Vertex):
+        """Add multiple vertices to the graph"""
+        for vertex in vertices:
+            self.add_vertex(vertex)
+
+    def add_edge(
+            self,
+            source_id: str,
+            target_id: str,
+            condition: Optional[Callable[[Any], bool]] = None,
+            metadata: Optional[Dict[str, Any]] = None
+    ):
         """Add an edge between two vertices with an optional condition"""
         if source_id not in self.vertices or target_id not in self.vertices:
             raise ValueError(f"Source vertex '{source_id}' or target vertex '{target_id}' not in graph")
@@ -122,7 +137,7 @@ class Graph(BaseModel):
         return self.vertices.get(vertex_id)
         
     def get_outgoing_edges(self, vertex_id: str) -> List[Edge]:
-        """Get all edges leaving from a vertex"""
+        """Get all edges leaving from a vertex, or get adjacent edges start from that vertex"""
         return [edge for edge in self.edges if edge.source == vertex_id]
         
     def get_successor_vertices(self, vertex_id: str) -> List[Vertex]:
@@ -184,11 +199,11 @@ class Graph(BaseModel):
         self.reset()
         self.shared_context.clear()
         
-        current_vertex_id = self.start_vertex_id
+        current_vertex_id: str = self.start_vertex_id
         # Initial input for the very first vertex, if provided
-        initial_prompt = kwargs.pop('prompt', None)
-        last_vertex_result = Message.from_any(initial_prompt) if initial_prompt else None
-        results_map = {}
+        initial_prompt: Optional[str] = kwargs.pop('prompt', None)
+        last_vertex_result: Message = Message.from_any(initial_prompt) if initial_prompt else None
+        results_map: dict = {}
 
         while current_vertex_id and len(self.execution_history) < max_steps:
             current_vertex = self.vertices[current_vertex_id]
@@ -199,7 +214,7 @@ class Graph(BaseModel):
             if last_vertex_result is not None:
                 # Pass the Message object directly as previous_result
                 vertex_kwargs['previous_result'] = last_vertex_result
-            if len(self.execution_history) == 1 and initial_prompt:
+            if len(self.execution_history) == 1 and initial_prompt:  # Only for the first vertex receive user prompt
                 vertex_kwargs['prompt'] = initial_prompt
             
             vertex_result = await current_vertex.run(*args, **vertex_kwargs)
@@ -217,7 +232,7 @@ class Graph(BaseModel):
                 last_vertex_result = vertex_result
             else:
                 # If the result is not already a Message, convert it
-                converted_result_message = Message.from_any(vertex_result)
+                converted_result_message = Message.from_any(vertex_result, role=RoleType.ASSISTANT)
                 results_map[current_vertex_id] = converted_result_message.content
                 last_vertex_result = converted_result_message
             
@@ -229,7 +244,7 @@ class Graph(BaseModel):
             outgoing_edges = self.get_outgoing_edges(current_vertex_id)
             
             if not outgoing_edges:
-                lgr.info(f"Vertex '{current_vertex_id}' is a terminal vertex. Halting execution.")
+                lgr.debug(f"Vertex '{current_vertex_id}' is a terminal vertex. Halting execution.")
                 break
             
             # If there's only one unconditional edge, take it

@@ -8,7 +8,7 @@ from puti.llm.roles import McpRole
 from puti.llm.messages import UserMessage, Message
 from puti.logs import logger_factory
 from puti.llm.prompts import Prompt
-from puti.llm.roles import Role
+from puti.llm.roles import Role, GraphRole
 from puti.llm.tools.web_search import WebSearch
 from puti.llm.tools.project_analyzer import ProjectAnalyzer
 from puti.llm.tools.terminal import Terminal
@@ -20,7 +20,12 @@ from puti.constant.llm import RoleType
 
 lgr = logger_factory.llm
 
-__all__ = ['Alex', 'CZ', 'Debater', 'Vision', 'Ethan']
+__all__ = ['Alex', 'CZ', 'Debater', 'Vision', 'Ethan', 'EthanG', 'Anonym']
+
+
+class Anonym(Role):
+    """ Default role."""
+    name: str = 'anonym'
 
 
 class Alex(Role):
@@ -40,6 +45,16 @@ class Vision(Role):
 
 class Ethan(Role):
     name: str = 'ethan'
+    identity: str = 'x bot'
+
+    def model_post_init(self, __context: Any) -> None:
+        self.set_tools([Twikitt])
+
+
+class EthanG(GraphRole):
+    """ Graph Role """
+
+    name: str = 'ehtan'
     identity: str = 'x bot'
 
     def model_post_init(self, __context: Any) -> None:

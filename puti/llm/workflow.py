@@ -3,7 +3,7 @@
 @Time:  2025-06-18 11:53
 @Description:  Workflow utilities for graph-based execution
 """
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, Annotated
 import json
 from pathlib import Path
 from pydantic import BaseModel, Field
@@ -22,7 +22,7 @@ class Workflow(BaseModel):
     such as running the full graph, a subgraph, or until a specific vertex is reached.
     """
     graph: Graph = Field(..., description="The graph to be executed")
-    results: Optional[Dict[str, Any]] = Field(default=None, description="The results of the last workflow run")
+    results: Optional[Dict[Annotated[str, 'Vertex Id'], Any]] = Field(default=None, description="The results of the last workflow run")
 
     async def run(self, max_steps: int = 10, **kwargs) -> Dict[str, Any]:
         """
@@ -59,7 +59,7 @@ class Workflow(BaseModel):
             raise ValueError(f"Target vertex '{target_vertex_id}' not in self.graph.vertices")
 
         modified_graph = Graph(
-            vertices=self.graph.vertices.copy(),
+            vertices=self.graph.vertices.copy(),  # `vertices` and `graph roles` copy from
             edges=[edge for edge in self.graph.edges if edge.source != target_vertex_id],
             start_vertex_id=self.graph.start_vertex_id
         )

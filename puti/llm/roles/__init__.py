@@ -300,29 +300,68 @@ class Role(BaseModel):
         elif chat_response.chat_state == ChatState.FC_CALL:
             if chat_response.tool_call_id:
                 self.tool_calls_one_round.append(chat_response.tool_call_id)
-            call_message = ToolMessage(non_standard=think)
+            call_message = ToolMessage(non_standard=think)  # for call message, we add origin to accord with official request
             await self.rc.memory.add_one(call_message)
 
-            call_info_message = ToolMessage(non_standard=chat_response)
+            call_info_message = ToolMessage(non_standard=chat_response)  #
             self.rc.todos.append(call_info_message)
             return True, call_info_message
 
     async def _react(self) -> Message:
-        """
-        The _react method is the core of the agent's decision-making.
-        It processes perceived messages, devises a plan, and executes it.
-        """
-        # Formulate a response based on the news
-        return await self._think()
+        message = Message.from_any('no tools taken yet')
+        for todo in self.rc.todos:
+            chat_response: ChatResponse = todo.non_standard
 
-    async def run(self, prompt: Optional[Union[str, Dict, Message]] = None, ignore_history: bool = False, *args, **kwargs) -> Optional[Union[Message, str]]:
-        if prompt:
-            self.rc.news = [UserMessage.from_any(prompt)]
+            run = partial(chat_response.tool_to_call.run, llm=self.llm)
+            try:
+                resp = await run(**chat_response.tool_args)
+                if isinstance(resp, ToolResponse):
+                    if resp.is_success():
+                        resp = resp.info
+                    else:
+                        resp = resp.msg
+                resp = json.dumps(resp, ensure_ascii=False) if not isinstance(resp, str) else resp
+            except Exception as e:
+                message = Message(non_standard_dic={
+                    'type': 'function_call_output',
+                    'call_id': chat_response.tool_call_id,
+                    'output': str(e)
+                })
+                message = Message(content=str(e), sender=self.name, role=RoleType.TOOL, tool_call_id=chat_response.tool_call_id)
+            else:
+                message = Message.from_any(resp, role=RoleType.TOOL, sender=self.name, tool_call_id=chat_response.tool_call_id)
+            finally:
+                self.rc.buffer.put_one_msg(message)
+                self.rc.todos = []
+                self.rc.action_taken += 1
+                self.answer = message
+        return message
 
-        await self._perceive(ignore_history=ignore_history)
-        self.answer = await self._react()
-        await self.publish_message()
-        return self.answer
+    async def run(self, msg: Optional[Union[str, Dict, Message]] = None, ignore_history: bool = False, *args, **kwargs) -> Optional[Union[Message, str]]:
+        if msg:
+            msg = Message.from_any(msg)
+            self.rc.buffer.put_one_msg(msg)
+
+        self.rc.action_taken = 0
+        resp = Message(content='No action taken yet', role=RoleType.SYSTEM)
+
+        while self.rc.action_taken < self.rc.max_react_loop:
+            perceive = await self._perceive()
+            if not perceive:
+                await self.publish_message()
+                break
+
+            todo, reply = await self._think()
+            if not todo:  # if have tool to call
+                if isinstance(reply, AssistantMessage) and reply.self_reflection:
+                    continue  # in next round handle issue
+                await self.publish_message()
+                return reply
+
+            resp = await self._react()
+
+        self.rc.todos = []
+        return resp
 
     @property
     def _env_prompt(self):
@@ -407,12 +446,14 @@ class GraphRole(Role):
     """
     is_in_graph: bool = Field(default=True, description="Flag indicating this role is part of a graph")
     vertex_id: Optional[str] = Field(default=None, description="ID of the vertex this role is associated with")
-    node_id: Optional[str] = Field(default=None, description="DEPRECATED: Use vertex_id instead")
     graph_context: Dict[str, Any] = Field(default_factory=dict, description="Shared context within the graph")
     
-    async def run(self, msg: Optional[Union[str, Dict, Message]] = None, 
-                 previous_result: Optional[Any] = None, 
-                 *args, **kwargs) -> Optional[Union[Message, str]]:
+    async def run(
+            self,
+            msg: Optional[Union[str, Dict, Message]] = None,
+            previous_result: Optional[Any] = None,
+            *args, **kwargs
+    ) -> Optional[Union[Message, str]]:
         """
         A specialized run method for graph-based execution that can handle
         results from previous vertices in the graph workflow.
@@ -448,11 +489,6 @@ class GraphRole(Role):
     def set_vertex_id(self, vertex_id: str):
         """Set the vertex ID for this role."""
         self.vertex_id = vertex_id
-        self.node_id = vertex_id  # For backward compatibility
-        
-    def set_node_id(self, node_id: str):
-        """DEPRECATED: Use set_vertex_id instead."""
-        self.set_vertex_id(node_id)
         
     def set_graph_context(self, context: Dict[str, Any]):
         """Set the shared graph context for this role."""
@@ -466,31 +502,13 @@ class CZ(McpRole):
         self.llm.conf.MODEL = 'gemini-2.5-pro-preview-03-25'
 
     async def run(self, text, *args, **kwargs):
-        """
-        Specific run method for the CZ role.
-        Determines user intent and either generates a new tweet or retrieves an existing one.
-        """
-        # Ensure the session is initialized before running
-        await self._initialize_session()
-        
-        intention_prompt = f"Determine the user's intention for the following text: '{text}'. " \
-                           "If they want you to provide a tweet, return '1'. " \
-                           "Otherwise, return '0'."
-        
-        judge_rsp = await self.session.chat(intention_prompt)
-        lgr.debug(f'Intent determination for CZ: {judge_rsp}')
-        
-        if judge_rsp and '1' in judge_rsp:
-            # If the user wants a new tweet, use the base run method with the original text
-            resp = await super().run(prompt=text, *args, **kwargs)
-        else:
-            # Otherwise, search for relevant past tweets
-            search_rsp = self.rc.memory.search(text)
-            numbered_rsp = [f'{i}. {j}' for i, j in enumerate(search_rsp, 1)]
-            his_rsp = '\n'.join(numbered_rsp)
-            
-            # Use a RAG template to generate a response based on past tweets
-            rag_prompt = f"Based on these past tweets:\n{his_rsp}\n\nUser query: {text}"
-            resp = await super().run(prompt=rag_prompt, *args, **kwargs)
-            
-        return resp
+        self.llm.conf.STREAM = False
+        intention_prompt = """
+        Determine the user's intention, whether they want to post or receive a tweet. 
+        Only return 1 or 0. 1 indicates that the user wants you to give them a tweet; otherwise, it is 0.
+        Here is user input: {}
+        """.format(text)
+        judge_rsp = await self.llm.chat([UserMessage.from_any(intention_prompt).to_message_dict()])
+        lgr.debug(f'post tweet choice is {judge_rsp}')
+        if judge_rsp == '1':
+            resp = await super(CZ, self).run(text, *args, **kwargs)

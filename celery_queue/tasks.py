@@ -7,86 +7,22 @@ import asyncio
 import json
 import traceback
 import requests
-import sys
-import os
-from celery import shared_task, Task
-from typing import List, Dict, Any
-from puti.constant.base import Pathh
-from puti.utils.path import root_dir
-from puti.llm.roles.agents import Ethan
-from puti.llm.graph.ethan_graph import run_ethan_workflow
-from celery.utils.log import get_task_logger
 
 from urllib.parse import quote
 from datetime import datetime
 from puti.logs import logger_factory
+from celery import shared_task
 from tenacity import retry, stop_after_attempt, wait_fixed, RetryCallState
 
 from puti.conf.client_config import TwitterConfig
-from puti.llm.roles.agents import CZ
+from puti.llm.roles.cz import CZ
 from puti.llm.roles.x_bot import TwitWhiz
-# from puti.db.mysql_operator import MysqlOperator
+from puti.db.mysql_operator import MysqlOperator
 
 lgr = logger_factory.default
 cz = CZ()
 x_conf = TwitterConfig()
 twit_whiz = TwitWhiz()
-
-# Set up logging
-logger = get_task_logger(__name__)
-
-# Add project root to Python path to ensure imports work correctly
-if str(Pathh.ROOT_DIR.val) not in sys.path:
-    sys.path.append(str(Pathh.ROOT_DIR.val))
-
-
-class AsyncTask(Task):
-    """Base class for tasks that run async code"""
-    
-    def run_async(self, *args, **kwargs):
-        """Override this method to implement the task's async logic"""
-        raise NotImplementedError("Subclasses must implement run_async")
-    
-    def __call__(self, *args, **kwargs):
-        """Run the async task using asyncio"""
-        return asyncio.run(self.run_async(*args, **kwargs))
-
-
-@shared_task(bind=True, base=AsyncTask)
-class RunEthanTweetingTask(AsyncTask):
-    """Task to run Ethan's daily tweeting workflow"""
-    
-    name = 'run_ethan_tweeting'
-    
-    async def run_async(self, save_results: bool = True) -> Dict[str, Any]:
-        """
-        Executes Ethan's workflow to generate and post a tweet.
-        
-        Args:
-            save_results: If True, save workflow results to a JSON file
-            
-        Returns:
-            Dict containing workflow results
-        """
-        try:
-            logger.info("Starting Ethan's daily tweet workflow")
-            
-            # Create Ethan instance
-            ethan = Ethan()
-            
-            # Run workflow
-            save_path = os.path.join(str(Pathh.ROOT_DIR.val), "data", "ethan_tweets",
-                                    f"tweet_{asyncio.get_event_loop().time()}.json") if save_results else None
-            
-            results = await run_ethan_workflow(ethan, save_path)
-            
-            logger.info(f"Ethan's tweet workflow completed successfully")
-            return results
-            
-        except Exception as e:
-            logger.error(f"Error in Ethan's tweet workflow: {str(e)}")
-            logger.error(traceback.format_exc())
-            raise
 
 
 # @celery_app.task(task_always_eager=True)
