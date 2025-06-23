@@ -175,6 +175,7 @@ def stop():
     """Stops the tweet scheduler daemon and disables the schedule."""
     from puti.scheduler import SchedulerDaemon
     from puti.db.schedule_manager import ScheduleManager
+    from puti.db.model.task.bot_task import TweetSchedule
     lgr = logger_factory.default
     lgr.info("Stopping the tweet scheduler...")
 

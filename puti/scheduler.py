@@ -11,15 +11,24 @@ from pathlib import Path
 from pydantic import BaseModel, Field
 from typing import Any
 from puti.constant.base import Pathh
+from puti.conf.config import conf
 from puti.logs import logger_factory
 import click
 
 lgr = logger_factory.default
 
 
+def get_default_pid_path():
+    """Reads the PID file path from the global config, with a fallback."""
+    try:
+        return conf.cc.module['common']['pid_file']
+    except (KeyError, AttributeError):
+        return str(Path.home() / 'puti' / 'scheduler.pid')
+
+
 class SchedulerDaemon(BaseModel):
     """Handles the daemonization of the Celery Beat scheduler."""
-    pidfile: str = Field(default=str(Path.home() / 'puti' / 'scheduler.pid'),
+    pidfile: str = Field(default_factory=get_default_pid_path,
                          description="Path to the scheduler's PID file.")
 
     def model_post_init(self, __context: Any) -> None:
@@ -89,8 +98,14 @@ class SchedulerDaemon(BaseModel):
         lgr.info(f"Stopping scheduler with PID: {pid}...")
 
         try:
+            # Attempt to kill the process group associated with the PID
             os.killpg(os.getpgid(pid), 15)
+        except ProcessLookupError:
+            # This is not a fatal error. It simply means the process with the given PID
+            # was not found. It's safe to assume it's already stopped.
+            lgr.warning(f"Process with PID {pid} not found, likely already stopped. Cleaning up PID file.")
         except OSError as e:
+            # Handle other, unexpected OS errors
             lgr.error(f"Failed to stop scheduler: {e}")
             click.echo(f"Error stopping scheduler: {e}", err=True)
         finally:
