@@ -33,7 +33,10 @@ class TweetSchedule(Model):
     enabled: bool = True
     last_run: Optional[datetime.datetime] = None
     next_run: Optional[datetime.datetime] = None
-    task_parameters: Dict[str, Any] = Field(default_factory=dict)
+    params: Dict[str, Any] = Field(default_factory=dict)
     created_at: Optional[datetime.datetime] = Field(default_factory=datetime.datetime.now, json_schema_extra={'dft_time': 'now'})
     updated_at: Optional[datetime.datetime] = Field(default_factory=datetime.datetime.now, json_schema_extra={'dft_time': 'now'})
+    pid: Optional[int] = Field(None, description="Process ID of the scheduler running this task")
+    task_id: Optional[str] = Field(None, max_length=255, description="Celery task ID associated with this schedule")
+    is_running: bool = Field(False, description="Whether the task is currently being executed")
     is_del: bool = False

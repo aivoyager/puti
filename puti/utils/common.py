@@ -22,7 +22,8 @@ from puti.constant.base import Modules
 from puti.logs import logger_factory
 from pathlib import Path
 from box import Box
-from typing import Annotated, Dict, TypedDict, Any, Required, NotRequired, ClassVar, cast, Type
+from typing import Annotated, Dict, TypedDict, Any, ClassVar, cast, Type
+from typing_extensions import Required, NotRequired
 
 lgr = logger_factory.default
 

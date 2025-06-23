@@ -43,6 +43,14 @@ class BaseManager(BaseModel):
     def get_all(self, where_clause: str = "", params: Tuple = ()) -> List[Model]:
         """Retrieves all model instances, with an optional filter."""
         return self.db_operator.get_models(self.model_type, where_clause, params)
+        
+    def get_one(self, where_clause: str = "", params: Tuple = ()) -> Optional[Model]:
+        """
+        Retrieves a single model instance based on a where clause.
+        Returns None if no matches are found.
+        """
+        results = self.get_all(where_clause, params)
+        return results[0] if results else None
 
     def save(self, instance: Model) -> int:
         """Saves a model instance (inserts) to the database."""

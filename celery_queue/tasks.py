@@ -135,14 +135,95 @@ def periodic_reply_to_tweet():
 
 
 @shared_task()
-async def generate_tweet_task(topic: str = None):
+def check_dynamic_schedules():
+    """
+    Checks for dynamic schedules in the database and triggers tasks as needed.
+    This task is the heartbeat of the dynamic scheduler system and should be
+    scheduled to run frequently (e.g., every minute).
+    """
+    now = datetime.now()
+    lgr.debug(f'Checking dynamic schedules at {now}')
+
+    try:
+        # Use the schedule manager for better database interaction
+        from puti.db.schedule_manager import ScheduleManager
+        manager = ScheduleManager()
+        
+        schedules = manager.get_active_schedules()
+
+        for schedule in schedules:
+            # Skip schedules that are already running
+            if schedule.is_running:
+                lgr.debug(f'Schedule "{schedule.name}" is already running, skipping.')
+                continue
+                
+            # A robust way to check if a task should have run.
+            # We iterate from the last known run time up to the current time.
+            # This ensures we don't miss runs if the service was down.
+            cron = croniter(schedule.cron_schedule, schedule.last_run or datetime.fromtimestamp(0))
+            
+            # Get the next scheduled run time based on the last execution
+            next_run_time = cron.get_next(datetime)
+
+            if next_run_time <= now:
+                lgr.info(f'[Scheduler] Triggering task for schedule "{schedule.name}" (ID: {schedule.id})')
+
+                # Extract parameters from the schedule
+                params = schedule.params or {}
+                topic = params.get('topic')
+
+                # Mark the task as running in the database
+                manager.update_schedule(schedule.id, is_running=True)
+                
+                # Asynchronously trigger the target task via Celery worker
+                task = generate_tweet_task.delay(topic=topic)
+                
+                # Update the schedule's timestamps and task info in the database
+                new_next_run = croniter(schedule.cron_schedule, now).get_next(datetime)
+                schedule_updates = {
+                    "last_run": now,
+                    "next_run": new_next_run,
+                    "task_id": task.id
+                }
+                manager.update_schedule(schedule.id, **schedule_updates)
+                
+                lgr.info(f'[Scheduler] Schedule "{schedule.name}" executed. Next run at {new_next_run}.')
+
+    except Exception as e:
+        lgr.error(f'[Scheduler] Error checking dynamic schedules: {str(e)}. {traceback.format_exc()}')
+
+    return 'ok'
+
+
+@shared_task(bind=True)
+def generate_tweet_task(self, topic: str = None):
     """
     Task that uses the test_generate_tweet_graph function to generate and post tweets.
     Accepts an optional topic to guide tweet generation.
     """
     start_time = datetime.now()
+    task_id = self.request.id
+    
     try:
-        lgr.info(f'[定时任务] generate_tweet_task 开始执行')
+        # Find the schedule associated with this task
+        from puti.db.schedule_manager import ScheduleManager
+        manager = ScheduleManager()
+        
+        # Try to update running status 
+        try:
+            import os
+            pid = os.getpid()
+            
+            # Try to find the schedule by task_id if we have one
+            schedules = manager.get_all(where_clause="task_id = ?", params=(task_id,))
+            if schedules:
+                schedule = schedules[0]
+                manager.update_schedule(schedule.id, pid=pid)
+                lgr.info(f'[Task {task_id}] Updated schedule {schedule.name} with PID {pid}')
+        except Exception as e:
+            lgr.warning(f'Could not update PID for task {task_id}: {str(e)}')
+        
+        lgr.info(f'[Task {task_id}] generate_tweet_task started, topic: {topic}')
         
         generate_tweet_action = GenerateTweetAction()
         post_tweet_action = PublishTweetAction()
@@ -157,62 +238,32 @@ async def generate_tweet_task(topic: str = None):
         graph.set_start_vertex(generate_tweet_vertex.id)
 
         workflow = Workflow(graph=graph)
-        resp = await workflow.run_until_vertex(post_tweet_vertex.id)
+        resp = asyncio.run(workflow.run_until_vertex(post_tweet_vertex.id))
         
-        lgr.info(f'[定时任务] 生成推文任务执行完成，耗时: {(datetime.now() - start_time).total_seconds():.2f}秒')
-        lgr.info(f'[定时任务] 生成推文结果: {resp}')
+        # Task completed successfully
+        try:
+            schedules = manager.get_all(where_clause="task_id = ?", params=(task_id,))
+            if schedules:
+                schedule = schedules[0]
+                manager.update_schedule(schedule.id, is_running=False, pid=None)
+                lgr.info(f'[Task {task_id}] Completed schedule {schedule.name} successfully')
+        except Exception as e:
+            lgr.warning(f'Could not update status for task {task_id}: {str(e)}')
+        
+        lgr.info(f'[Task {task_id}] Completed in {(datetime.now() - start_time).total_seconds():.2f} seconds')
         return resp
     except Exception as e:
-        lgr.error(f'[定时任务] 生成推文任务执行失败: {e.__class__.__name__} {str(e)}. {traceback.format_exc()}')
-    finally:
-        lgr.info(f'============== [定时任务] generate_tweet_task 执行结束 ==============')
-    return 'ok'
-
-
-@shared_task()
-def check_dynamic_schedules():
-    """
-    Checks for dynamic schedules in the database and triggers tasks as needed.
-    This task is the heartbeat of the dynamic scheduler system and should be
-    scheduled to run frequently (e.g., every minute).
-    """
-    now = datetime.now()
-    lgr.debug(f'Checking dynamic schedules at {now}')
-
-    try:
-        db = SQLiteOperator()
-        # Use the model manager for a cleaner DB interaction
-        from puti.db.schedule_manager import ScheduleManager
-        manager = ScheduleManager(model_type=TweetSchedule, db_operator=db)
-        
-        schedules = manager.get_all(where_clause="enabled = 1 AND is_del = 0")
-
-        for schedule in schedules:
-            # A robust way to check if a task should have run.
-            # We iterate from the last known run time up to the current time.
-            # This ensures we don't miss runs if the service was down.
-            cron = croniter(schedule.cron_schedule, schedule.last_run or datetime.fromtimestamp(0))
+        # Task failed
+        try:
+            schedules = manager.get_all(where_clause="task_id = ?", params=(task_id,))
+            if schedules:
+                schedule = schedules[0]
+                manager.update_schedule(schedule.id, is_running=False, pid=None)
+                lgr.error(f'[Task {task_id}] Failed schedule {schedule.name}: {str(e)}')
+        except Exception as inner_e:
+            lgr.warning(f'Could not update status for task {task_id}: {str(inner_e)}')
             
-            # Get the next scheduled run time based on the last execution
-            next_run_time = cron.get_next(datetime)
-
-            if next_run_time <= now:
-                lgr.info(f'[Scheduler] Triggering task for schedule "{schedule.name}" (ID: {schedule.id})')
-
-                # Asynchronously trigger the target task via Celery worker
-                generate_tweet_task.delay(topic=schedule.task_parameters.get('topic'))
-
-                # Update the schedule's timestamps in the database
-                new_next_run = croniter(schedule.cron_schedule, now).get_next(datetime)
-                schedule_updates = {
-                    "last_run": now,
-                    "next_run": new_next_run
-                }
-                manager.update(schedule.id, schedule_updates)
-                
-                lgr.info(f'[Scheduler] Schedule "{schedule.name}" executed. Next run at {new_next_run}.')
-
-    except Exception as e:
-        lgr.error(f'[Scheduler] Error checking dynamic schedules: {str(e)}. {traceback.format_exc()}')
-
+        lgr.error(f'[Task {task_id}] Failed: {str(e)}. {traceback.format_exc()}')
+    finally:
+        lgr.info(f'[Task {task_id}] Execution finished')
     return 'ok'
