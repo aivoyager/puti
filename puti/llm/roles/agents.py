@@ -65,16 +65,16 @@ class CZ(McpRole):
     name: str = 'cz or 赵长鹏 or changpeng zhao'
 
     def model_post_init(self, __context: Any) -> None:
-        self.agent_node.conf.MODEL = 'gemini-2.5-pro-preview-03-25'
+        self.llm.conf.MODEL = 'gemini-2.5-pro-preview-03-25'
 
     async def run(self, text, *args, **kwargs):
-        self.agent_node.conf.STREAM = False
+        self.llm.conf.STREAM = False
         intention_prompt = """
         Determine the user's intention, whether they want to post or receive a tweet. 
         Only return 1 or 0. 1 indicates that the user wants you to give them a tweet; otherwise, it is 0.
         Here is user input: {}
         """.format(text)
-        judge_rsp = await self.agent_node.chat([UserMessage.from_any(intention_prompt).to_message_dict()])
+        judge_rsp = await self.llm.chat([UserMessage.from_any(intention_prompt).to_message_dict()])
         lgr.debug(f'post tweet choice is {judge_rsp}')
         if judge_rsp == '1':
             resp = await super(CZ, self).run(text, *args, **kwargs)

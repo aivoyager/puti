@@ -7,7 +7,7 @@ import datetime
 
 from puti.db.model import Model
 from puti.constant.base import TaskType, TaskActivityType, TaskPostType
-from typing import Optional, Any, List
+from typing import Optional, Any, List, Dict
 from pydantic import Field
 
 
@@ -22,4 +22,18 @@ class BotTask(Model):
     task_start_time: Optional[float] = None
     task_done_time: Optional[float] = None
     created_at: datetime.datetime = Field(None, description='data time', dft_time='now')
+    is_del: bool = False
+    
+    
+class TweetSchedule(Model):
+    __table_name__ = 'tweet_schedules'
+    
+    name: str = Field(..., max_length=255, json_schema_extra={'unique': True})
+    cron_schedule: str = Field(..., max_length=255)
+    enabled: bool = True
+    last_run: Optional[datetime.datetime] = None
+    next_run: Optional[datetime.datetime] = None
+    task_parameters: Dict[str, Any] = Field(default_factory=dict)
+    created_at: Optional[datetime.datetime] = Field(default_factory=datetime.datetime.now, json_schema_extra={'dft_time': 'now'})
+    updated_at: Optional[datetime.datetime] = Field(default_factory=datetime.datetime.now, json_schema_extra={'dft_time': 'now'})
     is_del: bool = False

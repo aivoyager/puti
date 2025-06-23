@@ -23,4 +23,4 @@ class TwitWhiz(Role):
     )
 
     def model_post_init(self, __context: Any) -> None:
-        self.agent_node.conf.MODEL = 'gpt-4.5-preview'
+        self.llm.conf.MODEL = 'gpt-4.5-preview'

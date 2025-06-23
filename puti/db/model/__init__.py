@@ -5,7 +5,9 @@
 """
 
 from pydantic import BaseModel
+from typing import Optional
 
 
 class Model(BaseModel):
     __table_name__ = ''
+    id: Optional[int] = None

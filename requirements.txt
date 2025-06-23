@@ -23,3 +23,5 @@ numpy==2.3.0
 numexpr==2.11.0
 celery==5.5.3
 tenacity==9.1.2
+croniter==2.0.2
+pymysql==1.1.1

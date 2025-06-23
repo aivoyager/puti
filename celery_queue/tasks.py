@@ -15,9 +15,15 @@ from celery import shared_task
 from tenacity import retry, stop_after_attempt, wait_fixed, RetryCallState
 
 from puti.conf.client_config import TwitterConfig
-from puti.llm.roles.cz import CZ
+from puti.llm.roles.agents import CZ
 from puti.llm.roles.x_bot import TwitWhiz
-from puti.db.mysql_operator import MysqlOperator
+from puti.db.sqlite_operator import SQLiteOperator
+from puti.db.model.task.bot_task import TweetSchedule
+from puti.llm.actions.x_bot import GenerateTweetAction, PublishTweetAction
+from puti.llm.roles.agents import EthanG
+from puti.llm.workflow import Workflow
+from puti.llm.graph import Graph, Vertex
+from croniter import croniter
 
 lgr = logger_factory.default
 cz = CZ()
@@ -93,7 +99,7 @@ def periodic_get_mentions():
 def periodic_reply_to_tweet():
     start_time = datetime.now()
     try:
-        db = MysqlOperator()
+        db = SQLiteOperator()
         sql = "SELECT text, author_id, mention_id FROM twitter_mentions WHERE replied=0 AND is_del=0"
         rows = db.fetchall(sql)
         lgr.debug(f'[定时任务] 查询待回复mentions数量: {len(rows)}')
@@ -124,4 +130,104 @@ def periodic_reply_to_tweet():
         lgr.debug(f'[定时任务] reply_to_tweet 任务执行失败: {e.__class__.__name__} {str(e)}. {traceback.format_exc()}')
     finally:
         lgr.debug(f'============== [定时任务] periodic_reply_to_tweet 执行结束 ==============')
+    return 'ok'
+
+
+@shared_task()
+async def generate_tweet_task(topic: str = None):
+    """
+    Task that uses the test_generate_tweet_graph function to generate and post tweets.
+    Accepts an optional topic to guide tweet generation.
+    """
+    start_time = datetime.now()
+    try:
+        lgr.info(f'[定时任务] generate_tweet_task 开始执行')
+        
+        generate_tweet_action = GenerateTweetAction()
+        post_tweet_action = PublishTweetAction()
+
+        ethan = EthanG()
+
+        # Pass the topic to the action
+        generate_tweet_vertex = Vertex(id='generate_tweet', action=generate_tweet_action, topic=topic)
+        post_tweet_vertex = Vertex(id='post_tweet', action=post_tweet_action, role=ethan)
+
+        graph = Graph()
+        graph.add_vertices(generate_tweet_vertex, post_tweet_vertex)
+        graph.add_edge(generate_tweet_vertex.id, post_tweet_vertex.id)
+        graph.set_start_vertex(generate_tweet_vertex.id)
+
+        workflow = Workflow(graph=graph)
+        resp = await workflow.run_until_vertex(post_tweet_vertex.id)
+        
+        lgr.info(f'[定时任务] 生成推文任务执行完成，耗时: {(datetime.now() - start_time).total_seconds():.2f}秒')
+        lgr.info(f'[定时任务] 生成推文结果: {resp}')
+        return resp
+    except Exception as e:
+        lgr.error(f'[定时任务] 生成推文任务执行失败: {e.__class__.__name__} {str(e)}. {traceback.format_exc()}')
+    finally:
+        lgr.info(f'============== [定时任务] generate_tweet_task 执行结束 ==============')
+    return 'ok'
+
+
+@shared_task()
+def check_dynamic_schedules():
+    """
+    Task to check for dynamic schedules in the database and trigger tasks as needed.
+    This task should be scheduled to run frequently (e.g., every minute) to check if any
+    dynamically scheduled tasks need to be executed.
+    """
+    now = datetime.now()
+    lgr.debug(f'[定时任务] Checking dynamic schedules at {now}')
+    
+    try:
+        # Use SQLite operator to access the database
+        db = SQLiteOperator()
+        
+        # Get all enabled schedules
+        schedules = db.fetchall(
+            "SELECT id, name, cron_schedule, last_run, task_parameters FROM tweet_schedules WHERE enabled=1 AND is_del=0"
+        )
+        
+        for schedule in schedules:
+            schedule_id, name, cron_expr, last_run, params = schedule['id'], schedule['name'], schedule['cron_schedule'], schedule['last_run'], schedule['task_parameters']
+            
+            # Parse parameters
+            task_params = json.loads(params) if params else {}
+            
+            # If last_run is None, set it to a past date
+            if not last_run:
+                last_run = datetime.fromtimestamp(0)
+            else:
+                last_run = datetime.fromisoformat(last_run)
+            
+            # Check if schedule should run now
+            cron = croniter(cron_expr, last_run)
+            next_run = cron.get_next(datetime)
+            
+            if next_run <= now:
+                lgr.info(f'[定时任务] Executing schedule "{name}" (ID: {schedule_id})')
+                
+                # Execute the tweet generation task, passing parameters
+                loop = asyncio.get_event_loop()
+                result = loop.run_until_complete(generate_tweet_task(**task_params))
+                
+                # Update the last_run time
+                db.execute(
+                    "UPDATE tweet_schedules SET last_run=?, next_run=?, updated_at=? WHERE id=?",
+                    (now.isoformat(), cron.get_next(datetime).isoformat(), now.isoformat(), schedule_id)
+                )
+                
+                lgr.info(f'[定时任务] Schedule "{name}" executed successfully, result: {result}')
+            else:
+                # Update next_run time without triggering the task
+                db.execute(
+                    "UPDATE tweet_schedules SET next_run=? WHERE id=?",
+                    (next_run.isoformat(), schedule_id)
+                )
+                lgr.debug(f'[定时任务] Schedule "{name}" next run at {next_run}')
+    
+    except Exception as e:
+        lgr.error(f'[定时任务] Error checking dynamic schedules: {str(e)}. {traceback.format_exc()}')
+    
     return 'ok'

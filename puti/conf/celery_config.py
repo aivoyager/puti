@@ -54,6 +54,8 @@ task_routes = {
     'celery_queue.tasks.add': {'queue': 'default'},
     'celery_queue.tasks.periodic_reply_to_tweet': {'queue': 'default'},
     'celery_queue.tasks.RunEthanTweetingTask': {'queue': 'high_priority'},
+    'celery_queue.tasks.generate_tweet_task': {'queue': 'high_priority'},
+    'celery_queue.tasks.check_dynamic_schedules': {'queue': 'default'},
 }
 
 # Schedule settings
@@ -76,6 +78,13 @@ beat_schedule = {
         'args': (),
         'kwargs': {'save_results': True},
         'options': {'queue': 'high_priority'}
+    },
+    # Check dynamic schedules every minute
+    'check-dynamic-schedules': {
+        'task': 'celery_queue.tasks.check_dynamic_schedules',
+        'schedule': crontab(minute='*'),  # Run every minute
+        'args': (),
+        'options': {'queue': 'default'}
     },
 }
 
