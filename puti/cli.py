@@ -141,6 +141,7 @@ def set(schedule, topic):
     """Creates or updates the schedule for the CLI-managed tweet task."""
     from puti.db.schedule_manager import ScheduleManager
     from puti.db.model.task.bot_task import TweetSchedule
+    from celery_queue.tasks import check_dynamic_schedules
     lgr = logger_factory.default
     lgr.info("Setting the tweet schedule...")
 
@@ -169,12 +170,18 @@ def set(schedule, topic):
         lgr.info(f"Created new schedule '{schedule_name}'.")
         click.echo(f"Created new schedule '{schedule_name}'.")
 
+    # Trigger an immediate check to apply the changes without waiting for the next minute.
+    result = check_dynamic_schedules.delay()
+    click.echo("Triggered an immediate schedule re-check.")
+    click.echo(f"  - Re-check Task ID: {result.id}")
+
 
 @scheduler.command()
 def stop():
     """Stops the tweet scheduler daemon and disables the schedule."""
     from puti.scheduler import SchedulerDaemon
     from puti.db.schedule_manager import ScheduleManager
+    from celery_queue.tasks import check_dynamic_schedules
     from puti.db.model.task.bot_task import TweetSchedule
     lgr = logger_factory.default
     lgr.info("Stopping the tweet scheduler...")
@@ -190,6 +197,10 @@ def stop():
         schedule_manager.update(existing_schedule.id, {"enabled": False})
         lgr.info(f"Disabled schedule '{schedule_name}' in the database.")
         click.echo(f"Disabled schedule '{schedule_name}'.")
+        # Trigger an immediate check to ensure the disabled task stops firing.
+        result = check_dynamic_schedules.delay()
+        click.echo("Triggered an immediate schedule re-check.")
+        click.echo(f"  - Re-check Task ID: {result.id}")
 
 
 if __name__ == '__main__':
