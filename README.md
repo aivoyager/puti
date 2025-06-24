@@ -181,6 +181,38 @@ class SoftwareEngineer(McpRole):
     goal: str = 'Your goal is to design, implement, and maintain scalable and robust software systems that meet user requirements and business objectives...'
 ```
 
+### 5. 📅 Using the Task Scheduler
+Puti includes a powerful task scheduler for automated tweet generation and other recurring tasks.
+
+```bash
+# List all scheduled tasks
+puti scheduler list
+
+# Create a new scheduled task (runs daily at 12:00)
+puti scheduler create daily_tweet "0 12 * * *" --topic "AI News"
+
+# Enable or disable a specific task
+puti scheduler enable 1
+puti scheduler disable 1
+
+# Manually run a specific task
+puti scheduler run 1
+
+# Start or stop the scheduler daemon
+puti scheduler start
+puti scheduler stop
+```
+
+To get started, use the provided environment setup script:
+
+```bash
+# Sets up the virtual environment and installs dependencies
+./puti-activate
+
+# Then you can use the scheduler commands
+puti scheduler list
+```
+
 ## 🤝 Contributing
 
 Contributions are welcome! Please refer to the contribution guide (if available) or contribute by submitting Issues or Pull Requests.

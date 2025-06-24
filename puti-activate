@@ -1,0 +1,46 @@
+#!/bin/bash
+
+# puti-activate: A script to help users set up the correct environment for puti commands
+
+# Set the path to the Puti project directory
+PUTI_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$PUTI_DIR"
+
+# Set the PUTI_DATA_PATH environment variable if not already set
+if [ -z "$PUTI_DATA_PATH" ]; then
+    export PUTI_DATA_PATH="$HOME/puti/data"
+    mkdir -p "$PUTI_DATA_PATH"
+    echo "Set PUTI_DATA_PATH to $PUTI_DATA_PATH"
+fi
+
+# Check if virtual environment exists, if not create it
+VENV_DIR="$PUTI_DIR/venv"
+if [ ! -d "$VENV_DIR" ]; then
+    echo "Creating virtual environment in $VENV_DIR"
+    python -m venv "$VENV_DIR"
+fi
+
+# Activate the virtual environment
+echo "Activating virtual environment..."
+source "$VENV_DIR/bin/activate"
+
+# Install or update the package in development mode
+echo "Installing/updating puti in development mode..."
+pip install -e .
+
+# Print usage instructions
+echo ""
+echo -e "\033[32mPuti environment is ready!\033[0m"
+echo -e "You can now use the \033[1mputi\033[0m command."
+echo ""
+echo "Examples:"
+echo "  puti scheduler list           # List all scheduled tasks"
+echo "  puti scheduler create name \"0 12 * * *\" --topic \"AI News\"  # Create a task"
+echo "  puti scheduler run 1          # Run a specific task"
+echo ""
+echo "To activate this environment in the future, run:"
+echo "  source $VENV_DIR/bin/activate"
+echo ""
+
+# Keep the session in the virtual environment
+exec "$SHELL" 

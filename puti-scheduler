@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# puti-scheduler: A wrapper script for puti scheduler commands
+# puti-scheduler: A wrapper script that redirects to the new puti command
 
 # Set the path to the Puti project directory
 PUTI_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -13,91 +13,88 @@ if [ -z "$PUTI_DATA_PATH" ]; then
     echo "Set PUTI_DATA_PATH to $PUTI_DATA_PATH"
 fi
 
-# Function to show usage
-show_usage() {
-    echo "Puti Scheduler Control"
-    echo ""
-    echo "Usage: puti-scheduler COMMAND [OPTIONS]"
-    echo ""
-    echo "Commands:"
-    echo "  start           Start the scheduler daemon"
-    echo "  stop            Stop the scheduler daemon"
-    echo "  status          Check if the scheduler daemon is running"
-    echo "  list            List all scheduled tasks"
-    echo "  create          Create a new scheduled tweet task"
-    echo "  enable ID       Enable a specific schedule by ID"
-    echo "  disable ID      Disable a specific schedule by ID"
-    echo "  delete ID       Delete a specific schedule by ID"
-    echo "  run ID          Manually run a specific schedule task"
-    echo "  alias           Show mapping between puti scheduler and puti-cmd commands"
-    echo ""
-    echo "Examples:"
-    echo "  puti-scheduler start              # Start the scheduler daemon"
-    echo "  puti-scheduler create daily_tweet \"0 12 * * *\" --topic \"AI News\""
-    echo "  puti-scheduler list               # List all scheduled tasks"
-    echo "  puti-scheduler run 1              # Manually run schedule with ID 1"
-    echo ""
-    echo "This is a wrapper for both puti-cmd and puti scheduler commands."
-    echo "You can use either approach based on your preference."
-    echo ""
-}
+# Print migration warning
+echo -e "\033[33mWARNING: The puti-scheduler command is deprecated.\033[0m"
+echo "Please use 'puti scheduler' instead. For example:"
+echo "  puti scheduler list"
+echo "  puti scheduler create <name> <cron_schedule>"
+echo ""
 
-# Map command to either python module or puti-cmd
+# Check if the python environment is properly set up
+if ! command -v puti &> /dev/null; then
+    echo -e "\033[31mWarning: puti command not found in PATH.\033[0m"
+    echo "Make sure you have activated the puti virtual environment."
+    echo "Example: source /path/to/puti/venv/bin/activate"
+    echo ""
+    echo "Attempting to use local puti installation..."
+fi
+
+# Map command to the new puti scheduler commands
 case "$1" in
     start)
-        ./puti-cmd start "${@:2}"
+        echo -e "\033[32mExecuting: puti scheduler start\033[0m"
+        echo "---------------------------------------------"
+        puti scheduler start "${@:2}" 2>/dev/null || python -m puti.cli scheduler start "${@:2}"
         ;;
     stop)
-        ./puti-cmd stop "${@:2}"
+        echo -e "\033[32mExecuting: puti scheduler stop\033[0m"
+        echo "---------------------------------------------"
+        puti scheduler stop "${@:2}" 2>/dev/null || python -m puti.cli scheduler stop "${@:2}"
         ;;
     status)
-        ./puti-cmd status "${@:2}"
+        echo -e "\033[32mExecuting: puti scheduler status\033[0m"
+        echo "---------------------------------------------"
+        puti scheduler status "${@:2}" 2>/dev/null || python -m puti.cli scheduler status "${@:2}"
         ;;
     list)
-        ./puti-cmd list "${@:2}"
+        echo -e "\033[32mExecuting: puti scheduler list\033[0m"
+        echo "---------------------------------------------"
+        puti scheduler list "${@:2}" 2>/dev/null || python -m puti.cli scheduler list "${@:2}"
         ;;
     create)
-        ./puti-cmd create "${@:2}"
+        echo -e "\033[32mExecuting: puti scheduler create\033[0m"
+        echo "---------------------------------------------"
+        puti scheduler create "${@:2}" 2>/dev/null || python -m puti.cli scheduler create "${@:2}"
         ;;
     enable)
-        ./puti-cmd enable "${@:2}"
+        echo -e "\033[32mExecuting: puti scheduler enable\033[0m"
+        echo "---------------------------------------------"
+        puti scheduler enable "${@:2}" 2>/dev/null || python -m puti.cli scheduler enable "${@:2}"
         ;;
     disable)
-        ./puti-cmd disable "${@:2}"
+        echo -e "\033[32mExecuting: puti scheduler disable\033[0m"
+        echo "---------------------------------------------"
+        puti scheduler disable "${@:2}" 2>/dev/null || python -m puti.cli scheduler disable "${@:2}"
         ;;
     delete)
-        ./puti-cmd delete "${@:2}"
+        echo -e "\033[32mExecuting: puti scheduler delete\033[0m"
+        echo "---------------------------------------------"
+        puti scheduler delete "${@:2}" 2>/dev/null || python -m puti.cli scheduler delete "${@:2}"
         ;;
     run)
-        ./puti-cmd run "${@:2}"
-        ;;
-    alias)
-        echo "Command Mapping"
-        echo ""
-        echo "| puti scheduler     | puti-cmd  | Description              |"
-        echo "|-------------------|-----------|--------------------------|"
-        echo "| start_daemon      | start     | Start the scheduler daemon"
-        echo "| stop_daemon       | stop      | Stop the scheduler daemon"
-        echo "| daemon_status     | status    | Check scheduler status"
-        echo "| list              | list      | List scheduled tasks"
-        echo "| set               | create    | Create/update a schedule"
-        echo "| toggle --enable   | enable    | Enable a schedule"
-        echo "| toggle --disable  | disable   | Disable a schedule"
-        echo "| delete            | delete    | Delete a schedule"
-        echo "| run               | run       | Manually run a task"
-        echo ""
-        echo "Note: You can use either command set based on your preference."
+        echo -e "\033[32mExecuting: puti scheduler run\033[0m"
+        echo "---------------------------------------------"
+        puti scheduler run "${@:2}" 2>/dev/null || python -m puti.cli scheduler run "${@:2}"
         ;;
     help|--help|-h)
-        show_usage
+        echo -e "\033[32mExecuting: puti scheduler --help\033[0m"
+        echo "---------------------------------------------"
+        puti scheduler --help 2>/dev/null || python -m puti.cli scheduler --help
         ;;
     *)
+        # If no arguments provided, show help
         if [ -z "$1" ]; then
-            show_usage
+            echo -e "\033[32mExecuting: puti scheduler --help\033[0m"
+            echo "---------------------------------------------"
+            puti scheduler --help 2>/dev/null || python -m puti.cli scheduler --help
         else
             echo "Unknown command: $1"
-            echo "Use 'puti-scheduler --help' to see available commands"
+            echo "Use 'puti scheduler --help' to see available commands"
             exit 1
         fi
         ;;
-esac 
+esac
+
+# Remind about the migration
+echo ""
+echo -e "\033[33mReminder: Please use 'puti scheduler' for all scheduler commands in the future.\033[0m" 

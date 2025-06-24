@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# puti-cmd: A script to control the Puti tweet scheduler
+# puti-cmd: A wrapper script that redirects to the new puti scheduler command
 
 # Set the path to the Puti project directory
 PUTI_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -13,111 +13,48 @@ if [ -z "$PUTI_DATA_PATH" ]; then
     echo "Set PUTI_DATA_PATH to $PUTI_DATA_PATH"
 fi
 
-# Function to show usage
-show_usage() {
-    echo "Puti Tweet Scheduler Control"
-    echo ""
-    echo "Usage: puti-cmd COMMAND [OPTIONS]"
-    echo ""
-    echo "Commands:"
-    echo "  start           Start the scheduler daemon"
-    echo "  stop            Stop the scheduler daemon"
-    echo "  status          Check if the scheduler daemon is running"
-    echo "  list            List all scheduled tasks"
-    echo "  create          Create a new scheduled tweet task"
-    echo "  enable ID       Enable a specific schedule by ID"
-    echo "  disable ID      Disable a specific schedule by ID"
-    echo "  delete ID       Delete a specific schedule by ID"
-    echo "  run ID          Manually run a specific schedule task"
-    echo ""
-    echo "Examples:"
-    echo "  puti-cmd start              # Start the scheduler daemon"
-    echo "  puti-cmd create daily_tweet \"0 12 * * *\" --topic \"AI News\""
-    echo "  puti-cmd list               # List all scheduled tasks"
-    echo "  puti-cmd run 1              # Manually run schedule with ID 1"
-    echo ""
-}
+# Print migration warning
+echo -e "\033[33mWARNING: The puti-cmd command is deprecated.\033[0m"
+echo "Please use 'puti scheduler' instead. For example:"
+echo "  puti scheduler list"
+echo "  puti scheduler create <name> <cron_schedule>"
+echo ""
 
-# Command handling
+# Check if the python environment is properly set up
+if ! command -v puti &> /dev/null; then
+    echo -e "\033[31mWarning: puti command not found in PATH.\033[0m"
+    echo "Make sure you have activated the puti virtual environment."
+    echo "Example: source /path/to/puti/venv/bin/activate"
+    echo ""
+    echo "Attempting to use local puti installation..."
+fi
+
+# Map command to the new puti scheduler commands
 case "$1" in
     start)
-        shift
-        python -c "
-import atexit
-from puti.scheduler import SchedulerDaemon, cleanup_daemon
-
-# Unregister the cleanup function to prevent automatic shutdown
-atexit.unregister(cleanup_daemon)
-
-# Start the daemon
-SchedulerDaemon().start()
-"
+        echo -e "\033[32mExecuting: puti scheduler start\033[0m"
+        echo "---------------------------------------------"
+        puti scheduler start "${@:2}" 2>/dev/null || python -m puti.cli scheduler start "${@:2}"
         ;;
     stop)
-        python -c "
-import atexit
-from puti.scheduler import SchedulerDaemon, cleanup_daemon
-
-# Unregister the cleanup function to prevent automatic shutdown
-atexit.unregister(cleanup_daemon)
-
-# Stop the daemon
-SchedulerDaemon().stop()
-"
+        echo -e "\033[32mExecuting: puti scheduler stop\033[0m"
+        echo "---------------------------------------------"
+        puti scheduler stop "${@:2}" 2>/dev/null || python -m puti.cli scheduler stop "${@:2}"
         ;;
     status)
-        python -c "
-import atexit
-from puti.scheduler import SchedulerDaemon, cleanup_daemon
-
-# Unregister the cleanup function to prevent automatic shutdown
-atexit.unregister(cleanup_daemon)
-
-# Check status
-daemon = SchedulerDaemon()
-running = daemon.is_running()
-pid = daemon._get_pid() if running else None
-print(f'Scheduler is {\"running with PID \" + str(pid) if running else \"not running\"}')
-"
+        echo -e "\033[32mExecuting: puti scheduler status\033[0m"
+        echo "---------------------------------------------"
+        puti scheduler status "${@:2}" 2>/dev/null || python -m puti.cli scheduler status "${@:2}"
         ;;
     list)
-        python -c "
-from puti.db.schedule_manager import ScheduleManager
-from rich.console import Console
-from rich.table import Table
-
-console = Console()
-manager = ScheduleManager()
-schedules = manager.get_all()
-
-if not schedules:
-    console.print('[yellow]No schedules found in the database.[/yellow]')
-else:
-    table = Table(title='All Scheduled Tasks')
-    table.add_column('ID', style='dim')
-    table.add_column('Name', style='cyan')
-    table.add_column('Cron Schedule', style='green')
-    table.add_column('Enabled', style='yellow')
-    table.add_column('Running', style='bright_green')
-    
-    for idx, schedule in enumerate(schedules, 1):
-        # Use row id or index if id is None
-        schedule_id = str(schedule.id) if schedule.id is not None else str(idx)
-        table.add_row(
-            schedule_id,
-            schedule.name,
-            schedule.cron_schedule,
-            '✅' if schedule.enabled else '❌',
-            '✅' if schedule.is_running else '❌'
-        )
-    
-    console.print(table)
-"
+        echo -e "\033[32mExecuting: puti scheduler list\033[0m"
+        echo "---------------------------------------------"
+        puti scheduler list "${@:2}" 2>/dev/null || python -m puti.cli scheduler list "${@:2}"
         ;;
     create)
         if [ "$#" -lt 3 ]; then
             echo "Error: Missing required arguments for create command"
-            echo "Usage: puti-scheduler create NAME CRON_SCHEDULE [--topic TOPIC] [--disabled]"
+            echo "Usage: puti scheduler create NAME CRON_SCHEDULE [--topic TOPIC] [--disabled]"
             exit 1
         fi
         
@@ -127,16 +64,16 @@ else:
         
         # Parse optional arguments
         topic=""
-        enabled="True"
+        disabled=""
         
         while [ "$#" -gt 0 ]; do
             case "$1" in
                 --topic)
-                    topic="$2"
+                    topic="--topic $2"
                     shift 2
                     ;;
                 --disabled)
-                    enabled="False"
+                    disabled="--disabled"
                     shift
                     ;;
                 *)
@@ -146,194 +83,78 @@ else:
             esac
         done
         
-        python -c "
-from puti.db.schedule_manager import ScheduleManager
-import sys
-
-try:
-    name = '$name'
-    cron = '$cron'
-    topic = '$topic' if '$topic' else None
-    enabled = $enabled
-    
-    # Set up parameters
-    params = {}
-    if topic:
-        params['topic'] = topic
-    
-    # Create schedule
-    manager = ScheduleManager()
-    schedule = manager.create_schedule(
-        name=name,
-        cron_schedule=cron,
-        enabled=enabled,
-        params=params
-    )
-    
-    print(f\"Created tweet schedule '{name}' (ID: {schedule.id})\")
-    
-    if enabled:
-        try:
-            from celery_queue.simplified_tasks import check_dynamic_schedules
-            check_dynamic_schedules.delay()
-            print(\"Triggered schedule registration\")
-        except Exception as err:
-            print(f\"Note: Could not trigger immediate check: {err}\")
-            print(\"Schedule was created but may not be active until Celery Beat restarts\")
-except Exception as e:
-    print(f\"Error creating schedule: {str(e)}\", file=sys.stderr)
-    sys.exit(1)
-"
+        echo -e "\033[32mExecuting: puti scheduler create $name \"$cron\" $topic $disabled\033[0m"
+        echo "---------------------------------------------"
+        puti scheduler create "$name" "$cron" $topic $disabled 2>/dev/null || \
+            python -m puti.cli scheduler create "$name" "$cron" $topic $disabled
         ;;
     enable)
         if [ "$#" -lt 2 ]; then
             echo "Error: Missing schedule ID"
-            echo "Usage: puti-scheduler enable ID"
+            echo "Usage: puti scheduler enable ID"
             exit 1
         fi
         
         id="$2"
-        python -c "
-from puti.db.schedule_manager import ScheduleManager
-import sys
-
-try:
-    manager = ScheduleManager()
-    schedule = manager.get_by_id($id)
-    
-    if not schedule:
-        print(f\"Error: Schedule with ID $id not found.\", file=sys.stderr)
-        sys.exit(1)
-    
-    manager.update_schedule($id, enabled=True)
-    print(f\"Schedule '{schedule.name}' (ID: $id) has been enabled.\")
-    
-    try:
-        from celery_queue.simplified_tasks import check_dynamic_schedules
-        check_dynamic_schedules.delay()
-        print(\"Triggered an immediate schedule check.\")
-    except Exception as err:
-        print(f\"Note: Could not trigger immediate check: {err}\")
-        print(\"Schedule was enabled but may not be active until Celery Beat restarts\")
-except Exception as e:
-    print(f\"Error enabling schedule: {str(e)}\", file=sys.stderr)
-    sys.exit(1)
-"
+        echo -e "\033[32mExecuting: puti scheduler enable $id\033[0m"
+        echo "---------------------------------------------"
+        puti scheduler enable $id 2>/dev/null || python -m puti.cli scheduler enable $id
         ;;
     disable)
         if [ "$#" -lt 2 ]; then
             echo "Error: Missing schedule ID"
-            echo "Usage: puti-scheduler disable ID"
+            echo "Usage: puti scheduler disable ID"
             exit 1
         fi
         
         id="$2"
-        python -c "
-from puti.db.schedule_manager import ScheduleManager
-import sys
-
-try:
-    manager = ScheduleManager()
-    schedule = manager.get_by_id($id)
-    
-    if not schedule:
-        print(f\"Error: Schedule with ID $id not found.\", file=sys.stderr)
-        sys.exit(1)
-    
-    manager.update_schedule($id, enabled=False)
-    print(f\"Schedule '{schedule.name}' (ID: $id) has been disabled.\")
-except Exception as e:
-    print(f\"Error disabling schedule: {str(e)}\", file=sys.stderr)
-    sys.exit(1)
-"
+        echo -e "\033[32mExecuting: puti scheduler disable $id\033[0m"
+        echo "---------------------------------------------"
+        puti scheduler disable $id 2>/dev/null || python -m puti.cli scheduler disable $id
         ;;
     delete)
         if [ "$#" -lt 2 ]; then
             echo "Error: Missing schedule ID"
-            echo "Usage: puti-scheduler delete ID"
+            echo "Usage: puti scheduler delete ID"
             exit 1
         fi
         
         id="$2"
-        python -c "
-from puti.db.schedule_manager import ScheduleManager
-import sys
-
-try:
-    manager = ScheduleManager()
-    schedule = manager.get_by_id($id)
-    
-    if not schedule:
-        print(f\"Error: Schedule with ID $id not found.\", file=sys.stderr)
-        sys.exit(1)
-    
-    # Stop the task if it's running
-    if schedule.is_running:
-        manager.stop_task($id)
-    
-    # Delete the schedule
-    manager.delete($id, soft_delete=False)
-    print(f\"Schedule '{schedule.name}' (ID: $id) has been deleted.\")
-except Exception as e:
-    print(f\"Error deleting schedule: {str(e)}\", file=sys.stderr)
-    sys.exit(1)
-"
+        echo -e "\033[32mExecuting: puti scheduler delete $id\033[0m"
+        echo "---------------------------------------------"
+        puti scheduler delete $id 2>/dev/null || python -m puti.cli scheduler delete $id
         ;;
     run)
         if [ "$#" -lt 2 ]; then
             echo "Error: Missing schedule ID"
-            echo "Usage: puti-scheduler run ID"
+            echo "Usage: puti scheduler run ID"
             exit 1
         fi
         
         id="$2"
-        python -c "
-from puti.db.schedule_manager import ScheduleManager
-import sys
-
-try:
-    manager = ScheduleManager()
-    schedule = manager.get_by_id($id)
-    
-    if not schedule:
-        print(f\"Error: Schedule with ID $id not found.\", file=sys.stderr)
-        sys.exit(1)
-    
-    # Get parameters from schedule
-    params = schedule.params or {}
-    topic = params.get('topic')
-    
-    # Directly use the simplified task
-    try:
-        from celery_queue.simplified_tasks import generate_tweet_task
-        task = generate_tweet_task.delay(topic=topic)
-        print(f\"Started task for schedule '{schedule.name}' (ID: $id)\")
-        
-        # Update the schedule record
-        import datetime
-        manager.update_schedule($id, 
-            is_running=True,
-            last_run=datetime.datetime.now(),
-            task_id=task.id
-        )
-    except Exception as task_err:
-        print(f\"Error starting task: {str(task_err)}\", file=sys.stderr)
-        sys.exit(1)
-except Exception as e:
-    print(f\"Error running schedule: {str(e)}\", file=sys.stderr)
-    sys.exit(1)
-"
+        echo -e "\033[32mExecuting: puti scheduler run $id\033[0m"
+        echo "---------------------------------------------"
+        puti scheduler run $id 2>/dev/null || python -m puti.cli scheduler run $id
         ;;
     help|--help|-h)
-        show_usage
+        echo -e "\033[32mExecuting: puti scheduler --help\033[0m"
+        echo "---------------------------------------------"
+        puti scheduler --help 2>/dev/null || python -m puti.cli scheduler --help
         ;;
     *)
+        # If no arguments provided, show help
         if [ -z "$1" ]; then
-            show_usage
+            echo -e "\033[32mExecuting: puti scheduler --help\033[0m"
+            echo "---------------------------------------------"
+            puti scheduler --help 2>/dev/null || python -m puti.cli scheduler --help
         else
             echo "Unknown command: $1"
-            echo "Use 'puti-scheduler --help' to see available commands"
+            echo "Use 'puti scheduler --help' to see available commands"
             exit 1
         fi
         ;;
-esac 
+esac
+
+# Remind about the migration
+echo ""
+echo -e "\033[33mReminder: Please use 'puti scheduler' for all scheduler commands in the future.\033[0m" 
