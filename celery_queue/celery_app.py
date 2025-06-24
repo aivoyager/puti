@@ -5,16 +5,22 @@
 """
 from celery import Celery
 from puti.conf import celery_config
-# from . import tasks
+# Import the simplified tasks directly instead of using autodiscover
+from celery_queue.simplified_tasks import check_dynamic_schedules, generate_tweet_task
 
 
 def make_celery(app_name):
     cel_app = Celery(app_name)
     cel_app.conf.update(result_expires=3600)
     cel_app.config_from_object(celery_config)
-    # 确保自动发现包含所有任务模块
-    cel_app.autodiscover_tasks(packages=['celery_queue'], related_name='tasks')
+    
+    # Register our tasks manually instead of using autodiscover
+    # This avoids loading problematic modules
+    cel_app.tasks.register(check_dynamic_schedules)
+    cel_app.tasks.register(generate_tweet_task)
+    
     return cel_app
 
 
-celery_app = make_celery('tasks')
+app = make_celery('tasks')
+celery_app = app  # For backwards compatibility

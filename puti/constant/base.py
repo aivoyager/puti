@@ -45,6 +45,8 @@ class Pathh(Base):
     INDEX_FILE = (str(Path.home() / 'puti' / 'index.faiss'), 'PuTi index file')
     INDEX_TEXT = (str(Path.home() / 'puti' / 'index.txt'), 'PuTi index text file')
 
+    SQLITE_FILE = (str(Path.home() / 'puti' / 'db.sqlite'), 'PuTi sqlite file')
+
 
 class Modules(Base):
     CLIENT = ('client', 'client module')

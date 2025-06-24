@@ -119,24 +119,29 @@ class ScheduleManager(BaseManager):
             return True
             
         # Start the Celery task
-        from celery_queue.tasks import generate_tweet_task
-        
-        # Get parameters from schedule
-        params = schedule.params or {}
-        topic = params.get('topic')
-        
-        # Trigger the task
-        result = generate_tweet_task.delay(topic=topic)
-        
-        # Update the schedule with task info
-        self.update(schedule_id, {
-            "is_running": True,
-            "pid": None,  # We don't have direct access to worker PID
-            "last_run": datetime.datetime.now()
-        })
-        
-        lgr.info(f"Started task for schedule '{schedule.name}' (ID: {schedule_id})")
-        return True
+        try:
+            from celery_queue.simplified_tasks import generate_tweet_task
+            
+            # Get parameters from schedule
+            params = schedule.params or {}
+            topic = params.get('topic')
+            
+            # Trigger the task
+            result = generate_tweet_task.delay(topic=topic)
+            
+            # Update the schedule with task info
+            self.update(schedule_id, {
+                "is_running": True,
+                "pid": None,  # We don't have direct access to worker PID
+                "last_run": datetime.datetime.now(),
+                "task_id": result.id
+            })
+            
+            lgr.info(f"Started task for schedule '{schedule.name}' (ID: {schedule_id})")
+            return True
+        except Exception as e:
+            lgr.error(f"Error starting task for schedule '{schedule.name}': {str(e)}")
+            return False
     
     def stop_task(self, schedule_id: int) -> bool:
         """

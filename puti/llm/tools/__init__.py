@@ -6,7 +6,8 @@
 import inspect
 
 from puti.utils.common import tool_args_to_fc_schema
-from typing import Annotated, Dict, TypedDict, Any, Required, NotRequired, List, Type, Set, cast, Optional
+from typing import Annotated, Dict, TypedDict, Any, List, Type, Set, cast, Optional
+from typing_extensions import Required, NotRequired
 from pydantic import BaseModel, Field, ConfigDict
 from abc import ABC, abstractmethod
 from puti.logs import logger_factory

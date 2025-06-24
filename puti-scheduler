@@ -1,0 +1,103 @@
+#!/bin/bash
+
+# puti-scheduler: A wrapper script for puti scheduler commands
+
+# Set the path to the Puti project directory
+PUTI_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$PUTI_DIR"
+
+# Set the PUTI_DATA_PATH environment variable if not already set
+if [ -z "$PUTI_DATA_PATH" ]; then
+    export PUTI_DATA_PATH="$HOME/puti/data"
+    mkdir -p "$PUTI_DATA_PATH"
+    echo "Set PUTI_DATA_PATH to $PUTI_DATA_PATH"
+fi
+
+# Function to show usage
+show_usage() {
+    echo "Puti Scheduler Control"
+    echo ""
+    echo "Usage: puti-scheduler COMMAND [OPTIONS]"
+    echo ""
+    echo "Commands:"
+    echo "  start           Start the scheduler daemon"
+    echo "  stop            Stop the scheduler daemon"
+    echo "  status          Check if the scheduler daemon is running"
+    echo "  list            List all scheduled tasks"
+    echo "  create          Create a new scheduled tweet task"
+    echo "  enable ID       Enable a specific schedule by ID"
+    echo "  disable ID      Disable a specific schedule by ID"
+    echo "  delete ID       Delete a specific schedule by ID"
+    echo "  run ID          Manually run a specific schedule task"
+    echo "  alias           Show mapping between puti scheduler and puti-cmd commands"
+    echo ""
+    echo "Examples:"
+    echo "  puti-scheduler start              # Start the scheduler daemon"
+    echo "  puti-scheduler create daily_tweet \"0 12 * * *\" --topic \"AI News\""
+    echo "  puti-scheduler list               # List all scheduled tasks"
+    echo "  puti-scheduler run 1              # Manually run schedule with ID 1"
+    echo ""
+    echo "This is a wrapper for both puti-cmd and puti scheduler commands."
+    echo "You can use either approach based on your preference."
+    echo ""
+}
+
+# Map command to either python module or puti-cmd
+case "$1" in
+    start)
+        ./puti-cmd start "${@:2}"
+        ;;
+    stop)
+        ./puti-cmd stop "${@:2}"
+        ;;
+    status)
+        ./puti-cmd status "${@:2}"
+        ;;
+    list)
+        ./puti-cmd list "${@:2}"
+        ;;
+    create)
+        ./puti-cmd create "${@:2}"
+        ;;
+    enable)
+        ./puti-cmd enable "${@:2}"
+        ;;
+    disable)
+        ./puti-cmd disable "${@:2}"
+        ;;
+    delete)
+        ./puti-cmd delete "${@:2}"
+        ;;
+    run)
+        ./puti-cmd run "${@:2}"
+        ;;
+    alias)
+        echo "Command Mapping"
+        echo ""
+        echo "| puti scheduler     | puti-cmd  | Description              |"
+        echo "|-------------------|-----------|--------------------------|"
+        echo "| start_daemon      | start     | Start the scheduler daemon"
+        echo "| stop_daemon       | stop      | Stop the scheduler daemon"
+        echo "| daemon_status     | status    | Check scheduler status"
+        echo "| list              | list      | List scheduled tasks"
+        echo "| set               | create    | Create/update a schedule"
+        echo "| toggle --enable   | enable    | Enable a schedule"
+        echo "| toggle --disable  | disable   | Disable a schedule"
+        echo "| delete            | delete    | Delete a schedule"
+        echo "| run               | run       | Manually run a task"
+        echo ""
+        echo "Note: You can use either command set based on your preference."
+        ;;
+    help|--help|-h)
+        show_usage
+        ;;
+    *)
+        if [ -z "$1" ]; then
+            show_usage
+        else
+            echo "Unknown command: $1"
+            echo "Use 'puti-scheduler --help' to see available commands"
+            exit 1
+        fi
+        ;;
+esac 

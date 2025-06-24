@@ -37,8 +37,8 @@ retry_delay = 3
 worker_log_level = 'INFO'
 beat_log_level = 'INFO'
 
-# Celery Beat Settings
-beat_scheduler = 'django_celery_beat.schedulers:DatabaseScheduler'
+# Celery Beat Settings - use the default scheduler
+beat_scheduler = 'celery.beat.PersistentScheduler'
 
 # Queue settings
 task_default_queue = 'default'
@@ -51,37 +51,15 @@ task_queues = (
 )
 
 task_routes = {
-    'celery_queue.tasks.add': {'queue': 'default'},
-    'celery_queue.tasks.periodic_reply_to_tweet': {'queue': 'default'},
-    'celery_queue.tasks.RunEthanTweetingTask': {'queue': 'high_priority'},
-    'celery_queue.tasks.generate_tweet_task': {'queue': 'high_priority'},
-    'celery_queue.tasks.check_dynamic_schedules': {'queue': 'default'},
+    'celery_queue.simplified_tasks.generate_tweet_task': {'queue': 'high_priority'},
+    'celery_queue.simplified_tasks.check_dynamic_schedules': {'queue': 'default'},
 }
 
 # Schedule settings
 beat_schedule = {
-    'add-every-30-seconds': {
-        'task': 'celery_queue.tasks.add',
-        'schedule': timedelta(seconds=3000),
-        'args': (16, 16),
-        'options': {'queue': 'low_priority'}
-    },
-    'reply-every-24-hours': {
-        'task': 'celery_queue.tasks.periodic_reply_to_tweet',
-        'schedule': crontab(minute=0, hour='*/24'),
-        'args': (),
-        'options': {'queue': 'low_priority'}
-    },
-    'ethan-daily-tweet': {
-        'task': 'celery_queue.tasks.RunEthanTweetingTask',
-        'schedule': crontab(hour=10, minute=0),  # Run daily at 10:00 AM
-        'args': (),
-        'kwargs': {'save_results': True},
-        'options': {'queue': 'high_priority'}
-    },
     # Check dynamic schedules every minute
     'check-dynamic-schedules': {
-        'task': 'celery_queue.tasks.check_dynamic_schedules',
+        'task': 'celery_queue.simplified_tasks.check_dynamic_schedules',
         'schedule': crontab(minute='*'),  # Run every minute
         'args': (),
         'options': {'queue': 'default'}

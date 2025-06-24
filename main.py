@@ -116,12 +116,19 @@ async def client_request(request: Request):
     return 'ok'
 
 
-@click.command()
+@click.group()
+def cli():
+    """Puti command line tools."""
+    pass
+
+
+@cli.command()
 @click.option("--host", default="0.0.0.0", help="Host to bind the server to")
 @click.option("--port", default=8000, help="Port to run the server on")
 @click.option("--reload", is_flag=True, help="Enable auto-reload during development")
 @click.option('--loop', default='asyncio')
-def run_server(host, port, reload, loop):
+def server(host, port, reload, loop):
+    """Run the FastAPI server."""
     uvicorn.run(
         app,
         host=host,
@@ -132,5 +139,52 @@ def run_server(host, port, reload, loop):
     )
 
 
+@click.group()
+def scheduler():
+    """
+    Manage tweet scheduler operations.
+    
+    This command group provides tools to:
+    
+    1. Start/stop the scheduler daemon
+    2. View task status and schedule information
+    """
+    pass
+
+
+@scheduler.command()
+@click.option('--start-tasks/--no-start-tasks', default=True, 
+              help="Whether to activate all enabled tasks when starting the daemon")
+def start(start_tasks):
+    """Start the scheduler daemon."""
+    from puti.scheduler import SchedulerDaemon
+    daemon = SchedulerDaemon()
+    daemon.start(activate_tasks=start_tasks)
+
+
+@scheduler.command()
+def stop():
+    """Stop the scheduler daemon."""
+    from puti.scheduler import SchedulerDaemon
+    daemon = SchedulerDaemon()
+    daemon.stop()
+
+
+@scheduler.command()
+def status():
+    """Check if the scheduler daemon is running."""
+    from puti.scheduler import SchedulerDaemon
+    daemon = SchedulerDaemon()
+    if daemon.is_running():
+        pid = daemon._get_pid()
+        click.echo(f"Scheduler is running with PID {pid}")
+    else:
+        click.echo("Scheduler is not running")
+
+
+# Add scheduler command group to main CLI
+cli.add_command(scheduler)
+
+
 if __name__ == '__main__':
-    run_server()
+    cli()

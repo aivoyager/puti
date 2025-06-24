@@ -85,8 +85,8 @@ class ChatResponse(Response):
         force: bool = False,
         raise_errors: bool = True,
         _parent_namespace_depth: int = 2,
-        _types_namespace: MappingNamespace | None = None,
-    ) -> bool | None:
+        _types_namespace: Optional[MappingNamespace] = None,
+    ) -> Optional[bool]:
         from puti.llm.tools import BaseTool  # noqa: F401
 
         return super(ChatResponse, cls).model_rebuild(

@@ -239,7 +239,7 @@ def set(name, cron, topic=None, tags=None, enabled=True, start=False):
             click.echo(f"Started task for schedule '{name}'")
     elif enabled:
         # Trigger an immediate check to register the schedule with Celery Beat
-        from celery_queue.tasks import check_dynamic_schedules
+        from celery_queue.simplified_tasks import check_dynamic_schedules
         check_dynamic_schedules.delay()
         click.echo("Triggered schedule registration")
 
@@ -402,7 +402,7 @@ def toggle(schedule_id, enable):
     
     # If enabling, trigger an immediate check
     if enable:
-        from celery_queue.tasks import check_dynamic_schedules
+        from celery_queue.simplified_tasks import check_dynamic_schedules
         check_dynamic_schedules.delay()
         console.print("[green]Triggered an immediate schedule check.[/green]")
 
@@ -653,3 +653,185 @@ To manage this schedule, you can use the following commands:
     """
     
     console.print(Panel(Markdown(commands), title="Commands", border_style="yellow"))
+
+
+@scheduler.command()
+@click.argument('schedule_id', type=int)
+def delete(schedule_id):
+    """Delete a schedule by ID."""
+    from puti.db.schedule_manager import ScheduleManager
+    from rich.console import Console
+    
+    console = Console()
+    manager = ScheduleManager()
+    
+    schedule = manager.get_by_id(schedule_id)
+    if not schedule:
+        console.print(f"[red]Error:[/red] Schedule with ID {schedule_id} not found.")
+        return
+    
+    # Stop the task if it's running
+    if schedule.is_running:
+        manager.stop_task(schedule_id)
+    
+    # Delete the schedule (use hard delete to actually remove it)
+    result = manager.delete(schedule_id, soft_delete=False)
+    if result:
+        console.print(f"[green]Schedule '{schedule.name}' (ID: {schedule_id}) has been deleted.[/green]")
+    else:
+        console.print(f"[red]Failed to delete schedule '{schedule.name}'.[/red]")
+
+
+@scheduler.command()
+@click.argument('schedule_id', type=int)
+def run(schedule_id):
+    """
+    Manually run a specific scheduled task.
+    
+    This will execute the task immediately, regardless of its scheduled time.
+    The task's last_run time will be updated, but the schedule itself won't be modified.
+    """
+    from puti.db.schedule_manager import ScheduleManager
+    from rich.console import Console
+    import datetime
+    
+    console = Console()
+    manager = ScheduleManager()
+    
+    schedule = manager.get_by_id(schedule_id)
+    if not schedule:
+        console.print(f"[red]Error:[/red] Schedule with ID {schedule_id} not found.")
+        return
+    
+    # Get parameters from schedule
+    params = schedule.params or {}
+    topic = params.get('topic')
+    
+    # Use the simplified task
+    try:
+        from celery_queue.simplified_tasks import generate_tweet_task
+        task = generate_tweet_task.delay(topic=topic)
+        console.print(f"[green]Task started![/green] Task ID: {task.id}")
+        
+        # Update the schedule record
+        manager.update_schedule(schedule_id, 
+            is_running=True,
+            last_run=datetime.datetime.now(),
+            task_id=task.id
+        )
+        
+        return True
+    except Exception as e:
+        console.print(f"[red]Error starting task:[/red] {str(e)}")
+        return False
+
+
+@scheduler.command()
+def alias():
+    """Show the mapping between puti scheduler commands and puti-cmd commands."""
+    from rich.console import Console
+    from rich.table import Table
+    
+    console = Console()
+    
+    table = Table(title="Command Mapping")
+    table.add_column("puti scheduler", style="cyan")
+    table.add_column("puti-cmd", style="green")
+    table.add_column("Description", style="yellow")
+    
+    table.add_row("start_daemon", "start", "Start the scheduler daemon")
+    table.add_row("stop_daemon", "stop", "Stop the scheduler daemon")
+    table.add_row("daemon_status", "status", "Check scheduler status")
+    table.add_row("list", "list", "List scheduled tasks")
+    table.add_row("set", "create", "Create/update a schedule")
+    table.add_row("toggle --enable", "enable", "Enable a schedule")
+    table.add_row("toggle --disable", "disable", "Disable a schedule")
+    table.add_row("delete", "delete", "Delete a schedule")
+    table.add_row("run", "run", "Manually run a task")
+    
+    console.print(table)
+    console.print("\n[bold yellow]Note:[/bold yellow] You can use either command set based on your preference.")
+
+
+@scheduler.command()
+@click.argument('schedule_id', type=int)
+def enable(schedule_id):
+    """
+    Enable a specific schedule.
+    
+    This is a convenience wrapper around the toggle command.
+    """
+    from puti.db.schedule_manager import ScheduleManager
+    from rich.console import Console
+    
+    console = Console()
+    manager = ScheduleManager()
+    
+    schedule = manager.get_by_id(schedule_id)
+    if not schedule:
+        console.print(f"[red]Error:[/red] Schedule with ID {schedule_id} not found.")
+        return
+    
+    if schedule.enabled:
+        console.print(f"[yellow]Schedule '{schedule.name}' is already enabled.[/yellow]")
+        return
+    
+    # Enable the schedule
+    result = manager.update_schedule(schedule_id, enabled=True)
+    
+    if result:
+        console.print(f"[green]Schedule '{schedule.name}' (ID: {schedule_id}) has been enabled.[/green]")
+        
+        # If enabling, trigger an immediate check
+        try:
+            from celery_queue.simplified_tasks import check_dynamic_schedules
+            check_dynamic_schedules.delay()
+            console.print("[green]Triggered an immediate schedule check.[/green]")
+        except Exception as e:
+            console.print(f"[yellow]Warning: Could not trigger schedule check: {str(e)}[/yellow]")
+    else:
+        console.print(f"[red]Failed to enable schedule '{schedule.name}' (ID: {schedule_id}).[/red]")
+
+
+@scheduler.command()
+@click.argument('schedule_id', type=int)
+def disable(schedule_id):
+    """
+    Disable a specific schedule.
+    
+    This is a convenience wrapper around the toggle command.
+    """
+    from puti.db.schedule_manager import ScheduleManager
+    from rich.console import Console
+    
+    console = Console()
+    manager = ScheduleManager()
+    
+    schedule = manager.get_by_id(schedule_id)
+    if not schedule:
+        console.print(f"[red]Error:[/red] Schedule with ID {schedule_id} not found.")
+        return
+    
+    if not schedule.enabled:
+        console.print(f"[yellow]Schedule '{schedule.name}' is already disabled.[/yellow]")
+        return
+    
+    # Disable the schedule
+    result = manager.update_schedule(schedule_id, enabled=False)
+    
+    if result:
+        console.print(f"[green]Schedule '{schedule.name}' (ID: {schedule_id}) has been disabled.[/green]")
+        
+        # If the schedule was running, stop it
+        if schedule.is_running:
+            manager.stop_task(schedule_id)
+            console.print(f"[yellow]Stopped running task for schedule '{schedule.name}'.[/yellow]")
+    else:
+        console.print(f"[red]Failed to disable schedule '{schedule.name}' (ID: {schedule_id}).[/red]")
+
+
+# Add the scheduler group to the main CLI
+main.add_command(scheduler)
+
+if __name__ == "__main__":
+    main()

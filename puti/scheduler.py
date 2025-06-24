@@ -9,7 +9,7 @@ import atexit
 import subprocess
 from pathlib import Path
 from pydantic import BaseModel, Field
-from typing import Any, Optional
+from typing import Any, Optional, Union
 from puti.constant.base import Pathh
 from puti.conf.config import conf
 from puti.logs import logger_factory
@@ -29,6 +29,9 @@ def get_default_log_dir():
 class SchedulerDaemon(BaseModel):
     """Handles the daemonization of the Celery Beat scheduler."""
     
+    # Allow arbitrary attributes to be set
+    model_config = {"arbitrary_types_allowed": True, "extra": "allow"}
+    
     def __init__(self, **data):
         super().__init__(**data)
         # Initialize database managers
@@ -41,7 +44,7 @@ class SchedulerDaemon(BaseModel):
         log_dir = get_default_log_dir()
         os.makedirs(log_dir, exist_ok=True)
 
-    def _get_pid(self) -> int | None:
+    def _get_pid(self) -> Optional[int]:
         """Read the PID from the database."""
         setting = self.setting_manager.get_one(where_clause="name = 'scheduler_pid'")
         if setting:
@@ -104,7 +107,12 @@ class SchedulerDaemon(BaseModel):
         
         # Activate all enabled schedules if requested
         if activate_tasks:
-            self._ensure_enabled_schedules_run()
+            try:
+                self._ensure_enabled_schedules_run()
+            except Exception as e:
+                lgr.warning(f"Could not ensure enabled schedules run: {e}")
+                click.echo("Note: Could not trigger immediate check of schedules.")
+                click.echo("Schedules will still be picked up on the next Celery Beat cycle.")
 
         # Use the shared application config directory for logs
         log_dir = get_default_log_dir()
@@ -142,26 +150,36 @@ class SchedulerDaemon(BaseModel):
         click.echo(f"  - Log file: {log_path.resolve()}")
         
         # Get list of enabled tasks for display
-        from puti.db.schedule_manager import ScheduleManager
-        manager = ScheduleManager()
-        enabled_tasks = manager.get_active_schedules()
-        
-        if enabled_tasks:
-            click.echo(f"  - Enabled tasks: {len(enabled_tasks)}")
-            for task in enabled_tasks[:5]:  # Show only first 5 to avoid clutter
-                click.echo(f"      - {task.name}")
-            if len(enabled_tasks) > 5:
-                click.echo(f"      - ... and {len(enabled_tasks) - 5} more")
-        else:
-            click.echo("  - No enabled tasks")
+        try:
+            from puti.db.schedule_manager import ScheduleManager
+            manager = ScheduleManager()
+            enabled_tasks = manager.get_active_schedules()
+            
+            if enabled_tasks:
+                click.echo(f"  - Enabled tasks: {len(enabled_tasks)}")
+                for task in enabled_tasks[:5]:  # Show only first 5 to avoid clutter
+                    click.echo(f"      - {task.name}")
+                if len(enabled_tasks) > 5:
+                    click.echo(f"      - ... and {len(enabled_tasks) - 5} more")
+            else:
+                click.echo("  - No enabled tasks")
+        except Exception as e:
+            lgr.warning(f"Could not display enabled tasks: {e}")
+            click.echo("  - Could not retrieve task list")
 
     def _ensure_enabled_schedules_run(self):
         """Makes sure that all active schedules in the database are running."""
         # Trigger an immediate check of all enabled schedules
-        from celery_queue.tasks import check_dynamic_schedules
-        check_dynamic_schedules.delay()
-        lgr.info("Triggered an immediate check of all enabled schedules.")
-        
+        try:
+            from celery_queue.simplified_tasks import check_dynamic_schedules
+            result = check_dynamic_schedules.delay()
+            lgr.info("Triggered an immediate check of all enabled schedules.")
+            click.echo("Triggered schedule registration")
+            return True
+        except Exception as e:
+            lgr.error(f"Failed to trigger schedule check: {str(e)}")
+            return False
+
     def get_active_schedules(self):
         """Returns all active schedules from the database."""
         from puti.db.schedule_manager import ScheduleManager
@@ -216,11 +234,53 @@ class SchedulerDaemon(BaseModel):
                 click.echo(f"  - {len(running_schedules)} running tasks were marked as stopped")
 
 
-def cleanup_daemon():
-    """A cleanup function to be registered with atexit to ensure the daemon is stopped."""
+# Command-line interface for direct invocation
+@click.group()
+def cli():
+    """Manage the scheduler daemon."""
+    pass
+
+
+@cli.command()
+@click.option('--start-tasks/--no-start-tasks', default=True, 
+              help="Whether to activate all enabled tasks when starting the daemon")
+def start(start_tasks):
+    """Start the scheduler daemon."""
+    daemon = SchedulerDaemon()
+    daemon.start(activate_tasks=start_tasks)
+
+
+@cli.command()
+def stop():
+    """Stop the scheduler daemon."""
+    daemon = SchedulerDaemon()
+    daemon.stop()
+
+
+@cli.command()
+def status():
+    """Check if the scheduler daemon is running."""
     daemon = SchedulerDaemon()
     if daemon.is_running():
-        daemon.stop()
+        pid = daemon._get_pid()
+        click.echo(f"Scheduler is running with PID {pid}")
+    else:
+        click.echo("Scheduler is not running")
+
+
+if __name__ == "__main__":
+    cli()
+
+
+def cleanup_daemon():
+    """A cleanup function to be registered with atexit to ensure the daemon is stopped."""
+    try:
+        daemon = SchedulerDaemon()
+        if daemon.is_running():
+            daemon.stop()
+    except Exception as e:
+        lgr.error(f"Error in cleanup_daemon: {e}")
+
 
 # Ensure the daemon is stopped on exit, just in case
 atexit.register(cleanup_daemon) 

@@ -45,10 +45,9 @@ class GenerateTweetAction(Action):
         description="Jinja2 template for the review step."
     )
 
-    async def run(self, topic: str = None, *args, **kwargs):
+    async def run(self, *args, **kwargs):
         """
         Executes the three-step topic-generation, tweet-creation, and review process.
-        If a topic is provided, it skips the generation step.
         This action uses its own OpenAINode instance, ignoring the role's LLM.
         """
         lgr.info(f"Starting tweet generation process with {self.name} action")
@@ -56,15 +55,11 @@ class GenerateTweetAction(Action):
         # This action uses its own private LLM node instance
         llm_node = OpenAINode()
 
-        if topic:
-            generated_topic = topic
-            lgr.debug(f"Using provided topic: {generated_topic}")
-        else:
-            # 1. Generate a topic
-            lgr.debug("Step 1: Generating topic")
-            topic_resp = await llm_node.chat([UserMessage(content=self.topic_prompt_template).to_message_dict()])
-            generated_topic = topic_resp.content if hasattr(topic_resp, 'content') else str(topic_resp)
-            lgr.debug(f"Generated topic: {generated_topic}")
+        # 1. Generate a topic
+        lgr.debug("Step 1: Generating topic")
+        topic_resp = await llm_node.chat([UserMessage(content=self.topic_prompt_template).to_message_dict()])
+        generated_topic = topic_resp.content if hasattr(topic_resp, 'content') else str(topic_resp)
+        lgr.debug(f"Generated topic: {generated_topic}")
 
         # 2. Generate the initial tweet using the topic
         lgr.debug("Step 2: Generating initial tweet from topic")
