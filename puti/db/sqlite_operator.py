@@ -5,6 +5,7 @@ import threading
 import datetime
 from typing import List, Optional, Type, Tuple, Any, Dict
 from puti.logs import logger_factory
+from puti.constant.base import Pathh
 
 lgr = logger_factory.db
 
@@ -20,7 +21,10 @@ class SQLiteOperator:
         # Ensure the directory exists
         os.makedirs(db_path, exist_ok=True)
 
-        self.db_file = os.path.join(db_path, 'puti.sqlite')
+        # 使用常量定义的SQLite文件路径，而不是硬编码的文件名
+        # 注意: 如果PUTI_DATA_PATH已经指向了正确的目录，我们只需要取文件名部分
+        sqlite_filename = os.path.basename(Pathh.SQLITE_FILE.val)
+        self.db_file = os.path.join(db_path, sqlite_filename)
         self._ensure_table_exists()
 
     def connect(self):
@@ -127,7 +131,7 @@ class SQLiteOperator:
         
         try:
             self.execute(create_table_sql)
-            lgr.info(f"Table '{table_name}' created or verified.")
+            # lgr.info(f"Table '{table_name}' created or verified.")
         except Exception as e:
             lgr.error(f"Error creating table '{table_name}': {e}")
             raise

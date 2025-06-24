@@ -14,8 +14,12 @@ from puti.constant.base import Pathh
 from puti.conf.config import conf
 from puti.logs import logger_factory
 import click
+from rich.console import Console
+from rich.panel import Panel
+from rich.table import Table
 
 lgr = logger_factory.default
+console = Console()
 
 
 def get_default_log_dir():
@@ -98,74 +102,128 @@ class SchedulerDaemon(BaseModel):
             activate_tasks: Whether to activate all enabled schedules when starting
         """
         if self.is_running():
-            lgr.warning(f"Scheduler is already running with PID {self._get_pid()}.")
-            click.echo(f"Scheduler is already running.")
+            pid = self._get_pid()
+            lgr.warning(f"调度器已经在运行中，PID: {pid}")
+            console.print(Panel(f"[yellow]调度器已经在运行中[/yellow]\nPID: [bold]{pid}[/bold]", 
+                               title="调度器状态", border_style="yellow"))
             return
 
-        lgr.info("Starting Celery Beat scheduler as a daemon...")
-        click.echo("Starting scheduler daemon in background...")
+        lgr.info("正在启动Celery Beat调度器...")
+        console.print("[blue]正在后台启动调度器守护进程...[/blue]")
         
-        # Activate all enabled schedules if requested
+        # 获取当前活跃任务状态
+        try:
+            from puti.db.schedule_manager import ScheduleManager
+            manager = ScheduleManager()
+            enabled_tasks = manager.get_active_schedules()
+            active_count = len(enabled_tasks)
+            lgr.info(f"发现 {active_count} 个已启用的计划任务")
+        except Exception as e:
+            lgr.error(f"获取活跃任务失败: {e}")
+            active_count = -1
+        
+        # 激活所有已启用的计划任务 - 现在默认不激活
         if activate_tasks:
             try:
-                self._ensure_enabled_schedules_run()
+                result = self._ensure_enabled_schedules_run()
+                if result:
+                    lgr.info("已触发任务调度检查，所有任务将被自动启动")
+                else:
+                    lgr.warning("无法触发任务调度检查")
             except Exception as e:
-                lgr.warning(f"Could not ensure enabled schedules run: {e}")
-                click.echo("Note: Could not trigger immediate check of schedules.")
-                click.echo("Schedules will still be picked up on the next Celery Beat cycle.")
+                lgr.error(f"激活任务失败: {e}")
+                console.print("[yellow]注意: 无法立即触发计划任务检查。[/yellow]")
+                console.print("[yellow]计划任务仍将在下一个Celery Beat周期中被检测。[/yellow]")
+        else:
+            lgr.info("调度器启动时不自动激活任务，任务需要手动启动或等待下一个计划时间")
 
-        # Use the shared application config directory for logs
+        # 使用共享的应用程序配置目录存放日志
         log_dir = get_default_log_dir()
         log_dir.mkdir(parents=True, exist_ok=True)
-        # Combine stdout and stderr into a single log file for easier monitoring
+        # 将stdout和stderr合并到同一个日志文件中，方便监控
         log_path = log_dir / 'scheduler_beat.log'
 
-        # We use the default Celery Beat scheduler. It is configured in
-        # celery_config.py to run our `check_dynamic_schedules` task, which
-        # then reads our custom schedule from the database.
+        # 我们使用默认的Celery Beat调度器。它在celery_config.py中配置为
+        # 运行我们的`check_dynamic_schedules`任务，该任务会从数据库中读取自定义调度。
         command = [
             'celery', '-A', 'celery_queue.celery_app', 'beat',
             '--loglevel=INFO'
         ]
 
-        log_file = open(log_path, 'a')
-
-        process = subprocess.Popen(
-            command,
-            stdout=log_file,
-            stderr=subprocess.STDOUT, # Redirect stderr to stdout
-            preexec_fn=os.setsid
-        )
-        
-        # The file descriptor is duplicated for the child process, so the parent
-        # should close its copy.
-        log_file.close()
-
-        # Store the PID in the database
-        self._set_pid(process.pid)
-
-        lgr.info(f"Scheduler started with PID: {process.pid}")
-        click.echo("Scheduler started")
-        click.echo(f"  - PID: {process.pid}")
-        click.echo(f"  - Log file: {log_path.resolve()}")
-        
-        # Get list of enabled tasks for display
         try:
-            from puti.db.schedule_manager import ScheduleManager
-            manager = ScheduleManager()
-            enabled_tasks = manager.get_active_schedules()
+            log_file = open(log_path, 'a')
             
-            if enabled_tasks:
-                click.echo(f"  - Enabled tasks: {len(enabled_tasks)}")
-                for task in enabled_tasks[:5]:  # Show only first 5 to avoid clutter
-                    click.echo(f"      - {task.name}")
+            process = subprocess.Popen(
+                command,
+                stdout=log_file,
+                stderr=subprocess.STDOUT, # 将stderr重定向到stdout
+                preexec_fn=os.setsid
+            )
+            
+            # 子进程已复制文件描述符，父进程应关闭其副本
+            log_file.close()
+
+            # 将PID存储到数据库中
+            self._set_pid(process.pid)
+
+            lgr.info(f"调度器已启动，PID: {process.pid}")
+            
+            # 构建任务启动说明
+            task_info = ""
+            if not activate_tasks:
+                task_info = "\n[yellow]注意: 调度器启动时不会自动启动所有任务[/yellow]\n" \
+                            "- 使用 [bold]puti scheduler run <任务ID>[/bold] 立即启动指定任务\n" \
+                            "- 使用 [bold]puti scheduler list[/bold] 查看所有可用任务\n" \
+                            "- 任务将在其下一个计划时间点自动执行"
+            
+            # 使用Rich创建更美观的输出
+            start_panel = Panel(
+                f"[green]调度器已成功启动[/green]\n\n"
+                f"PID: [bold]{process.pid}[/bold]\n"
+                f"日志文件: [cyan]{log_path.resolve()}[/cyan]\n"
+                f"已启用任务数: [yellow]{active_count if active_count >= 0 else '未知'}[/yellow]"
+                f"{task_info}",
+                title="调度器状态",
+                border_style="green"
+            )
+            console.print(start_panel)
+            
+            # 显示已启用任务的详细信息
+            if enabled_tasks and len(enabled_tasks) > 0:
+                task_table = Table(title="已启用的任务")
+                task_table.add_column("ID", style="dim")
+                task_table.add_column("名称", style="cyan")
+                task_table.add_column("类型", style="magenta")
+                task_table.add_column("Cron表达式", style="blue")
+                task_table.add_column("下次执行", style="yellow")
+                
+                for task in enabled_tasks[:5]:  # 只显示前5个，避免过多输出
+                    task_type_display = f"{task.task_type} ({task.task_type_display})" if hasattr(task, 'task_type_display') else task.task_type
+                    next_run = task.next_run.strftime("%Y-%m-%d %H:%M:%S") if task.next_run else "未设置"
+                    
+                    task_table.add_row(
+                        str(task.id),
+                        task.name,
+                        task_type_display,
+                        task.cron_schedule,
+                        next_run
+                    )
+                
                 if len(enabled_tasks) > 5:
-                    click.echo(f"      - ... and {len(enabled_tasks) - 5} more")
-            else:
-                click.echo("  - No enabled tasks")
+                    console.print(f"显示前5个任务 (共{len(enabled_tasks)}个)")
+                    
+                console.print(task_table)
+                
+                # 添加启动提示
+                if not activate_tasks and len(enabled_tasks) > 0:
+                    console.print("\n[cyan]提示: 要立即启动某个任务，请使用:[/cyan]")
+                    console.print(f"  [bold]puti scheduler run <任务ID>[/bold]  例如: puti scheduler run {enabled_tasks[0].id}")
         except Exception as e:
-            lgr.warning(f"Could not display enabled tasks: {e}")
-            click.echo("  - Could not retrieve task list")
+            lgr.error(f"启动调度器失败: {e}")
+            console.print(f"[red]启动调度器失败: {e}[/red]")
+            return False
+            
+        return True
 
     def _ensure_enabled_schedules_run(self):
         """Makes sure that all active schedules in the database are running."""
@@ -173,114 +231,96 @@ class SchedulerDaemon(BaseModel):
         try:
             from celery_queue.simplified_tasks import check_dynamic_schedules
             result = check_dynamic_schedules.delay()
-            lgr.info("Triggered an immediate check of all enabled schedules.")
-            click.echo("Triggered schedule registration")
+            lgr.info("已触发对所有已启用计划的立即检查。")
             return True
         except Exception as e:
-            lgr.error(f"Failed to trigger schedule check: {str(e)}")
+            lgr.error(f"触发计划检查失败: {str(e)}")
             return False
 
-    def get_active_schedules(self):
-        """Returns all active schedules from the database."""
-        from puti.db.schedule_manager import ScheduleManager
-        
-        manager = ScheduleManager()
-        return manager.get_active_schedules()
-        
-    def get_running_schedules(self):
-        """Returns all currently running schedules from the database."""
-        from puti.db.schedule_manager import ScheduleManager
-        
-        manager = ScheduleManager()
-        return manager.get_running_schedules()
-
     def stop(self):
-        """Stop the scheduler daemon."""
+        """停止调度器守护进程。"""
         pid = self._get_pid()
         if not pid:
-            lgr.warning("Scheduler is not running (or PID not found in database).")
-            click.echo("Scheduler is not running.")
-            return
+            lgr.warning("调度器未运行（或在数据库中未找到PID）。")
+            console.print("[yellow]调度器未运行。[/yellow]")
+            return False
 
-        lgr.info(f"Stopping scheduler with PID: {pid}...")
+        lgr.info(f"正在停止PID为 {pid} 的调度器...")
+        console.print(f"[blue]正在停止调度器 (PID: {pid})...[/blue]")
 
         try:
-            # Attempt to kill the process group associated with the PID
+            # 尝试终止与PID关联的进程组
             os.killpg(os.getpgid(pid), 15)
-        except ProcessLookupError:
-            # This is not a fatal error. It simply means the process with the given PID
-            # was not found. It's safe to assume it's already stopped.
-            lgr.warning(f"Process with PID {pid} not found, likely already stopped. Cleaning up PID record.")
-        except OSError as e:
-            # Handle other, unexpected OS errors
-            lgr.error(f"Failed to stop scheduler: {e}")
-            click.echo(f"Error stopping scheduler: {e}", err=True)
-        finally:
-            # Always clear the PID from the database
+            
+            # 等待进程结束
+            import time
+            for _ in range(10):  # 最多等待5秒钟
+                time.sleep(0.5)
+                try:
+                    # 检查进程是否仍在运行
+                    os.kill(pid, 0)
+                except OSError:
+                    # 进程已经终止
+                    break
+            else:
+                # 如果循环正常结束，表示进程仍在运行，尝试强制终止
+                try:
+                    lgr.warning(f"进程未响应SIGTERM信号，正在强制终止 (PID: {pid})...")
+                    os.killpg(os.getpgid(pid), 9)  # SIGKILL
+                except Exception as e:
+                    lgr.error(f"强制终止进程失败: {e}")
+            
+            # 从数据库中清除PID
             self._clear_pid()
             
-            # Also mark all running tasks as stopped
-            from puti.db.schedule_manager import ScheduleManager
-            manager = ScheduleManager()
-            running_schedules = manager.get_running_schedules()
-            
-            for schedule in running_schedules:
-                manager.update_schedule(schedule.id, is_running=False, pid=None)
-                lgr.info(f"Marked task '{schedule.name}' (ID: {schedule.id}) as stopped")
-                
-            lgr.info("Scheduler stopped and PID record removed.")
-            click.echo("Scheduler stopped.")
-            if running_schedules:
-                click.echo(f"  - {len(running_schedules)} running tasks were marked as stopped")
+            lgr.info("调度器已成功停止。")
+            console.print(Panel("[green]调度器已成功停止[/green]", 
+                               title="调度器状态", 
+                               border_style="green"))
+            return True
+        except ProcessLookupError:
+            # 这不是致命错误。它只是意味着给定PID的进程未找到。
+            # 可以安全地假设它已经停止。
+            lgr.warning(f"未找到PID为 {pid} 的进程，可能已经停止。正在清理PID记录。")
+            self._clear_pid()
+            console.print(Panel("[yellow]未找到调度器进程，可能已经停止[/yellow]\n已清理数据库中的PID记录", 
+                               title="调度器状态", 
+                               border_style="yellow"))
+            return True
+        except OSError as e:
+            # 清理数据库中的PID
+            self._clear_pid()
+            lgr.error(f"停止调度器失败: {e}")
+            console.print(f"[red]停止调度器失败: {e}[/red]\n已清理数据库中的PID记录")
+            return False
+        except Exception as e:
+            lgr.error(f"停止调度器时发生未知错误: {e}")
+            console.print(f"[red]停止调度器失败: {e}[/red]")
+            self._clear_pid()
+            return False
 
 
-# Command-line interface for direct invocation
-@click.group()
-def cli():
-    """Manage the scheduler daemon."""
-    pass
-
-
-@cli.command()
-@click.option('--start-tasks/--no-start-tasks', default=True, 
-              help="Whether to activate all enabled tasks when starting the daemon")
-def start(start_tasks):
-    """Start the scheduler daemon."""
-    daemon = SchedulerDaemon()
-    daemon.start(activate_tasks=start_tasks)
-
-
-@cli.command()
-def stop():
-    """Stop the scheduler daemon."""
-    daemon = SchedulerDaemon()
-    daemon.stop()
-
-
-@cli.command()
-def status():
-    """Check if the scheduler daemon is running."""
-    daemon = SchedulerDaemon()
-    if daemon.is_running():
-        pid = daemon._get_pid()
-        click.echo(f"Scheduler is running with PID {pid}")
-    else:
-        click.echo("Scheduler is not running")
-
-
-if __name__ == "__main__":
-    cli()
-
+# 避免自动清理守护进程
+# 在CLI命令中，我们不应该自动清理已启动的守护进程
+# 只需在异常情况下进行清理，例如CTRL+C中断启动过程时
+_should_cleanup = False
 
 def cleanup_daemon():
-    """A cleanup function to be registered with atexit to ensure the daemon is stopped."""
+    """
+    清理函数，只在特定条件下执行
+    比如在调度器启动过程中异常终止时清理
+    """
+    global _should_cleanup
+    if not _should_cleanup:
+        return
+        
     try:
         daemon = SchedulerDaemon()
         if daemon.is_running():
+            lgr.warning("Cleaning up scheduler daemon due to abnormal termination")
             daemon.stop()
     except Exception as e:
         lgr.error(f"Error in cleanup_daemon: {e}")
 
-
-# Ensure the daemon is stopped on exit, just in case
+# 注册清理函数，但默认情况下不会清理守护进程
 atexit.register(cleanup_daemon) 

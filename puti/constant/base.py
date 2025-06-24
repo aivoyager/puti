@@ -45,7 +45,7 @@ class Pathh(Base):
     INDEX_FILE = (str(Path.home() / 'puti' / 'index.faiss'), 'PuTi index file')
     INDEX_TEXT = (str(Path.home() / 'puti' / 'index.txt'), 'PuTi index text file')
 
-    SQLITE_FILE = (str(Path.home() / 'puti' / 'db.sqlite'), 'PuTi sqlite file')
+    SQLITE_FILE = (str(Path.home() / 'puti' / 'puti.sqlite'), 'PuTi sqlite file')
 
 
 class Modules(Base):
@@ -73,8 +73,16 @@ class Resp(Base):
 
 
 class TaskType(Base):
-    POST = ('post', 'post task')
-    REPLY = ('reply', 'reply task')
+    POST = ('post', '发推任务')
+    REPLY = ('reply', '回复任务')
+    RETWEET = ('retweet', '转发任务')
+    LIKE = ('like', '点赞任务')
+    FOLLOW = ('follow', '关注任务')
+    NOTIFICATION = ('notification', '通知任务')
+    ANALYTICS = ('analytics', '数据分析任务')
+    CONTENT_CURATION = ('content_curation', '内容策划任务')
+    SCHEDULED_THREAD = ('scheduled_thread', '计划线程任务')
+    OTHER = ('other', '其他任务')
 
 
 class TaskPostType(Base):

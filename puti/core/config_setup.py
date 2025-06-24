@@ -10,8 +10,6 @@ from rich.markdown import Markdown
 from dotenv import load_dotenv, find_dotenv, set_key
 from puti.constant.base import Pathh
 
-import puti.bootstrap  # noqa: F401
-
 # --- Configuration Constants ---
 CONFIG_DIR = Pathh.CONFIG_DIR.val
 CONFIG_FILE = Pathh.CONFIG_FILE.val

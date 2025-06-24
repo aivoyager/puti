@@ -39,4 +39,13 @@ class TweetSchedule(Model):
     pid: Optional[int] = Field(None, description="Process ID of the scheduler running this task")
     task_id: Optional[str] = Field(None, max_length=255, description="Celery task ID associated with this schedule")
     is_running: bool = Field(False, description="Whether the task is currently being executed")
+    task_type: str = Field(TaskType.POST.val, description="任务类型，如发推、回复等")
     is_del: bool = False
+    
+    @property
+    def task_type_display(self) -> str:
+        """获取任务类型的显示名称"""
+        try:
+            return TaskType.elem_from_str(self.task_type).dsp
+        except ValueError:
+            return "未知类型"

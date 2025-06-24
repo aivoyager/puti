@@ -115,4 +115,4 @@ class BaseManager(BaseModel):
     def create_table(self):
         """Creates the database table for the model if it doesn't exist."""
         self.db_operator.execute_model_table_creation(self.model_type)
-        lgr.info(f"Table '{self._table_name}' created or verified.") 
+        # lgr.info(f"Table '{self._table_name}' created or verified.")

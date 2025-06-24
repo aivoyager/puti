@@ -11,6 +11,7 @@ from typing import List, Optional, Dict, Any, Union
 
 from puti.db.base_manager import BaseManager
 from puti.db.model.task.bot_task import TweetSchedule
+from puti.constant.base import TaskType
 from puti.logs import logger_factory
 
 lgr = logger_factory.default
@@ -24,7 +25,7 @@ class ScheduleManager(BaseManager):
         super().__init__(model_type=TweetSchedule, **kwargs)
     
     def create_schedule(self, name: str, cron_schedule: str, enabled: bool = True, 
-                       params: Optional[Dict[str, Any]] = None) -> TweetSchedule:
+                       params: Optional[Dict[str, Any]] = None, task_type: str = TaskType.POST.val) -> TweetSchedule:
         """
         Create a new schedule in the database.
         
@@ -33,11 +34,19 @@ class ScheduleManager(BaseManager):
             cron_schedule: Cron expression for schedule timing
             enabled: Whether the schedule should be enabled
             params: Parameters for the task (like topic, tags, etc.)
+            task_type: 任务类型，默认为发推(post)，可以是reply(回复)、retweet(转发)等
             
         Returns:
             The created schedule object
         """
         from croniter import croniter
+        
+        # 验证任务类型是否有效
+        try:
+            TaskType.elem_from_str(task_type)
+        except ValueError:
+            lgr.warning(f"无效的任务类型: {task_type}，使用默认类型: {TaskType.POST.val}")
+            task_type = TaskType.POST.val
         
         # Calculate next run time
         now = datetime.datetime.now()
@@ -55,7 +64,8 @@ class ScheduleManager(BaseManager):
             enabled=enabled,
             params=params or {},
             pid=None,
-            is_running=False
+            is_running=False,
+            task_type=task_type
         )
         
         # Save to database
@@ -74,6 +84,14 @@ class ScheduleManager(BaseManager):
         Returns:
             True if successful, False otherwise
         """
+        # 如果更新任务类型，验证它是否有效
+        if 'task_type' in updates:
+            try:
+                TaskType.elem_from_str(updates['task_type'])
+            except ValueError:
+                lgr.error(f"无效的任务类型: {updates['task_type']}")
+                return False
+                
         # If updating cron schedule, recalculate next run time
         if 'cron_schedule' in updates:
             from croniter import croniter
@@ -93,11 +111,19 @@ class ScheduleManager(BaseManager):
     
     def get_active_schedules(self) -> List[TweetSchedule]:
         """Get all active (enabled) schedules."""
-        return self.get_all(where_clause="enabled = 1")
+        return self.get_all(where_clause="enabled = 1 AND is_del = 0")
     
     def get_running_schedules(self) -> List[TweetSchedule]:
         """Get all schedules that are currently running."""
-        return self.get_all(where_clause="is_running = 1")
+        return self.get_all(where_clause="is_running = 1 AND is_del = 0")
+    
+    def get_schedules_by_type(self, task_type: str) -> List[TweetSchedule]:
+        """获取指定类型的所有计划任务"""
+        return self.get_all(where_clause="task_type = ? AND is_del = 0", params=(task_type,))
+    
+    def get_active_schedules_by_type(self, task_type: str) -> List[TweetSchedule]:
+        """获取指定类型的所有启用的计划任务"""
+        return self.get_all(where_clause="task_type = ? AND enabled = 1 AND is_del = 0", params=(task_type,))
     
     def start_task(self, schedule_id: int) -> bool:
         """
@@ -126,8 +152,19 @@ class ScheduleManager(BaseManager):
             params = schedule.params or {}
             topic = params.get('topic')
             
-            # Trigger the task
-            result = generate_tweet_task.delay(topic=topic)
+            # 根据任务类型选择不同的任务处理方式
+            if schedule.task_type == TaskType.POST.val:
+                # 发推任务 - 使用Graph的Workflow功能
+                result = generate_tweet_task.delay(topic=topic, use_graph_workflow=True)
+                lgr.info(f"Started Graph Workflow tweet task for '{schedule.name}' with topic: {topic}")
+            elif schedule.task_type == TaskType.REPLY.val:
+                # 回复任务 - 目前仅记录，但尚未实现
+                lgr.info(f"Reply task '{schedule.name}' triggered but not implemented yet")
+                result = generate_tweet_task.delay(topic=topic)  # 暂时仍使用发推任务
+            else:
+                # 其他类型的任务 - 默认使用发推任务
+                lgr.warning(f"Task type {schedule.task_type} not fully implemented, using post task")
+                result = generate_tweet_task.delay(topic=topic)
             
             # Update the schedule with task info
             self.update(schedule_id, {
@@ -137,7 +174,7 @@ class ScheduleManager(BaseManager):
                 "task_id": result.id
             })
             
-            lgr.info(f"Started task for schedule '{schedule.name}' (ID: {schedule_id})")
+            lgr.info(f"Started task for schedule '{schedule.name}' (ID: {schedule_id}, Type: {schedule.task_type_display})")
             return True
         except Exception as e:
             lgr.error(f"Error starting task for schedule '{schedule.name}': {str(e)}")

@@ -52,7 +52,12 @@ Or, for development, clone the repository and install in editable mode:
 ```bash
 git clone https://github.com/aivoyager/puti.git
 cd puti
-pip install -e .
+
+# Set up the development environment (creates venv and installs dependencies)
+python -m puti.bootstrap
+# Or use the console script after installation
+# pip install -e .
+# puti-setup
 ```
 
 ## 🚀 Quick Start
@@ -185,6 +190,12 @@ class SoftwareEngineer(McpRole):
 Puti includes a powerful task scheduler for automated tweet generation and other recurring tasks.
 
 ```bash
+# First, make sure your environment is set up
+# For development environment:
+python -m puti.bootstrap
+# For installed package:
+# puti-setup
+
 # List all scheduled tasks
 puti scheduler list
 
@@ -194,23 +205,6 @@ puti scheduler create daily_tweet "0 12 * * *" --topic "AI News"
 # Enable or disable a specific task
 puti scheduler enable 1
 puti scheduler disable 1
-
-# Manually run a specific task
-puti scheduler run 1
-
-# Start or stop the scheduler daemon
-puti scheduler start
-puti scheduler stop
-```
-
-To get started, use the provided environment setup script:
-
-```bash
-# Sets up the virtual environment and installs dependencies
-./puti-activate
-
-# Then you can use the scheduler commands
-puti scheduler list
 ```
 
 ## 🤝 Contributing
