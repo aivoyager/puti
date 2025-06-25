@@ -31,14 +31,10 @@ class TweetSchedule(Model):
     name: str = Field(..., max_length=255, json_schema_extra={'unique': True})
     cron_schedule: str = Field(..., max_length=255)
     enabled: bool = True
-    last_run: Optional[datetime.datetime] = None
-    next_run: Optional[datetime.datetime] = None
     params: Dict[str, Any] = Field(default_factory=dict)
     created_at: Optional[datetime.datetime] = Field(default_factory=datetime.datetime.now, json_schema_extra={'dft_time': 'now'})
     updated_at: Optional[datetime.datetime] = Field(default_factory=datetime.datetime.now, json_schema_extra={'dft_time': 'now'})
-    pid: Optional[int] = Field(None, description="Process ID of the scheduler running this task")
     task_id: Optional[str] = Field(None, max_length=255, description="Celery task ID associated with this schedule")
-    is_running: bool = Field(False, description="Whether the task is currently being executed")
     task_type: str = Field(TaskType.POST.val, description="任务类型，如发推、回复等")
     is_del: bool = False
     

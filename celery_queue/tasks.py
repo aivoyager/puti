@@ -20,7 +20,7 @@ from puti.llm.roles.x_bot import TwitWhiz
 from puti.db.sqlite_operator import SQLiteOperator
 from puti.db.model.task.bot_task import TweetSchedule
 from puti.llm.actions.x_bot import GenerateTweetAction, PublishTweetAction
-from puti.llm.roles.agents import EthanG
+from puti.llm.roles.agents import Ethan
 from puti.llm.workflow import Workflow
 from puti.llm.graph import Graph, Vertex
 from croniter import croniter
@@ -29,7 +29,7 @@ lgr = logger_factory.default
 cz = CZ()
 x_conf = TwitterConfig()
 twit_whiz = TwitWhiz()
-ethan = EthanG()
+ethan = Ethan()
 
 
 # @celery_app.task(task_always_eager=True)

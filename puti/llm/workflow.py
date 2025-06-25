@@ -24,7 +24,7 @@ class Workflow(BaseModel):
     graph: Graph = Field(..., description="The graph to be executed")
     results: Optional[Dict[Annotated[str, 'Vertex Id'], Any]] = Field(default=None, description="The results of the last workflow run")
 
-    async def run(self, max_steps: int = 10, **kwargs) -> Dict[str, Any]:
+    async def run(self, max_steps: int = 10, *args, **kwargs) -> Dict[str, Any]:
         """
         Run the full graph workflow and return the results.
 
@@ -36,13 +36,13 @@ class Workflow(BaseModel):
             A dictionary mapping vertex IDs to their results.
         """
         try:
-            self.results = await self.graph.run(max_steps=max_steps, **kwargs)
+            self.results = await self.graph.run(max_steps=max_steps, *args, **kwargs)
             return self.results
         except Exception as e:
             lgr.error(f"Error running graph: {str(e)}")
             raise
 
-    async def run_until_vertex(self, target_vertex_id: str, max_steps: int = 10, **kwargs) -> Dict[str, Any]:
+    async def run_until_vertex(self, target_vertex_id: str, max_steps: int = 10, *args, **kwargs) -> Dict[str, Any]:
         """
         Run the graph until a specific vertex is reached, including the target vertex.
         Execution stops after the target vertex is completed.
@@ -65,7 +65,7 @@ class Workflow(BaseModel):
         )
         
         workflow = Workflow(graph=modified_graph)
-        self.results = await workflow.run(max_steps=max_steps, **kwargs)
+        self.results = await workflow.run(max_steps=max_steps, *args, **kwargs)
         return self.results
 
     async def run_subgraph(self, start_vertex_id: str, end_vertex_ids: List[str], max_steps: int = 10, **kwargs) -> Dict[str, Any]:

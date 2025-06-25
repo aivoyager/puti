@@ -7,8 +7,9 @@ import os
 import datetime
 import subprocess
 from pathlib import Path
-from typing import List, Optional, Dict, Any, Union
 
+from typing import List, Optional, Dict, Any, Union
+from croniter import croniter
 from puti.db.base_manager import BaseManager
 from puti.db.model.task.bot_task import TweetSchedule
 from puti.constant.base import TaskType
@@ -39,8 +40,7 @@ class ScheduleManager(BaseManager):
         Returns:
             The created schedule object
         """
-        from croniter import croniter
-        
+
         # 验证任务类型是否有效
         try:
             TaskType.elem_from_str(task_type)
@@ -112,115 +112,3 @@ class ScheduleManager(BaseManager):
     def get_active_schedules(self) -> List[TweetSchedule]:
         """Get all active (enabled) schedules."""
         return self.get_all(where_clause="enabled = 1 AND is_del = 0")
-    
-    def get_running_schedules(self) -> List[TweetSchedule]:
-        """Get all schedules that are currently running."""
-        return self.get_all(where_clause="is_running = 1 AND is_del = 0")
-    
-    def get_schedules_by_type(self, task_type: str) -> List[TweetSchedule]:
-        """获取指定类型的所有计划任务"""
-        return self.get_all(where_clause="task_type = ? AND is_del = 0", params=(task_type,))
-    
-    def get_active_schedules_by_type(self, task_type: str) -> List[TweetSchedule]:
-        """获取指定类型的所有启用的计划任务"""
-        return self.get_all(where_clause="task_type = ? AND enabled = 1 AND is_del = 0", params=(task_type,))
-    
-    def start_task(self, schedule_id: int) -> bool:
-        """
-        Start the task for a specific schedule.
-        
-        Args:
-            schedule_id: ID of the schedule to start
-            
-        Returns:
-            True if successful, False otherwise
-        """
-        schedule = self.get_by_id(schedule_id)
-        if not schedule:
-            lgr.error(f"Schedule with ID {schedule_id} not found")
-            return False
-            
-        if schedule.is_running:
-            lgr.warning(f"Schedule '{schedule.name}' is already running with PID {schedule.pid}")
-            return True
-            
-        # Start the Celery task
-        try:
-            from celery_queue.simplified_tasks import generate_tweet_task
-            
-            # Get parameters from schedule
-            params = schedule.params or {}
-            topic = params.get('topic')
-            
-            # 根据任务类型选择不同的任务处理方式
-            if schedule.task_type == TaskType.POST.val:
-                # 发推任务 - 使用Graph的Workflow功能
-                result = generate_tweet_task.delay(topic=topic, use_graph_workflow=True)
-                lgr.info(f"Started Graph Workflow tweet task for '{schedule.name}' with topic: {topic}")
-            elif schedule.task_type == TaskType.REPLY.val:
-                # 回复任务 - 目前仅记录，但尚未实现
-                lgr.info(f"Reply task '{schedule.name}' triggered but not implemented yet")
-                result = generate_tweet_task.delay(topic=topic)  # 暂时仍使用发推任务
-            else:
-                # 其他类型的任务 - 默认使用发推任务
-                lgr.warning(f"Task type {schedule.task_type} not fully implemented, using post task")
-                result = generate_tweet_task.delay(topic=topic)
-            
-            # Update the schedule with task info
-            self.update(schedule_id, {
-                "is_running": True,
-                "pid": None,  # We don't have direct access to worker PID
-                "last_run": datetime.datetime.now(),
-                "task_id": result.id
-            })
-            
-            lgr.info(f"Started task for schedule '{schedule.name}' (ID: {schedule_id}, Type: {schedule.task_type_display})")
-            return True
-        except Exception as e:
-            lgr.error(f"Error starting task for schedule '{schedule.name}': {str(e)}")
-            return False
-    
-    def stop_task(self, schedule_id: int) -> bool:
-        """
-        Stop a running task.
-        
-        Args:
-            schedule_id: ID of the schedule to stop
-            
-        Returns:
-            True if successful, False otherwise
-        """
-        schedule = self.get_by_id(schedule_id)
-        if not schedule:
-            lgr.error(f"Schedule with ID {schedule_id} not found")
-            return False
-            
-        if not schedule.is_running:
-            lgr.warning(f"Schedule '{schedule.name}' is not running")
-            return True
-            
-        # In a Celery environment, we can't easily stop a running task
-        # But we can mark it as not running in our database
-        self.update(schedule_id, {
-            "is_running": False,
-            "pid": None
-        })
-        
-        lgr.info(f"Marked task for schedule '{schedule.name}' (ID: {schedule_id}) as stopped")
-        return True
-    
-    def check_is_running(self, schedule_id: int) -> bool:
-        """
-        Check if a task for a specific schedule is running.
-        
-        Args:
-            schedule_id: ID of the schedule to check
-            
-        Returns:
-            True if running, False otherwise
-        """
-        schedule = self.get_by_id(schedule_id)
-        if not schedule:
-            return False
-            
-        return schedule.is_running 

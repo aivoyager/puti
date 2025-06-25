@@ -8,6 +8,8 @@ from pydantic import Field, ConfigDict
 from puti.llm.nodes import OpenAINode
 from puti.llm.messages import UserMessage
 from puti.logs import logger_factory
+from typing import Union, Optional
+
 
 lgr = logger_factory.llm
 
@@ -21,6 +23,8 @@ class GenerateTweetAction(Action):
 
     name: str = 'generate_and_review_tweet'
     description: str = 'Generate a topic, create a new tweet, review it for quality, and return the final version.'
+
+    topic: Optional[str] = Field(default='', description="Optional topic to use for generating the tweet.")
 
     topic_prompt_template: str = Field(
         default="Generate a trending topic or interesting insight about AI, tech, or programming that would be valuable to tweet about today.",
@@ -49,32 +53,36 @@ class GenerateTweetAction(Action):
         """
         Executes the three-step topic-generation, tweet-creation, and review process.
         This action uses its own OpenAINode instance, ignoring the role's LLM.
+        
+        Args:
+            *args: Variable length argument list
+            **kwargs: Arbitrary keyword arguments including possible topic parameter
         """
         lgr.info(f"Starting tweet generation process with {self.name} action")
-        
-        # This action uses its own private LLM node instance
+
+        if kwargs.get('topic'):
+            self.topic = kwargs.get('topic')
+
         llm_node = OpenAINode()
 
-        # 1. Generate a topic
-        lgr.debug("Step 1: Generating topic")
-        topic_resp = await llm_node.chat([UserMessage(content=self.topic_prompt_template).to_message_dict()])
-        generated_topic = topic_resp.content if hasattr(topic_resp, 'content') else str(topic_resp)
-        lgr.debug(f"Generated topic: {generated_topic}")
+        # 1. Generate a topic (use provided topic if given)
+        if self.topic:
+            generated_topic = self.topic
+        else:
+            topic_resp = await llm_node.chat([UserMessage(content=self.topic_prompt_template).to_message_dict()])
+            generated_topic = topic_resp.content if hasattr(topic_resp, 'content') else str(topic_resp)
 
         # 2. Generate the initial tweet using the topic
-        lgr.debug("Step 2: Generating initial tweet from topic")
         generation_prompt = self.generation_prompt_template.render(generated_topic=generated_topic)
         initial_tweet_resp = await llm_node.chat([UserMessage(content=generation_prompt).to_message_dict()])
         initial_tweet_content = initial_tweet_resp.content if hasattr(initial_tweet_resp, 'content') else str(initial_tweet_resp)
-        lgr.debug(f"Initial tweet: {initial_tweet_content}")
 
         # 3. Review the generated tweet
-        lgr.debug("Step 3: Reviewing and finalizing tweet")
         review_prompt = self.review_prompt_template.render(generated_tweet=initial_tweet_content)
         final_tweet_resp = await llm_node.chat([UserMessage(content=review_prompt).to_message_dict()])
         
         final_content = final_tweet_resp.content if hasattr(final_tweet_resp, 'content') else str(final_tweet_resp)
-        lgr.info(f"Final tweet generated: {final_content}")
+        lgr.debug(f"Final tweet generated: {final_content}")
 
         return final_tweet_resp
 
@@ -89,7 +97,7 @@ class PublishTweetAction(Action):
     name: str = 'publish_tweet'
     description: str = 'Publishes the provided tweet content to Twitter.'
     
-    prompt: Template = Field(
+    prompt: Union[Template, str] = Field(
         default=Template("post the following tweet: '{{ previous_result }}'"),
         description="Message confirming the tweet to be posted."
     )

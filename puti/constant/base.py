@@ -3,10 +3,11 @@
 @Time: 10/01/25 11:52
 @Description:  
 """
+import os
 from pathlib import Path
 from enum import Enum
 from puti.utils.path import root_dir
-from typing import Type, TypeVar
+from typing import Type, TypeVar, Union, Any
 
 T = TypeVar("T", bound='Base')
 
@@ -33,19 +34,72 @@ class Base(Enum):
         return {item.val for item in cls}
 
 
+class PathAutoCreate:
+    """工具类，用于自动创建路径"""
+    
+    @staticmethod
+    def ensure_path(path_str: str) -> str:
+        """确保路径存在
+        
+        Args:
+            path_str: 路径字符串
+            
+        Returns:
+            原始路径字符串
+        """
+        if not path_str:
+            return path_str
+            
+        path = Path(path_str)
+        
+        # 判断是文件还是目录（根据是否包含文件扩展名）
+        if path.suffix:  # 有扩展名，视为文件
+            # 确保父目录存在
+            parent_dir = path.parent
+            if not parent_dir.exists():
+                os.makedirs(parent_dir, exist_ok=True)
+        else:  # 没有扩展名，视为目录
+            if not path.exists():
+                os.makedirs(path, exist_ok=True)
+                
+        return path_str
+
+
+# 首先定义基本路径，不依赖于其他路径
+home_dir = str(Path.home())
+config_dir = str(Path(home_dir) / 'puti')
+
+
 class Pathh(Base):
     PROJ_NAME = ('PuTi', '')
     ROOT_DIR = (root_dir(), 'PuTi')
 
     POOL_SIZE = (3, 'db connection pool size')
 
-    CONFIG_DIR = (str(Path.home() / 'puti'), 'PuTi config dir')
-    CONFIG_FILE = (str(Path.home() / 'puti' / '.env'), 'PuTi config file')
+    # 使用预定义的变量，避免递归初始化
+    CONFIG_DIR = (config_dir, 'PuTi config dir')
 
-    INDEX_FILE = (str(Path.home() / 'puti' / 'index.faiss'), 'PuTi index file')
-    INDEX_TEXT = (str(Path.home() / 'puti' / 'index.txt'), 'PuTi index text file')
+    CONFIG_FILE = (str(Path(config_dir) / '.env'), 'PuTi config file')
 
-    SQLITE_FILE = (str(Path.home() / 'puti' / 'puti.sqlite'), 'PuTi sqlite file')
+    INDEX_FILE = (str(Path(config_dir) / 'index.faiss'), 'PuTi index file')
+    INDEX_TEXT = (str(Path(config_dir) / 'index.txt'), 'PuTi index text file')  # long-term memory retrieval
+
+    SQLITE_FILE = (str(Path(config_dir) / 'puti.sqlite'), 'PuTi sqlite file')
+
+    # celery beat
+    BEAT_PID = (str(Path(config_dir) / 'celery' / 'beat.pid'), 'celery beat pid file')
+    BEAT_LOG = (str(Path(config_dir) / 'celery' / 'beat.log'), 'celery beat log file')
+    BEAT_DB = (str(Path(config_dir) / 'celery' / 'celerybeat-schedule.db'), 'celery beat db file')
+    
+    @property
+    def val(self) -> str:
+        """获取路径值并自动检查/创建路径"""
+        path_str = super().val
+        return PathAutoCreate.ensure_path(path_str)
+    
+    def __call__(self) -> str:
+        """调用枚举实例时自动检查/创建路径"""
+        return self.val
 
 
 class Modules(Base):

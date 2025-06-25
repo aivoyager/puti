@@ -64,13 +64,6 @@ beat_schedule = {
         'args': (),
         'options': {'queue': 'default'}
     },
-    # Auto manage scheduler every 5 minutes
-    'auto-manage-scheduler': {
-        'task': 'celery_queue.simplified_tasks.auto_manage_scheduler',
-        'schedule': crontab(minute='*/5'),  # Run every 5 minutes
-        'args': (),
-        'options': {'queue': 'default'}
-    },
 }
 
 # Worker settings

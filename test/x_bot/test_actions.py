@@ -6,7 +6,7 @@
 import pytest
 from puti.llm.actions.x_bot import GenerateTweetAction, PublishTweetAction
 from puti.llm.messages import AssistantMessage
-from puti.llm.roles.agents import Ethan, EthanG
+from puti.llm.roles.agents import Ethan
 from puti.logs import logger_factory
 from puti.llm.workflow import Workflow
 from puti.llm.graph import Graph, Vertex
@@ -60,7 +60,7 @@ async def test_generate_tweet_graph():
     generate_tweet_action = GenerateTweetAction()
     post_tweet_action = PublishTweetAction()
 
-    ethan = EthanG()
+    ethan = Ethan()
 
     generate_tweet_vertex = Vertex(id='generate_tweet', action=generate_tweet_action)
     post_tweet_vertex = Vertex(id='post_tweet', action=post_tweet_action, role=ethan)

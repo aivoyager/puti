@@ -14,7 +14,6 @@ from puti.llm.actions import Action
 from puti.constant.llm import NodeState as VertexState
 from puti.logs import logger_factory
 from puti.llm.messages import Message
-from puti.llm.roles.agents import Anonym
 from puti.constant.llm import RoleType
 
 lgr = logger_factory.llm
@@ -26,9 +25,9 @@ class Vertex(BaseModel):
     
     id: str = Field(..., description="Unique identifier for the vertex")
     role: Role = Field(
-        default_factory=Anonym,
+        default_factory=lambda: Role(name="Anonymous"),
         description="Role that executes the vertex's action. "
-                    "If action doesn't need role's ability, default set to `Anonym`."
+                    "If action doesn't need role's ability, default set to a simple anonymous role."
     )
     action: Action = Field(..., description="The action to be executed by the vertex")
     state: VertexState = Field(default=VertexState.PENDING, description="The current state of the vertex")
@@ -181,7 +180,7 @@ class Graph(BaseModel):
             
         return self
 
-    async def run(self, *args, max_steps: int = 10, **kwargs):
+    async def run(self, max_steps: int = 10, *args, **kwargs):
         """
         Execute the graph workflow starting from the start vertex.
         
