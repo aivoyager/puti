@@ -11,7 +11,7 @@ from datetime import datetime
 from pydantic import BaseModel, Field, ConfigDict, model_validator
 from puti.llm.roles import Role, GraphRole
 from puti.llm.actions import Action
-from puti.constant.llm import NodeState as VertexState
+from puti.constant.llm import VertexState
 from puti.logs import logger_factory
 from puti.llm.messages import Message
 from puti.constant.llm import RoleType

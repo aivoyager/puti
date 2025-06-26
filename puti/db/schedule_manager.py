@@ -112,3 +112,32 @@ class ScheduleManager(BaseManager):
     def get_active_schedules(self) -> List[TweetSchedule]:
         """Get all active (enabled) schedules."""
         return self.get_all(where_clause="enabled = 1 AND is_del = 0")
+
+    def update(self, schedule_id: int, updates_or_dict: Union[Dict[str, Any], Any], **kwargs) -> bool:
+        """
+        更新计划任务，支持字典参数或关键字参数。
+        
+        Args:
+            schedule_id: 计划任务ID
+            updates_or_dict: 更新字段的字典，或者第一个字段的值
+            **kwargs: 如果updates_or_dict不是字典，则这里包含剩余的字段更新
+            
+        Returns:
+            更新是否成功
+        """
+        if isinstance(updates_or_dict, dict):
+            # 如果传入的是字典，直接使用
+            updates = updates_or_dict
+        else:
+            # 否则，假设第一个参数是字段名，值是第一个参数的值
+            field_names = list(self.model_type.__annotations__.keys())
+            if field_names and field_names[0] not in kwargs:
+                # 将第一个参数作为第一个字段的值
+                updates = {field_names[0]: updates_or_dict}
+                updates.update(kwargs)
+            else:
+                # 否则只使用kwargs
+                updates = kwargs
+                
+        # 为了兼容，调用父类的update方法
+        return super().update(schedule_id, updates)

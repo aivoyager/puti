@@ -33,114 +33,71 @@ TASK_MAP = {
 @shared_task()
 def check_dynamic_schedules():
     """
-    Checks for dynamic schedules in the database and triggers tasks as needed.
-    This task is the heartbeat of the dynamic scheduler system and should be
-    scheduled to run frequently (e.g., every minute).
+    Checks for enabled schedules in the database and triggers them if they are due.
+    This is the core scheduler logic.
     """
     now = datetime.now()
-    lgr.info(f'Checking dynamic schedules at {now}')
+    lgr.info(f'Core scheduler check running at {now}')
 
     try:
-        # Use the schedule manager for better database interaction
         manager = ScheduleManager()
-        
-        # 1. 自动重置卡住的任务 (stuck tasks)
-        running_schedules = manager.get_all(where_clause="is_running = 1 AND is_del = 0")
-        stuck_timeout = datetime.timedelta(minutes=10)  # 10分钟超时
-        
-        for schedule in running_schedules:
-            # updated_at 是自动更新的，我们检查它
-            if schedule.updated_at and (now - schedule.updated_at > stuck_timeout):
-                lgr.warning(f'Task "{schedule.name}" (ID: {schedule.id}) appears to be stuck. '
-                            f'Last update was at {schedule.updated_at}. Resetting status.')
-                manager.update(schedule.id, {"is_running": False, "pid": None})
-
-        # 2. 获取所有活跃的计划任务 (只处理启用的且未删除的任务)
         schedules = manager.get_all(where_clause="enabled = 1 AND is_del = 0")
-        lgr.info(f'Found {len(schedules)} active schedules to evaluate')
-        
-        # 3. 检查并更新下次执行时间（实时计算）
+        lgr.info(f'Found {len(schedules)} active schedules to evaluate.')
+
         for schedule in schedules:
-            try:
-                # 如果任务正在运行，跳过更新下次执行时间
-                if schedule.is_running:
-                    continue
-                    
-                # 检查下次执行时间是否已过期
-                if schedule.next_run and schedule.next_run < now:
-                    from croniter import croniter
-                    # 计算从当前时间开始的下一次执行时间
-                    new_next_run = croniter(schedule.cron_schedule, now).get_next(datetime)
-                    # 更新数据库
-                    manager.update(schedule.id, {"next_run": new_next_run})
-                    lgr.info(f'Updated next_run for schedule "{schedule.name}" (ID: {schedule.id}) to {new_next_run}')
-            except Exception as e:
-                lgr.error(f'Error updating next_run for schedule {schedule.id}: {str(e)}')
-        
-        # 4. 获取所有状态为"运行中"但已经完成的任务
-        running_schedules = manager.get_all(where_clause="is_running = 1 AND is_del = 0")
-        for schedule in running_schedules:
-            # 检查任务是否仍在运行
-            if schedule.pid:
-                import os
-                try:
-                    # 尝试向进程发送信号0来检查它是否存在
-                    os.kill(schedule.pid, 0)
-                    # 如果没有抛出异常，进程仍在运行
-                    continue
-                except OSError:
-                    # 进程不存在，将任务标记为未运行
-                    lgr.info(f'Process for schedule "{schedule.name}" (PID: {schedule.pid}) is no longer running, marking as not running')
-                    manager.update(schedule.id, {"is_running": False, "pid": None})
-        
-        # 5. 检查并触发到期的任务
-        for schedule in schedules:
-            # Skip schedules that are already running
-            if schedule.is_running:
+            # Skip if the task is already marked as running
+            if getattr(schedule, 'is_running', False):
                 lgr.debug(f'Schedule "{schedule.name}" is already running, skipping.')
                 continue
+
+            try:
+                from croniter import croniter
                 
-            # A robust way to check if a task should have run.
-            # We iterate from the last known run time up to the current time.
-            # This ensures we don't miss runs if the service was down.
-            last_run = schedule.last_run or datetime.fromtimestamp(0)
-            cron = croniter(schedule.cron_schedule, last_run)
-            
-            # Get the next scheduled run time based on the last execution
-            next_run_time = cron.get_next(datetime)
-
-            if next_run_time <= now:
-                lgr.info(f'[Scheduler] Triggering task for schedule "{schedule.name}" (ID: {schedule.id})')
-
-                # Extract parameters from the schedule
-                params = schedule.params or {}
-
-                # Get the correct task function from the task map
-                task_name = TASK_MAP.get(schedule.task_type)
-                if not task_name:
-                    lgr.error(f"No task found for type '{schedule.task_type}' on schedule {schedule.id}. Skipping.")
-                    continue
-
-                # Mark the task as running in the database
-                manager.update(schedule.id, {"is_running": True})
-
-                # Dynamically trigger the task by name
-                from celery import current_app
-                task = current_app.send_task(task_name, kwargs=params)
+                # Determine the base time for the next run calculation
+                last_run = getattr(schedule, 'last_run', None) or datetime.fromtimestamp(0)
                 
-                # Update the schedule's timestamps and task info in the database
-                new_next_run = croniter(schedule.cron_schedule, now).get_next(datetime)
-                schedule_updates = {
-                    "last_run": now,
-                    "next_run": new_next_run,
-                    "task_id": task.id
-                }
-                manager.update(schedule.id, **schedule_updates)
-                
-                lgr.info(f'[Scheduler] Schedule "{schedule.name}" executed. Next run at {new_next_run}.')
+                # Check if the task is due
+                cron = croniter(schedule.cron_schedule, last_run)
+                next_run_time = cron.get_next(datetime)
+
+                if next_run_time <= now:
+                    lgr.info(f'Triggering task for schedule "{schedule.name}" (ID: {schedule.id})')
+                    
+                    # Get task type and parameters
+                    task_type = schedule.task_type
+                    params = schedule.params or {}
+                    
+                    # Find the corresponding Celery task from the mapping
+                    task_name = TASK_MAP.get(task_type)
+                    if not task_name:
+                        lgr.error(f"No task found for type '{task_type}' on schedule {schedule.id}. Skipping.")
+                        continue
+
+                    # Mark as running BEFORE dispatching
+                    manager.update(schedule.id, {"is_running": True})
+
+                    # Dispatch the task to Celery
+                    from celery import current_app
+                    task = current_app.send_task(task_name, kwargs=params)
+                    
+                    # Update schedule with new run times and task ID
+                    new_next_run = croniter(schedule.cron_schedule, now).get_next(datetime)
+                    schedule_updates = {
+                        "last_run": now,
+                        "next_run": new_next_run,
+                        "task_id": task.id
+                    }
+                    manager.update(schedule.id, schedule_updates)
+                    
+                    lgr.info(f'Schedule "{schedule.name}" executed. Next run at {new_next_run}. Task ID: {task.id}')
+
+            except Exception as e:
+                lgr.error(f'Error processing schedule {schedule.id} ("{schedule.name}"): {str(e)}')
+                # Optional: Attempt to reset the task so it can run again later
+                manager.update(schedule.id, {"is_running": False})
 
     except Exception as e:
-        lgr.error(f'[Scheduler] Error checking dynamic schedules: {str(e)}. {traceback.format_exc()}')
+        lgr.error(f'Fatal error in check_dynamic_schedules: {str(e)}. {traceback.format_exc()}')
 
     return 'ok'
 
@@ -166,14 +123,10 @@ def generate_tweet_task(self, topic: str = None):
     task_id = self.request.id
     
     try:
-        # Find the schedule associated with this task
         manager = ScheduleManager()
         
-        # Try to update running status 
         try:
             pid = os.getpid()
-            
-            # Try to find the schedule by task_id if we have one
             schedules = manager.get_all(where_clause="task_id = ?", params=(task_id,))
             if schedules:
                 schedule = schedules[0]
@@ -216,8 +169,6 @@ def generate_tweet_task(self, topic: str = None):
     except Exception as e:
         # Task failed
         try:
-            from puti.db.schedule_manager import ScheduleManager
-            manager = ScheduleManager()
             schedules = manager.get_all(where_clause="task_id = ?", params=(task_id,))
             if schedules:
                 schedule = schedules[0]
@@ -227,7 +178,7 @@ def generate_tweet_task(self, topic: str = None):
             lgr.warning(f'Could not update status for task {task_id}: {str(inner_e)}')
             
         lgr.error(f'[Task {task_id}] Failed: {str(e)}. {traceback.format_exc()}')
-        return {"status": "error", "message": str(e)}
+        return str(e)
         
     finally:
         lgr.info(f'[Task {task_id}] Execution finished')
@@ -271,4 +222,5 @@ def auto_manage_scheduler():
         return 'No scheduler management needed'
     except Exception as e:
         lgr.error(f'Error in auto_manage_scheduler: {str(e)}. {traceback.format_exc()}')
+        return f'Error: {str(e)}' 
         return f'Error: {str(e)}' 

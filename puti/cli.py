@@ -1,20 +1,28 @@
-import datetime
-import puti.bootstrap  # noqa: F401, must be the first import
+"""
+@Author: obstacle
+@Time: 10/05/25 16:51
+@Description: CLI commands for the PuTi package
+"""
+import os
+import json
 import click
 import asyncio
 import questionary
-import os
 import subprocess
-
+from typing import Optional, Dict, Any, List
+from pathlib import Path
 from rich.console import Console
-from rich.markdown import Markdown
 from rich.panel import Panel
+from rich.markdown import Markdown
 from rich.table import Table
-from puti.db.schedule_manager import ScheduleManager
-from puti.llm.roles.agents import Alex, Ethan
-from puti.core.config_setup import ensure_twikit_config_is_present
-from puti.scheduler import WorkerDaemon, BeatDaemon, ensure_worker_running, ensure_beat_running
 
+from puti.core.config_setup import ensure_twikit_config_is_present
+from puti.db.schedule_manager import ScheduleManager
+from puti.scheduler import ensure_worker_running, ensure_beat_running, WorkerDaemon, BeatDaemon
+from puti.llm.roles.agents import Alex, Ethan
+from puti.constant.base import Pathh
+
+# 创建全局console实例
 console = Console()
 
 
@@ -62,7 +70,7 @@ def alex_chat(name):
                     title=f"🤖 {name}",
                     border_style="green",
                     title_align="left"
-                )
+            )
                 console.print(response_panel)
 
             except (KeyboardInterrupt, EOFError):
@@ -112,7 +120,7 @@ def ethan_chat(name):
                     title=f"🤖 {name}",
                     border_style="green",
                     title_align="left"
-                )
+            )
                 console.print(response_panel)
 
             except (KeyboardInterrupt, EOFError):
@@ -135,13 +143,14 @@ def scheduler(ctx):
         console.print("[red]✗ Failed to start Celery worker. Please check logs.[/red]")
         ctx.abort()
     
-    ctx.obj = {'manager': ScheduleManager()}
+    ctx.obj = {'manager': ScheduleManager(), 'console': console}
 
 
 @scheduler.command('list')
-def list_tasks():
+@click.pass_context
+def list_tasks(ctx):
     """Lists all non-deleted tasks."""
-    console = Console()
+    console = ctx.obj.get('console', Console())
     manager = ScheduleManager()
     tasks = manager.get_all(where_clause="is_del = 0")
 
@@ -159,13 +168,13 @@ def list_tasks():
             str(task.id),
             task.name,
             enabled_str,
-            task.task_type,
+            task.task_type_display,
             task.cron_schedule,
             str(task.params)
         )
     
     console.print(table)
-
+    
 
 @scheduler.command('create')
 @click.argument('name')
@@ -175,7 +184,7 @@ def list_tasks():
 @click.pass_context
 def create_task(ctx, name, cron, task_type, params):
     """Creates a new task (disabled by default)."""
-    console = Console()
+    console = ctx.obj.get('console', Console())
     manager = ctx.obj['manager']
     try:
         import json
@@ -200,7 +209,7 @@ def create_task(ctx, name, cron, task_type, params):
 @click.pass_context
 def delete_task(ctx, task_id):
     """Logically deletes a task by setting is_del=1."""
-    console = Console()
+    console = ctx.obj.get('console', Console())
     manager = ctx.obj['manager']
     task = manager.get_by_id(task_id)
     if not task:
@@ -217,7 +226,7 @@ def delete_task(ctx, task_id):
 @click.pass_context
 def start_task(ctx, task_id):
     """Enables a disabled task and ensures the scheduler (beat) is running."""
-    console = Console()
+    console = ctx.obj.get('console', Console())
     manager = ctx.obj['manager']
     task = manager.get_by_id(task_id)
 
@@ -227,7 +236,7 @@ def start_task(ctx, task_id):
     if task.enabled:
         console.print(f"[yellow]Task '{task.name}' (ID: {task_id}) is already enabled.[/yellow]")
         return
-
+    
     manager.update(task_id, {'enabled': True})
     console.print(f"[green]✓ Task '{task.name}' (ID: {task_id}) has been enabled.[/green]")
 
@@ -243,7 +252,7 @@ def start_task(ctx, task_id):
 @click.pass_context
 def stop_task(ctx, task_id):
     """Disables an enabled task."""
-    console = Console()
+    console = ctx.obj.get('console', Console())
     manager = ctx.obj['manager']
     task = manager.get_by_id(task_id)
 
@@ -253,25 +262,33 @@ def stop_task(ctx, task_id):
     if not task.enabled:
         console.print(f"[yellow]Task '{task.name}' (ID: {task_id}) is already disabled.[/yellow]")
         return
-
+    
     manager.update(task_id, {'enabled': False})
     console.print(f"[green]✓ Task '{task.name}' (ID: {task_id}) has been disabled.[/green]")
     ensure_beat_running()  # Ensure beat is running to pick up the change
 
 
 @scheduler.command('logs')
-@click.argument('service', type=click.Choice(['worker', 'beat']))
+@click.argument('service', type=click.Choice(['worker', 'beat', 'scheduler']))
 @click.option('--lines', '-n', default=20, help="Number of log lines to show.")
-def show_logs(service, lines):
-    """Shows logs for the worker or beat service."""
-    console = Console()
-    daemon = WorkerDaemon() if service == 'worker' else BeatDaemon()
-    log_file = daemon.log_file
+@click.pass_context
+def show_logs(ctx, service, lines):
+    """Shows logs for scheduler, worker, or beat services."""
+    console = ctx.obj.get('console', Console())
+    
+    # 根据选择的服务类型确定日志文件路径
+    if service == 'worker':
+        log_file = Pathh.WORKER_LOG.val
+    elif service == 'beat':
+        log_file = Pathh.BEAT_LOG.val
+    elif service == 'scheduler':
+        # scheduler 日志实际上是 scheduler_beat.log
+        log_file = str(Path(Pathh.CONFIG_DIR.val) / 'logs' / 'scheduler_beat.log')
     
     if not os.path.exists(log_file):
         console.print(f"[red]Log file not found at: {log_file}[/red]")
         return
-        
+    
     console.print(Panel(f"Showing last {lines} lines from [bold]{log_file}[/bold]", border_style="blue"))
     try:
         # Use tail for efficiency

@@ -12,22 +12,18 @@ from pathlib import Path
 from puti.constant.base import Pathh
 from typing import Optional, List, Dict, Any
 from puti.logs import logger_factory
+from pydantic import BaseModel
 
 lgr = logger_factory.default
 
 
-class Daemon:
+class Daemon(BaseModel):
     """Base class for managing daemon processes (worker, beat)."""
-    
-    def __init__(self, name: str, pid_filename: str, log_filename: str):
-        self.name = name
-        self.pid_dir = os.path.expanduser('~/puti/run')
-        self.log_dir = os.path.expanduser('~/puti/logs')
-        os.makedirs(self.pid_dir, exist_ok=True)
-        os.makedirs(self.log_dir, exist_ok=True)
-        self.pid_file = os.path.join(self.pid_dir, pid_filename)
-        self.log_file = os.path.join(self.log_dir, log_filename)
-    
+
+    name: str
+    pid_file: str
+    log_file: str
+
     def _get_pid_from_file(self) -> Optional[int]:
         """Reads the PID from the PID file."""
         if not os.path.exists(self.pid_file):
@@ -43,8 +39,9 @@ class Daemon:
         pid = self._get_pid_from_file()
         if not pid:
             return False
+
         try:
-            os.kill(pid, 0)
+            os.kill(pid, 0)  # not kill, for detect
             return True
         except OSError:
             # Process doesn't exist, clean up stale PID file
@@ -58,14 +55,15 @@ class Daemon:
     
     def start(self, env_command: str = "conda run -n puti") -> bool:
         """Starts the daemon process."""
+        # TODO: virtual environment
         if self.is_running():
-            lgr.info(f"{self.name} is already running")
+            lgr.debug(f"{self.name} is already running")
             return True
         
         command = self.get_command()
-        full_command = f"{env_command} {command}"
+        full_command = f"{env_command} {command}" if env_command else command
         
-        lgr.info(f"Starting {self.name} with command: {full_command}")
+        lgr.debug(f"Starting {self.name} with command: {full_command}")
         try:
             subprocess.Popen(
                 full_command.split(),
@@ -138,10 +136,7 @@ class Daemon:
 
 class WorkerDaemon(Daemon):
     """Manages the Celery worker daemon."""
-    
-    def __init__(self):
-        super().__init__(name="worker", pid_filename="worker.pid", log_filename="worker.log")
-    
+
     def get_command(self) -> str:
         return (
             f"celery -A celery_queue.celery_app worker "
@@ -158,8 +153,8 @@ class BeatDaemon(Daemon):
         return (
             f"celery -A celery_queue.celery_app beat "
             f"--loglevel=INFO --detach "
-            f"--pidfile={Pathh.BEAT_PID.val} "
-            f"--logfile={Pathh.BEAT_LOG.val}"
+            f"--pidfile={self.pid_file} "
+            f"--logfile={self.log_file}"
         )
 
 
@@ -171,7 +166,7 @@ class SchedulerDaemon(BeatDaemon):
 
 def ensure_worker_running() -> bool:
     """Ensures that the worker daemon is running."""
-    worker = WorkerDaemon()
+    worker = WorkerDaemon(name='worker', pid_file=Pathh.WORKER_PID.val, log_file=Pathh.WORKER_LOG.val)
     if not worker.is_running():
         return worker.start()
     return True
@@ -179,7 +174,7 @@ def ensure_worker_running() -> bool:
 
 def ensure_beat_running() -> bool:
     """Ensures that the beat daemon is running."""
-    beat = BeatDaemon()
+    beat = BeatDaemon(name='beat', pid_file=Pathh.BEAT_PID.val, log_file=Pathh.BEAT_LOG.val)
     if not beat.is_running():
         return beat.start()
     return True

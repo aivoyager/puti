@@ -86,10 +86,14 @@ class Pathh(Base):
 
     SQLITE_FILE = (str(Path(config_dir) / 'puti.sqlite'), 'PuTi sqlite file')
 
-    # celery beat
-    BEAT_PID = (str(Path(config_dir) / 'celery' / 'beat.pid'), 'celery beat pid file')
-    BEAT_LOG = (str(Path(config_dir) / 'celery' / 'beat.log'), 'celery beat log file')
+    # celery beat - 使用与当前运行进程相同的路径
+    BEAT_PID = (str(Path(config_dir) / 'run' / 'beat.pid'), 'celery beat pid file')
+    BEAT_LOG = (str(Path(config_dir) / 'logs' / 'beat.log'), 'celery beat log file')
     BEAT_DB = (str(Path(config_dir) / 'celery' / 'celerybeat-schedule.db'), 'celery beat db file')
+
+    # celery worker
+    WORKER_PID = (str(Path(config_dir) / 'celery' / 'worker.pid'), 'celery worker pid file')
+    WORKER_LOG = (str(Path(config_dir) / 'celery' / 'worker.log'), 'celery worker log file')
     
     @property
     def val(self) -> str:
