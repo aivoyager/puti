@@ -26,7 +26,10 @@ class Action(BaseModel):
 
     name: str = Field(..., description="The name of the action")
     description: str = Field('', description="A brief description of the action")
-    prompt: Optional[Union['Action', str, Template, MsgPlaceholder]] = Field(default=None, description="The prompt to be sent to the role. Can be a plain string, a Jinja2 Template, or a callable.")
+    prompt: Optional[Union['Action', str, Template, MsgPlaceholder]] = Field(
+        default=None,
+        description="The prompt to be sent to the role. Can be a plain string, a Jinja2 Template, or a callable."
+    )
 
     async def run(self, role: Role, *args, **kwargs) -> Union[str, Message]:
         """

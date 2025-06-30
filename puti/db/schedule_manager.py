@@ -25,8 +25,14 @@ class ScheduleManager(BaseManager[TweetSchedule]):
         """Initialize with TweetSchedule as the model type."""
         super().__init__(model_type=TweetSchedule, **kwargs)
     
-    def create_schedule(self, name: str, cron_schedule: str, enabled: bool = True, 
-                       params: Optional[Dict[str, Any]] = None, task_type: str = TaskType.POST.val) -> TweetSchedule:
+    def create_schedule(
+            self,
+            name: str,
+            cron_schedule: str,
+            enabled: bool = True,
+            params: Optional[Dict[str, Any]] = None,
+            task_type: str = TaskType.POST.val
+    ) -> TweetSchedule:
         """
         Create a new schedule in the database.
         
@@ -45,8 +51,8 @@ class ScheduleManager(BaseManager[TweetSchedule]):
         try:
             TaskType.elem_from_str(task_type)
         except ValueError:
-            lgr.warning(f"Invalid task type: {task_type}, using default: {TaskType.POST.val}")
-            task_type = TaskType.POST.val
+            lgr.warning(f"Invalid task type: {task_type}, using default: {TaskType.UNIMPLEMENTED.val}")
+            task_type = TaskType.UNIMPLEMENTED.val
         
         # Calculate next run time
         now = datetime.datetime.now()

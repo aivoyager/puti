@@ -142,6 +142,8 @@ class TaskType(Base):
     SCHEDULED_THREAD = ('scheduled_thread', 'Scheduled Thread Task')
     OTHER = ('other', 'Other Task')
 
+    UNIMPLEMENTED = ('unimplemented', 'Unimplemented Task')
+
 
 class TaskPostType(Base):
     IMAGE = ('image', 'image task')

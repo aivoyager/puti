@@ -193,7 +193,12 @@ class Graph(BaseModel):
             A dictionary mapping vertex IDs to their results
         """
         if not self.start_vertex_id:
-            raise ValueError("Start vertex not set")
+            if len(self.vertices) == 1:
+                self.start_vertex_id = next(iter(self.vertices.values())).id
+            elif len(self.start_vertex_id) == 0:
+                raise ValueError("No start vertex set and graph has more than one vertex")
+            else:
+                raise ValueError("Start vertex not set")
             
         self.reset()
         self.shared_context.clear()

@@ -8,7 +8,8 @@ from pydantic import Field, ConfigDict
 from puti.llm.nodes import OpenAINode
 from puti.llm.messages import UserMessage
 from puti.logs import logger_factory
-from typing import Union, Optional
+from typing import Union, Optional, List, Literal
+import datetime
 
 
 lgr = logger_factory.llm
@@ -105,8 +106,41 @@ class PublishTweetAction(Action):
     async def run(self, role, previous_result=None, *args, **kwargs):
         if previous_result:
             tweet_content = previous_result.content if hasattr(previous_result, 'content') else str(previous_result)
+        else:
+            tweet_content = None
 
-        response = await super().run(role=role, previous_result=previous_result, *args, **kwargs)
+        response = await super().run(role=role, previous_result=tweet_content, *args, **kwargs)
         lgr.debug("Tweet publication completed")
         return response
+
+
+class ReplyToRecentUnrepliedTweetsAction(Action):
+    """
+    An action to find and reply to unreplied tweets within a specified time frame.
+    This action instructs an agent (like Ethan) to perform the task.
+    """
+    model_config = ConfigDict(arbitrary_types_allowed=True, extra="allow")
+
+    name: str = 'reply_to_recent_unreplied_tweets'
+    description: str = 'Finds and replies to unreplied tweets from the last n days or n hours.'
+
+    time_value: int = Field(default=7, description="The number of time units to look back (e.g., 7).")
+    time_unit: Literal['days', 'hours'] = Field(default='days', description="The unit of time, either 'days' or 'hours'.")
+
+    async def run(self, role, time_value: Optional[int] = None, time_unit: Optional[Literal['days', 'hours']] = None, *args, **kwargs):
+        """
+        Instructs the role to handle replying to recent tweets.
+        The time frame can be customized by passing 'time_value' and 'time_unit'.
+        """
+        final_time_value = time_value if time_value is not None else self.time_value
+        final_time_unit = time_unit if time_unit is not None else self.time_unit
+
+        lgr.info(f"Delegating the task of replying to unreplied tweets from the last {final_time_value} {final_time_unit}.")
+        # The instruction will be processed by the agent's LLM, which should use its tools.
+        instruction = (
+            f"Find all tweets from the last {final_time_value} {final_time_unit} that mention me "
+            f"and have not been replied to. For each of these tweets, "
+            f"please draft and send a thoughtful reply."
+        )
+        return await role.run(instruction)
 

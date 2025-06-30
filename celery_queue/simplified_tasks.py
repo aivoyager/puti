@@ -14,7 +14,7 @@ from celery import shared_task
 from croniter import croniter
 from puti.logs import logger_factory
 from puti.constant.base import TaskType
-from puti.llm.actions.x_bot import GenerateTweetAction, PublishTweetAction
+from puti.llm.actions.x_bot import GenerateTweetAction, PublishTweetAction, ReplyToRecentUnrepliedTweetsAction
 from puti.llm.roles.agents import Ethan, EthanG
 from puti.llm.workflow import Workflow
 from puti.llm.graph import Graph, Vertex
@@ -80,8 +80,9 @@ def get_ethan_instance():
 
 TASK_MAP = {
     TaskType.POST.val: 'celery_queue.simplified_tasks.generate_tweet_task',
-    TaskType.REPLY.val: 'celery_queue.simplified_tasks.unimplemented_task',
+    TaskType.REPLY.val: 'celery_queue.simplified_tasks.reply_to_tweets_task',
     TaskType.RETWEET.val: 'celery_queue.simplified_tasks.unimplemented_task',
+    TaskType.UNIMPLEMENTED.val: 'celery_queue.simplified_tasks.unimplemented_task'
 }
 
 
@@ -133,12 +134,13 @@ def check_dynamic_schedules():
                         lgr.error(f"No task found for type '{task_type}' on schedule {schedule.id}. Skipping.")
                         continue
 
-                    # Mark as running before dispatching the task
+                    # Mark as running before dispatching the task and include the schedule_id
                     manager.update(schedule.id, {"is_running": True})
 
-                    # Dispatch the task to Celery
+                    # Dispatch the task to Celery with schedule_id and other params
                     from celery import current_app
-                    task = current_app.send_task(task_name, kwargs=params)
+                    task_kwargs = {"schedule_id": schedule.id, **params}
+                    task = current_app.send_task(task_name, kwargs=task_kwargs)
                     
                     # Update the schedule's run time and task ID
                     new_next_run = croniter(schedule.cron_schedule, now).get_next(datetime)
@@ -172,7 +174,7 @@ def unimplemented_task(self, **kwargs):
 
 
 @shared_task(bind=True)
-def generate_tweet_task(self, topic: str = None):
+async def generate_tweet_task(self, schedule_id, topic, **kwargs):
     """
     Generates and publishes a tweet using a Graph Workflow.
 
@@ -183,18 +185,18 @@ def generate_tweet_task(self, topic: str = None):
     from puti.db.task_state_guard import TaskStateGuard
 
     task_id = self.request.id
-    
+
     # Use TaskStateGuard to ensure the task state is always updated correctly.
     with TaskStateGuard.for_task(task_id=task_id) as guard:
         lgr.info(f'[Task {task_id}] generate_tweet_task started, topic: {topic}')
-        
+
         # You can update additional states here if needed.
         guard.update_state(status="generating_tweet")
 
         # Create action instances.
         generate_tweet_action = GenerateTweetAction(topic=topic)
         post_tweet_action = PublishTweetAction()
-        
+
         # Use the module-level Ethan instance to avoid repeated creation.
         ethan = get_ethan_instance()
 
@@ -213,14 +215,44 @@ def generate_tweet_task(self, topic: str = None):
 
         # Execute the workflow.
         workflow = Workflow(graph=graph)
-        resp = run_async(workflow.run_until_vertex(post_tweet_vertex.id))
-        
+        resp = await workflow.run_until_vertex(post_tweet_vertex.id)
+
         # No need to manually update task status here; TaskStateGuard handles it automatically.
         # On successful completion, it automatically sets is_running=False, pid=None, and last_run=start_time.
-        
+
         # Log completion information.
         lgr.info(f'[Task {task_id}] Completed successfully')
         return resp
+
+
+@shared_task(bind=True)
+async def reply_to_tweets_task(self, schedule_id, **kwargs):
+    """
+    Celery task to reply to recent tweets based on a schedule.
+    It uses a TaskStateGuard to manage the lifecycle of the task.
+    This task is defined as async.
+    """
+    with TaskStateGuard.for_task(task_id=self.request.id, schedule_id=schedule_id) as guard:
+        lgr.info(f"Executing async reply to tweets task for schedule_id: {schedule_id} with params: {kwargs}")
+
+        # Explicitly extract known parameters from the task's keyword arguments.
+        time_value = kwargs.get('time_value')
+        time_unit = kwargs.get('time_unit')
+
+        # Instantiate the graph and action
+        graph = Graph()
+        reply_action = ReplyToRecentUnrepliedTweetsAction(time_value=time_value, time_unit=time_unit)
+        reply_tweet_vertex = Vertex(id='reply_tweet', action=reply_action, role=get_ethan_instance())
+        graph.add_vertices(reply_tweet_vertex)
+
+        workflow = Workflow(graph=graph)
+
+        guard.update_state(status="reply_tweet")
+
+        resp = await workflow.run()
+
+        lgr.info(f"Reply task for schedule {schedule_id} completed. Final result: {resp}")
+        return str(resp)
 
 
 @shared_task()
@@ -257,9 +289,9 @@ def auto_manage_scheduler():
             # daemon.stop()
             # lgr.info('Scheduler auto-stopped')
             # return 'Scheduler auto-stopped'
-            
-        return 'Scheduler status checked, no action needed'
+        
+        return 'Scheduler state checked'
         
     except Exception as e:
-        lgr.error(f'Error in auto_manage_scheduler: {str(e)}')
-        return f'Error: {str(e)}' 
+        lgr.error(f"Error in auto_manage_scheduler: {str(e)}")
+        return 'Error checking scheduler state' 
