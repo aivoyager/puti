@@ -186,26 +186,64 @@ class SoftwareEngineer(McpRole):
     goal: str = 'Your goal is to design, implement, and maintain scalable and robust software systems that meet user requirements and business objectives...'
 ```
 
-### 5. 📅 Using the Task Scheduler
-Puti includes a powerful task scheduler for automated tweet generation and other recurring tasks.
+### 5. 📅 Task Scheduler (`puti scheduler`)
+Puti includes a powerful, built-in task scheduler for automating recurring tasks like posting tweets or replying to mentions. It runs as a persistent background process and can be managed entirely from the command line.
 
+![Puti Scheduler Logs](docs/puti_scheduler.png)
+
+#### Managing the Scheduler Process
+The scheduler runs as a daemon process managed by Celery Beat.
 ```bash
-# First, make sure your environment is set up
-# For development environment:
-python -m puti.bootstrap
-# For installed package:
-# puti-setup
+# Start the scheduler in the background
+puti scheduler start
 
-# List all scheduled tasks
+# Stop the scheduler
+puti scheduler stop
+
+# Check the status of the scheduler and all tasks
+puti scheduler status
+```
+
+#### Managing Tasks
+You can create, list, and manage individual scheduled tasks.
+```bash
+# List all scheduled tasks in a table
 puti scheduler list
 
-# Create a new scheduled task (runs daily at 12:00)
-puti scheduler create daily_tweet "0 12 * * *" --topic "AI News"
+# Create a new task (it will be disabled by default)
+# This example creates a daily task to post a tweet about "AI News" at 12:00
+puti scheduler create daily_post "0 12 * * *" --type "post" --params '{"topic": "AI News"}'
 
-# Enable or disable a specific task
+# Create a task to reply to unreplied mentions from the last 3 days, running every hour
+puti scheduler create hourly_reply "0 * * * *" --type "reply" --params '{"time_value": 3, "time_unit": "days"}'
+
+# Enable or disable a task by its ID
 puti scheduler enable 1
-puti scheduler disable 1
+puti scheduler disable 2
+
+# Logically delete a task
+puti scheduler delete 1
 ```
+
+#### Viewing Logs
+The scheduler comes with a robust, real-time logging command with powerful filtering options.
+```bash
+# Stream logs in real-time (like tail -f)
+puti scheduler logs --follow
+
+# Filter logs for a specific keyword (e.g., "error")
+puti scheduler logs --filter "error"
+
+# Show only logs of a certain level (e.g., "WARNING")
+puti scheduler logs --level "WARNING"
+
+# Show simplified output without timestamps and other metadata
+puti scheduler logs --simple
+
+# Show raw, unformatted log lines
+puti scheduler logs --raw
+```
+
 
 ## 🤝 Contributing
 

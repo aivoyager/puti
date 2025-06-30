@@ -25,20 +25,6 @@ from puti.db.task_state_guard import TaskStateGuard
 lgr = logger_factory.default
 
 
-def run_async(coro):
-    """
-    Runs and manages an asyncio event loop for a coroutine from a synchronous context.
-    This creates a new event loop for each call to ensure isolation,
-    preventing "Event loop is closed" errors in long-running applications like Celery.
-    """
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    try:
-        return loop.run_until_complete(coro)
-    finally:
-        loop.close()
-
-
 # Instantiate the Ethan role at the module level to ensure it's created only once.
 _ethan_instance = None
 # Add a thread lock to protect _ethan_instance in a multi-threaded environment.
