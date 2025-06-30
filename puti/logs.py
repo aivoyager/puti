@@ -29,7 +29,7 @@ class LoggerFactory(object):
     @classmethod
     def _define_loggers(cls, print_level=_print_level, logfile_level=_logfile_level):
         _logger.remove()
-        _logger.add(sys.stderr, level=print_level, enqueue=True, backtrace=True, diagnose=True)
+        _logger.add(sys.stderr, level=print_level, enqueue=False, backtrace=True, diagnose=True)
         _logger.level("OBSTACLES", no=38, color="<green>", icon="😋")
 
         # Define named loggers that write to the console stream instead of files.

@@ -150,16 +150,9 @@ def check_dynamic_schedules():
         manager = ScheduleManager()
         
         # 1. 自动重置卡住的任务 (stuck tasks)
-        running_schedules = manager.get_all(where_clause="is_running = 1 AND is_del = 0")
-        stuck_timeout = datetime.timedelta(minutes=10)  # 10分钟超时
-        
-        for schedule in running_schedules:
-            # updated_at 是自动更新的，我们检查它
-            if schedule.updated_at and (now - schedule.updated_at > stuck_timeout):
-                lgr.warning(f'Task "{schedule.name}" (ID: {schedule.id}) appears to be stuck. '
-                            f'Last update was at {schedule.updated_at}. Resetting status.')
-                # 即使模型中没有这些字段，我们仍可以通过字典更新数据库
-                manager.update(schedule.id, {"is_running": False, "pid": None})
+        reset_count = manager.reset_stuck_tasks(max_minutes=10)
+        if reset_count > 0:
+            lgr.info(f'Reset {reset_count} stuck tasks')
         
         # 2. 获取所有活跃的计划任务
         schedules = manager.get_all(where_clause="enabled = 1 AND is_del = 0")
@@ -168,14 +161,14 @@ def check_dynamic_schedules():
         # 3. 检查并触发到期的任务
         for schedule in schedules:
             # Skip schedules that are already running
-            if getattr(schedule, 'is_running', False):
+            if schedule.is_running:
                 lgr.debug(f'Schedule "{schedule.name}" is already running, skipping.')
                 continue
                 
             # A robust way to check if a task should have run.
             # We iterate from the last known run time up to the current time.
             # This ensures we don't miss runs if the service was down.
-            last_run = getattr(schedule, 'last_run', None) or datetime.fromtimestamp(0)
+            last_run = schedule.last_run or datetime.fromtimestamp(0)
             try:
                 cron = croniter(schedule.cron_schedule, last_run)
                 
@@ -186,7 +179,7 @@ def check_dynamic_schedules():
                     lgr.info(f'[Scheduler] Triggering task for schedule "{schedule.name}" (ID: {schedule.id})')
 
                     # Extract parameters from the schedule
-                    params = getattr(schedule, 'params', {}) or {}
+                    params = schedule.params or {}
                     topic = params.get('topic')
 
                     # Mark the task as running in the database
@@ -245,7 +238,6 @@ def generate_tweet_task(self, topic: str = None):
             schedules = manager.get_all(where_clause="task_id = ?", params=(task_id,))
             if schedules:
                 schedule = schedules[0]
-                # 即使模型中没有pid字段，我们仍可以通过字典更新数据库
                 manager.update(schedule.id, {"pid": pid})
                 lgr.info(f'[Task {task_id}] Updated schedule {schedule.name} with PID {pid}')
         except Exception as e:
@@ -273,7 +265,6 @@ def generate_tweet_task(self, topic: str = None):
             schedules = manager.get_all(where_clause="task_id = ?", params=(task_id,))
             if schedules:
                 schedule = schedules[0]
-                # 即使模型中没有is_running和pid字段，我们仍可以通过字典更新数据库
                 manager.update(schedule.id, {"is_running": False, "pid": None})
                 lgr.info(f'[Task {task_id}] Completed schedule {schedule.name} successfully')
         except Exception as e:
@@ -291,7 +282,6 @@ def generate_tweet_task(self, topic: str = None):
             schedules = manager.get_all(where_clause="task_id = ?", params=(task_id,))
             if schedules:
                 schedule = schedules[0]
-                # 即使模型中没有is_running和pid字段，我们仍可以通过字典更新数据库
                 manager.update(schedule.id, {"is_running": False, "pid": None})
                 lgr.error(f'[Task {task_id}] Failed schedule {schedule.name}: {str(e)}')
         except Exception as inner_e:

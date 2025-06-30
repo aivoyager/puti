@@ -37,6 +37,10 @@ class TweetSchedule(Model):
     task_id: Optional[str] = Field(None, max_length=255, description="Celery task ID associated with this schedule")
     task_type: str = Field(TaskType.POST.val, description="任务类型，如发推、回复等")
     is_del: bool = False
+    last_run: Optional[datetime.datetime] = Field(None, description="Last time the task was executed")
+    next_run: Optional[datetime.datetime] = Field(None, description="Next scheduled execution time")
+    is_running: bool = Field(False, description="Whether the task is currently running")
+    pid: Optional[int] = Field(None, description="Process ID of the running task, if active")
     
     @property
     def task_type_display(self) -> str:

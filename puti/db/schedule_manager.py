@@ -18,7 +18,7 @@ from puti.logs import logger_factory
 lgr = logger_factory.default
 
 
-class ScheduleManager(BaseManager):
+class ScheduleManager(BaseManager[TweetSchedule]):
     """Manages tweet schedules in the database with individual PID tracking."""
     
     def __init__(self, **kwargs):
@@ -65,6 +65,7 @@ class ScheduleManager(BaseManager):
             params=params or {},
             pid=None,
             is_running=False,
+            last_run=None,
             task_type=task_type
         )
         
@@ -141,3 +142,30 @@ class ScheduleManager(BaseManager):
                 
         # 为了兼容，调用父类的update方法
         return super().update(schedule_id, updates)
+        
+    def reset_stuck_tasks(self, max_minutes: int = 30) -> int:
+        """
+        重置卡住的任务（标记为运行中但已超过规定时间）
+        
+        Args:
+            max_minutes: 最大运行时间（分钟），超过此时间的任务将被重置
+            
+        Returns:
+            重置的任务数量
+        """
+        now = datetime.datetime.now()
+        stuck_timeout = datetime.timedelta(minutes=max_minutes)
+        reset_count = 0
+        
+        # 查找所有标记为运行中的任务
+        running_tasks = self.get_all(where_clause="is_running = 1 AND is_del = 0")
+        
+        for task in running_tasks:
+            # 如果任务有上次更新时间，并且超过了最大运行时间
+            if task.updated_at and (now - task.updated_at > stuck_timeout):
+                lgr.warning(f'Task "{task.name}" (ID: {task.id}) appears to be stuck. '
+                           f'Last update was at {task.updated_at}. Resetting status.')
+                self.update(task.id, {"is_running": False, "pid": None})
+                reset_count += 1
+                
+        return reset_count

@@ -8,6 +8,7 @@ import sys
 import signal
 import time
 import subprocess
+import platform
 from pathlib import Path
 from puti.constant.base import Pathh
 from typing import Optional, List, Dict, Any
@@ -15,6 +16,44 @@ from puti.logs import logger_factory
 from pydantic import BaseModel
 
 lgr = logger_factory.default
+
+
+def get_current_venv_command() -> Optional[str]:
+    """
+    Determines the command to run in the current Python virtual environment.
+    Supports conda, venv, and poetry.
+    Returns the absolute path to the python executable if possible.
+    """
+    # Check for conda environment
+    conda_env_path = os.environ.get('CONDA_PREFIX')
+    if conda_env_path:
+        python_executable = Path(conda_env_path) / 'bin' / 'python'
+        if python_executable.exists():
+            return str(python_executable)
+
+    # Check for standard venv
+    virtual_env_path = os.environ.get('VIRTUAL_ENV')
+    if virtual_env_path:
+        python_executable = Path(virtual_env_path) / 'bin' / 'python'
+        if python_executable.exists():
+            return str(python_executable)
+
+    # If inside an active venv, sys.executable should be the right one
+    if hasattr(sys, 'real_prefix') or (hasattr(sys, 'base_prefix') and sys.base_prefix != sys.prefix):
+        return sys.executable
+
+    # Fallback for poetry
+    try:
+        result = subprocess.run(['poetry', 'env', 'info', '-p'], capture_output=True, text=True, check=True)
+        venv_path = result.stdout.strip()
+        if venv_path:
+            python_executable = Path(venv_path) / 'bin' / 'python'
+            if python_executable.exists():
+                return str(python_executable)
+    except (FileNotFoundError, subprocess.CalledProcessError):
+        pass
+
+    return "python" # Fallback to just 'python'
 
 
 class Daemon(BaseModel):
@@ -53,32 +92,53 @@ class Daemon(BaseModel):
         """Returns the command to start the daemon. Must be implemented by subclasses."""
         raise NotImplementedError
     
-    def start(self, env_command: str = "conda run -n puti") -> bool:
+    def start(self, env_command: Optional[str] = "auto") -> bool:
         """Starts the daemon process."""
-        # TODO: virtual environment
         if self.is_running():
             lgr.debug(f"{self.name} is already running")
             return True
-        
+
+        if env_command == "auto":
+            env_command = get_current_venv_command()
+
         command = self.get_command()
-        full_command = f"{env_command} {command}" if env_command else command
         
+        # If env_command is a python executable, we use it directly.
+        # Otherwise, it's a command like 'poetry run'.
+        if env_command and Path(env_command).is_file() and 'python' in Path(env_command).name:
+            full_command = f"{env_command} -m {command}"
+        else:
+            full_command = f"{env_command} {command}" if env_command else command
+
         lgr.debug(f"Starting {self.name} with command: {full_command}")
-        try:
-            subprocess.Popen(
-                full_command.split(),
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL
-            )
+
+        # Get the current environment and add the fork safety variable for macOS
+        proc_env = os.environ.copy()
+        if platform.system() == "Darwin":
+            proc_env["OBJC_DISABLE_INITIALIZE_FORK_SAFETY"] = "YES"
             
+        try:
+            process = subprocess.Popen(
+                full_command.split(),
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                env=proc_env
+            )
+
             # Wait for the process to start and create its PID file
             for _ in range(10):
                 time.sleep(1)
                 if self.is_running():
                     lgr.info(f"{self.name} started successfully")
                     return True
-            
+
+            # If the process failed to start, read stderr
+            _, stderr = process.communicate(timeout=1)
+            error_message = stderr.strip() if stderr else "No error message captured."
             lgr.error(f"Failed to start {self.name}. Check the log file: {self.log_file}")
+            if error_message:
+                lgr.error(f"Captured stderr: {error_message}")
             return False
         except Exception as e:
             lgr.error(f"Error starting {self.name}: {str(e)}")

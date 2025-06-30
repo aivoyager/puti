@@ -3,7 +3,7 @@
 @Time: 27/06/20 10:00
 @Description: A base manager for handling database operations for a specific model.
 """
-from typing import Type, List, Optional, Dict, Any, Tuple
+from typing import Type, List, Optional, Dict, Any, Tuple, TypeVar, Generic
 from pydantic import BaseModel, Field, ConfigDict, PrivateAttr
 import json
 import datetime
@@ -14,12 +14,15 @@ from puti.logs import logger_factory
 
 lgr = logger_factory.db
 
+# 定义泛型类型变量
+T = TypeVar('T', bound=Model)
 
-class BaseManager(BaseModel):
+
+class BaseManager(BaseModel, Generic[T]):
     """A generic model manager that inherits from BaseModel."""
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
-    model_type: Type[Model] = Field(..., description="The Pydantic model class this manager operates on.")
+    model_type: Type[T] = Field(..., description="The Pydantic model class this manager operates on.")
     db_operator: Optional[SQLiteOperator] = Field(None, description="The database operator instance.")
 
     _table_name: str = PrivateAttr()
@@ -36,15 +39,15 @@ class BaseManager(BaseModel):
         self._table_name = self.model_type.__table_name__
         self.create_table()
 
-    def get_by_id(self, record_id: int) -> Optional[Model]:
+    def get_by_id(self, record_id: int) -> Optional[T]:
         """Retrieves a single model instance by its primary key."""
         return self.db_operator.get_model_by_id(self.model_type, record_id)
 
-    def get_all(self, where_clause: str = "", params: Tuple = ()) -> List[Model]:
+    def get_all(self, where_clause: str = "", params: Tuple = ()) -> List[T]:
         """Retrieves all model instances, with an optional filter."""
         return self.db_operator.get_models(self.model_type, where_clause, params)
         
-    def get_one(self, where_clause: str = "", params: Tuple = ()) -> Optional[Model]:
+    def get_one(self, where_clause: str = "", params: Tuple = ()) -> Optional[T]:
         """
         Retrieves a single model instance based on a where clause.
         Returns None if no matches are found.
@@ -52,7 +55,7 @@ class BaseManager(BaseModel):
         results = self.get_all(where_clause, params)
         return results[0] if results else None
 
-    def save(self, instance: Model) -> int:
+    def save(self, instance: T) -> int:
         """Saves a model instance (inserts) to the database."""
         if not isinstance(instance, self.model_type):
             raise TypeError(f"Instance must be of type {self.model_type.__name__}")
