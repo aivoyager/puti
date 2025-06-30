@@ -91,13 +91,13 @@ class TwikitClient(Client, ABC):
             f"reply to tweet text :{text} author_id: {author_id} link = https://twitter.com/i/web/status/{tweet_id}")
         db = SqliteOperator()
         try:
-            # 检查是否已回复
+            # Check if it has been replied to
             sql_check = "SELECT replied FROM twitter_mentions WHERE mention_id = ?"
             result = db.fetchone(sql_check, (str(tweet_id),))
             
             # If the mention exists and has been replied to, do nothing.
             if result and result['replied']:
-                return CliResp(code=Resp.OK.val, msg="该推文已回复，无需重复操作")
+                return CliResp(code=Resp.OK.val, msg="This tweet has already been replied to, no need to repeat the operation.")
 
             # Execute the reply by calling post_tweet
             rs = await self.post_tweet(text, media_path, reply_tweet_id=tweet_id)

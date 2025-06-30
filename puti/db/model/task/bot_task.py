@@ -35,7 +35,7 @@ class TweetSchedule(Model):
     created_at: Optional[datetime.datetime] = Field(default_factory=datetime.datetime.now, json_schema_extra={'dft_time': 'now'})
     updated_at: Optional[datetime.datetime] = Field(default_factory=datetime.datetime.now, json_schema_extra={'dft_time': 'now'})
     task_id: Optional[str] = Field(None, max_length=255, description="Celery task ID associated with this schedule")
-    task_type: str = Field(TaskType.POST.val, description="任务类型，如发推、回复等")
+    task_type: str = Field(TaskType.POST.val, description="The type of task, e.g., post, reply, etc.")
     is_del: bool = False
     last_run: Optional[datetime.datetime] = Field(None, description="Last time the task was executed")
     next_run: Optional[datetime.datetime] = Field(None, description="Next scheduled execution time")
@@ -44,8 +44,8 @@ class TweetSchedule(Model):
     
     @property
     def task_type_display(self) -> str:
-        """获取任务类型的显示名称"""
+        """Get the display name of the task type."""
         try:
             return TaskType.elem_from_str(self.task_type).dsp
         except ValueError:
-            return "未知类型"
+            return "Unknown Type"

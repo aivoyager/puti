@@ -175,7 +175,7 @@ def is_mac():
 
 
 def get_specific_parent(cls, target_cls):
-    """获取指定的父类"""
+    """Get the specified parent class."""
     while cls and cls != object:
         if issubclass(cls, target_cls) and cls != target_cls:
             return target_cls
@@ -205,7 +205,7 @@ def import_class(class_name: str, module_name: str) -> type:
 
 
 def unwrap_annotated(field_type: Any) -> (Any, str, List[Any]):
-    """ 递归解析 Annotated，返回 (基础类型, 描述, 限制条件) """
+    """ Recursively parse Annotated, returning (base_type, description, constraints). """
     if get_origin(field_type) is Annotated:
         base_type, *meta = get_args(field_type)
         description = meta[0] if isinstance(meta[0], str) else ""
@@ -218,14 +218,14 @@ def unwrap_annotated(field_type: Any) -> (Any, str, List[Any]):
 
 def parse_type(field_type: Any, field_desc: str = "", constraints: List[Any] = None) -> Dict[str, Any]:
     """
-    递归解析字段类型，转换为 Function Calling 兼容的 JSON Schema 结构
+    Recursively parse field types into a Function Calling-compatible JSON Schema structure.
     """
-    field_type, annotated_desc, field_constraints = unwrap_annotated(field_type)  # 解析 Annotated，获取描述信息
-    field_desc = annotated_desc or field_desc  # 优先使用 Annotated 的描述
-    constraints = constraints or field_constraints  # 额外限制条件
+    field_type, annotated_desc, field_constraints = unwrap_annotated(field_type)  # Parse Annotated to get description
+    field_desc = annotated_desc or field_desc  # Prioritize description from Annotated
+    constraints = constraints or field_constraints  # Additional constraints
 
-    origin = get_origin(field_type)  # 获取泛型的原始类型 (List, Dict 等)
-    args = get_args(field_type)  # 获取泛型参数 (例如 List[int] -> int)
+    origin = get_origin(field_type)  # Get the raw type of a generic (List, Dict, etc.)
+    args = get_args(field_type)  # Get generic parameters (e.g., List[int] -> int)
 
     # Handle Optional[T] as Union[T, None]
     if origin is Union and len(args) == 2 and args[1] is type(None):
@@ -255,7 +255,7 @@ def parse_type(field_type: Any, field_desc: str = "", constraints: List[Any] = N
         key_base, key_desc, _ = unwrap_annotated(key_type)
         value_base, value_desc, _ = unwrap_annotated(value_type)
 
-        # 确保键是 `string`
+        # Ensure the key is a string
         if key_base is str:
             schema = {
                 "type": "object",
@@ -282,10 +282,9 @@ def parse_type(field_type: Any, field_desc: str = "", constraints: List[Any] = N
             "type": type_mapping[field_type],
             "description": field_desc
         }
-
     if constraints:
         for constraint in constraints:
-            if isinstance(constraint, list):  # 处理枚举
+            if isinstance(constraint, list):  # Handle enums
                 schema["enum"] = constraint
 
     return schema
@@ -293,7 +292,7 @@ def parse_type(field_type: Any, field_desc: str = "", constraints: List[Any] = N
 
 def tool_args_to_fc_schema(model_cls: Type['BaseModel']):
     """
-    将 ToolArgs 模型类转换为 Function Calling 兼容的 JSON 结构
+    Convert a ToolArgs model class into a Function Calling-compatible JSON structure.
     """
     schema = {
         "type": "object",
@@ -363,10 +362,12 @@ def is_valid_json(s: str) -> bool:
 
 
 def print_green(text):
+    """Prints green text to the console."""
     print(f"\033[92m{text}\033[0m")
 
 
 def print_blue(text):
+    """Prints blue text to the console."""
     print(f"\033[94m{text}\033[0m")
 
 

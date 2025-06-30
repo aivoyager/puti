@@ -11,7 +11,7 @@ def count_gpt_message_tokens(messages, model="gpt-4"):
     if model.startswith("gpt-4"):
         tokens_per_message = 3
         tokens_per_name = 1
-    else:  # gpt-3.5 等
+    else:  # gpt-3.5 etc.
         tokens_per_message = 4
         tokens_per_name = -1  # Not applicable
 
@@ -22,7 +22,7 @@ def count_gpt_message_tokens(messages, model="gpt-4"):
             num_tokens += len(encoding.encode(value))
             if key == "name":
                 num_tokens += tokens_per_name
-    num_tokens += 3  # 每个 reply 的额外 token
+    num_tokens += 3  # Additional token for each reply
     return num_tokens
 
 

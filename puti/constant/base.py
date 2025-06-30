@@ -35,37 +35,37 @@ class Base(Enum):
 
 
 class PathAutoCreate:
-    """工具类，用于自动创建路径"""
+    """Utility class for automatically creating paths."""
     
     @staticmethod
     def ensure_path(path_str: str) -> str:
-        """确保路径存在
+        """Ensure the path exists.
         
         Args:
-            path_str: 路径字符串
+            path_str: The path string.
             
         Returns:
-            原始路径字符串
+            The original path string.
         """
         if not path_str:
             return path_str
             
         path = Path(path_str)
         
-        # 判断是文件还是目录（根据是否包含文件扩展名）
-        if path.suffix:  # 有扩展名，视为文件
-            # 确保父目录存在
+        # Determine if it is a file or a directory (based on whether it contains a file extension)
+        if path.suffix:  # Has an extension, treated as a file
+            # Ensure the parent directory exists
             parent_dir = path.parent
             if not parent_dir.exists():
                 os.makedirs(parent_dir, exist_ok=True)
-        else:  # 没有扩展名，视为目录
+        else:  # No extension, treated as a directory
             if not path.exists():
                 os.makedirs(path, exist_ok=True)
                 
         return path_str
 
 
-# 首先定义基本路径，不依赖于其他路径
+# First, define the base paths without dependency on other paths.
 home_dir = str(Path.home())
 config_dir = str(Path(home_dir) / 'puti')
 
@@ -76,7 +76,7 @@ class Pathh(Base):
 
     POOL_SIZE = (3, 'db connection pool size')
 
-    # 使用预定义的变量，避免递归初始化
+    # Use predefined variables to avoid recursive initialization
     CONFIG_DIR = (config_dir, 'PuTi config dir')
 
     CONFIG_FILE = (str(Path(config_dir) / '.env'), 'PuTi config file')
@@ -86,7 +86,7 @@ class Pathh(Base):
 
     SQLITE_FILE = (str(Path(config_dir) / 'puti.sqlite'), 'PuTi sqlite file')
 
-    # celery beat - 使用与当前运行进程相同的路径
+    # celery beat - use the same path as the current running process
     BEAT_PID = (str(Path(config_dir) / 'run' / 'beat.pid'), 'celery beat pid file')
     BEAT_LOG = (str(Path(config_dir) / 'logs' / 'beat.log'), 'celery beat log file')
     BEAT_DB = (str(Path(config_dir) / 'celery' / 'celerybeat-schedule.db'), 'celery beat db file')
@@ -97,12 +97,12 @@ class Pathh(Base):
     
     @property
     def val(self) -> str:
-        """获取路径值并自动检查/创建路径"""
+        """Get the path value and automatically check/create the path."""
         path_str = super().val
         return PathAutoCreate.ensure_path(path_str)
     
     def __call__(self) -> str:
-        """调用枚举实例时自动检查/创建路径"""
+        """Automatically check/create the path when calling the enum instance."""
         return self.val
 
 
@@ -131,16 +131,16 @@ class Resp(Base):
 
 
 class TaskType(Base):
-    POST = ('post', '发推任务')
-    REPLY = ('reply', '回复任务')
-    RETWEET = ('retweet', '转发任务')
-    LIKE = ('like', '点赞任务')
-    FOLLOW = ('follow', '关注任务')
-    NOTIFICATION = ('notification', '通知任务')
-    ANALYTICS = ('analytics', '数据分析任务')
-    CONTENT_CURATION = ('content_curation', '内容策划任务')
-    SCHEDULED_THREAD = ('scheduled_thread', '计划线程任务')
-    OTHER = ('other', '其他任务')
+    POST = ('post', 'Post Task')
+    REPLY = ('reply', 'Reply Task')
+    RETWEET = ('retweet', 'Retweet Task')
+    LIKE = ('like', 'Like Task')
+    FOLLOW = ('follow', 'Follow Task')
+    NOTIFICATION = ('notification', 'Notification Task')
+    ANALYTICS = ('analytics', 'Analytics Task')
+    CONTENT_CURATION = ('content_curation', 'Content Curation Task')
+    SCHEDULED_THREAD = ('scheduled_thread', 'Scheduled Thread Task')
+    OTHER = ('other', 'Other Task')
 
 
 class TaskPostType(Base):

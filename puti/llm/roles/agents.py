@@ -73,7 +73,7 @@ class CZ(McpRole):
 
 
 class Debater(Role):
-    name: str = '乔治'
+    name: str = 'George'
 
     def model_post_init(self, __context: Any) -> None:
         self.set_tools([WebSearch])

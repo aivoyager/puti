@@ -21,8 +21,8 @@ class SQLiteOperator:
         # Ensure the directory exists
         os.makedirs(db_path, exist_ok=True)
 
-        # 使用常量定义的SQLite文件路径，而不是硬编码的文件名
-        # 注意: 如果PUTI_DATA_PATH已经指向了正确的目录，我们只需要取文件名部分
+        # Use the SQLite file path defined in constants, not a hardcoded filename
+        # Note: If PUTI_DATA_PATH already points to the correct directory, we just need the filename part
         sqlite_filename = os.path.basename(Pathh.SQLITE_FILE.val)
         self.db_file = os.path.join(db_path, sqlite_filename)
         self._ensure_table_exists()

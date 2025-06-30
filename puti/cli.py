@@ -22,7 +22,7 @@ from puti.scheduler import ensure_worker_running, ensure_beat_running, WorkerDae
 from puti.llm.roles.agents import Alex, Ethan
 from puti.constant.base import Pathh
 
-# 创建全局console实例
+# Create a global console instance
 console = Console()
 
 
@@ -150,6 +150,8 @@ def scheduler(ctx):
 @click.pass_context
 def list_tasks(ctx):
     """Lists all non-deleted tasks."""
+    from datetime import datetime
+    
     console = ctx.obj.get('console', Console())
     manager = ScheduleManager()
     tasks = manager.get_all(where_clause="is_del = 0")
@@ -160,16 +162,35 @@ def list_tasks(ctx):
     table.add_column("Enabled", justify="center")
     table.add_column("Task Type")
     table.add_column("CRON")
+    table.add_column("Next Run", style="yellow")
     table.add_column("Params")
+    
+    now = datetime.now()
 
     for task in tasks:
         enabled_str = "[green]Yes[/green]" if task.enabled else "[red]No[/red]"
+        
+        # Format next run time
+        if task.next_run:
+            if task.next_run > now:
+                time_to = (task.next_run - now).total_seconds() / 60
+                if time_to < 60:
+                    next_run_str = f"{task.next_run.strftime('%H:%M:%S')} (in {int(time_to)}m)"
+                else:
+                    hours = int(time_to / 60)
+                    next_run_str = f"{task.next_run.strftime('%H:%M:%S')} (in {hours}h)"
+            else:
+                next_run_str = f"{task.next_run.strftime('%H:%M:%S')} [red](overdue)[/red]"
+        else:
+            next_run_str = "[dim]N/A[/dim]"
+
         table.add_row(
             str(task.id),
             task.name,
             enabled_str,
             task.task_type_display,
             task.cron_schedule,
+            next_run_str,
             str(task.params)
         )
     
@@ -284,20 +305,20 @@ def show_logs(ctx, service, lines, follow, filter, level, simple, raw):
     
     console = ctx.obj.get('console', Console())
     
-    # 根据选择的服务类型确定日志文件路径
+    # Determine the log file path based on the selected service
     if service == 'worker':
         log_file = Pathh.WORKER_LOG.val
     elif service == 'beat':
         log_file = Pathh.BEAT_LOG.val
     elif service == 'scheduler':
-        # scheduler 日志实际上是 scheduler_beat.log
+        # The scheduler log is actually scheduler_beat.log
         log_file = str(Path(Pathh.CONFIG_DIR.val) / 'logs' / 'scheduler_beat.log')
     
     if not os.path.exists(log_file):
         console.print(f"[red]Log file not found at: {log_file}[/red]")
         return
     
-    # 定义日志级别的样式映射和优先级
+    # Define style mapping and priority for log levels
     log_level_styles = {
         'DEBUG': 'dim blue',
         'INFO': 'green',
@@ -316,19 +337,19 @@ def show_logs(ctx, service, lines, follow, filter, level, simple, raw):
     
     min_level_priority = log_level_priority.get(level, 0) if level else 0
     
-    # 用于识别不同日志格式的正则表达式模式
-    # 1. 标准格式: [2025-06-25 12:00:32,330: WARNING/MainProcess]
+    # Regex patterns for different log formats
+    # 1. Standard format: [2025-06-25 12:00:32,330: WARNING/MainProcess]
     log_pattern1 = re.compile(r'\[(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2},\d{3}): (\w+)/(.+)\](.+)')
-    # 2. 通用格式: 2023-01-01 13:45:01,123 | DEBUG | message
+    # 2. General format: 2023-01-01 13:45:01,123 | DEBUG | message
     log_pattern2 = re.compile(r'(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2},\d{3}) \| (\w+)\s+ \| (.+)')
     
     def should_display_log(line, log_level=None):
-        """根据过滤条件决定是否显示日志行"""
-        # 关键字过滤
+        """Decide whether to display a log line based on filtering conditions."""
+        # Keyword filtering
         if filter and filter.lower() not in line.lower():
             return False
             
-        # 日志级别过滤
+        # Log level filtering
         if level and log_level:
             log_priority = log_level_priority.get(log_level, 0)
             if log_priority < min_level_priority:
@@ -337,23 +358,23 @@ def show_logs(ctx, service, lines, follow, filter, level, simple, raw):
         return True
     
     def format_log_line(line):
-        """格式化日志行，添加颜色和样式"""
+        """Format the log line, adding color and style."""
         line = line.strip()
         
-        # 如果使用原始输出，只进行过滤，不进行格式化
+        # If using raw output, only filter, do not format
         if raw:
             return None if not should_display_log(line) else line
         
-        # 尝试匹配标准格式 [时间戳: 级别/进程]
+        # Try to match standard format [timestamp: level/process]
         match = log_pattern1.match(line)
         if match:
             timestamp, log_level, process, content = match.groups()
             
-            # 根据过滤条件决定是否显示
+            # Decide whether to display based on filtering conditions
             if not should_display_log(line, log_level):
                 return None
             
-            # 简化格式，不显示时间戳
+            # Simplified format, no timestamp
             if simple:
                 level_style = log_level_styles.get(log_level, '')
                 if level_style:
@@ -367,16 +388,16 @@ def show_logs(ctx, service, lines, follow, filter, level, simple, raw):
                 else:
                     return f"[dim]{timestamp}[/dim] | {log_level:8} ({process}) | {content.strip()}"
         
-        # 尝试匹配通用格式 时间戳 | 级别 | 消息
+        # Try to match general format: timestamp | level | message
         match = log_pattern2.match(line)
         if match:
             timestamp, log_level, content = match.groups()
             
-            # 根据过滤条件决定是否显示
+            # Decide whether to display based on filtering conditions
             if not should_display_log(line, log_level):
                 return None
             
-            # 简化格式，不显示时间戳
+            # Simplified format, no timestamp
             if simple:
                 level_style = log_level_styles.get(log_level, '')
                 if level_style:
@@ -390,13 +411,13 @@ def show_logs(ctx, service, lines, follow, filter, level, simple, raw):
                 else:
                     return f"[dim]{timestamp}[/dim] | {log_level:8} | {content}"
         
-        # 对于不匹配任何模式的行，也进行关键字过滤
+        # For lines that do not match any pattern, also perform keyword filtering
         if not should_display_log(line):
             return None
             
         return line
     
-    # 构建描述过滤条件的文本
+    # Build text describing the filtering conditions
     filter_description = []
     if filter:
         filter_description.append(f"keyword: '[bold]{filter}[/bold]'")
@@ -412,7 +433,7 @@ def show_logs(ctx, service, lines, follow, filter, level, simple, raw):
             border_style="blue"
         ))
         try:
-            # 使用subprocess.Popen执行tail -f命令来实时跟踪日志
+            # Use subprocess.Popen to execute tail -f for real-time log tracking
             process = subprocess.Popen(
                 ['tail', '-f', '-n', str(lines), log_file], 
                 stdout=subprocess.PIPE,
@@ -421,19 +442,19 @@ def show_logs(ctx, service, lines, follow, filter, level, simple, raw):
                 bufsize=1  # Line buffered
             )
             
-            # 循环读取输出直到用户中断
+            # Loop to read output until user interrupts
             try:
                 for line in process.stdout:
                     formatted_line = format_log_line(line)
-                    if formatted_line:  # 如果行应该被显示
+                    if formatted_line:  # If the line should be displayed
                         console.print(formatted_line)
             except KeyboardInterrupt:
-                # 用户按下Ctrl+C，优雅地退出
+                # User pressed Ctrl+C, exit gracefully
                 process.terminate()
                 console.print("\n[yellow]Stopped following log file[/yellow]")
                 return
             finally:
-                # 确保进程被终止
+                # Ensure the process is terminated
                 process.terminate()
                 process.wait()
                 
@@ -441,7 +462,7 @@ def show_logs(ctx, service, lines, follow, filter, level, simple, raw):
             console.print("[red]Error: 'tail' command not found. Cannot follow logs.[/red]")
             return
     else:
-        # 原有的非实时日志显示逻辑
+        # Original logic for non-real-time log display
         console.print(Panel(
             f"Showing last {lines} lines from [bold]{log_file}[/bold]{filter_text}{format_text}", 
             border_style="blue"
@@ -453,11 +474,11 @@ def show_logs(ctx, service, lines, follow, filter, level, simple, raw):
                 displayed_count = 0
                 for line in result.stdout.splitlines():
                     formatted_line = format_log_line(line)
-                    if formatted_line:  # 如果行应该被显示
+                    if formatted_line:  # If the line should be displayed
                         console.print(formatted_line)
                         displayed_count += 1
                 
-                # 如果过滤后没有显示任何内容，给出提示
+                # If nothing is displayed after filtering, provide a hint
                 if displayed_count == 0 and (filter or level):
                     console.print("[yellow]No log entries match your filter criteria.[/yellow]")
             else:
@@ -469,11 +490,11 @@ def show_logs(ctx, service, lines, follow, filter, level, simple, raw):
                 displayed_count = 0
                 for line in log_lines[-lines:]:
                     formatted_line = format_log_line(line)
-                    if formatted_line:  # 如果行应该被显示
+                    if formatted_line:  # If the line should be displayed
                         console.print(formatted_line)
                         displayed_count += 1
                 
-                # 如果过滤后没有显示任何内容，给出提示
+                # If nothing is displayed after filtering, provide a hint
                 if displayed_count == 0 and (filter or level):
                     console.print("[yellow]No log entries match your filter criteria.[/yellow]")
 
@@ -481,7 +502,7 @@ def show_logs(ctx, service, lines, follow, filter, level, simple, raw):
 @scheduler.command('status')
 @click.pass_context
 def show_tasks_status(ctx):
-    """显示所有调度任务的状态"""
+    """Shows the status of all scheduled tasks."""
     from datetime import datetime
     from rich.console import Console
     from rich.table import Table
@@ -497,10 +518,10 @@ def show_tasks_status(ctx):
             console.print("[yellow]No scheduled tasks found.[/yellow]")
             return
             
-        # 创建状态表格
+        # Create a status table
         table = Table(title="Scheduled Tasks Status")
         
-        # 添加列
+        # Add columns
         table.add_column("ID", style="dim")
         table.add_column("Name", style="green")
         table.add_column("Schedule", style="blue")
@@ -512,9 +533,9 @@ def show_tasks_status(ctx):
         
         now = datetime.now()
         
-        # 添加任务行
+        # Add task rows
         for task in tasks:
-            # 确定状态
+            # Determine status
             if task.is_del:
                 status = "[red]Deleted[/red]"
             elif not task.enabled:
@@ -524,7 +545,7 @@ def show_tasks_status(ctx):
             else:
                 status = "[white]Ready[/white]"
                 
-            # 格式化上次运行时间
+            # Format last run time
             if task.last_run:
                 last_run = task.last_run.strftime('%Y-%m-%d %H:%M')
                 time_ago = (now - task.last_run).total_seconds() / 60
@@ -536,7 +557,7 @@ def show_tasks_status(ctx):
             else:
                 last_run = "[dim]Never[/dim]"
                 
-            # 格式化下次运行时间
+            # Format next run time
             if task.next_run:
                 if task.next_run > now:
                     time_to = (task.next_run - now).total_seconds() / 60
@@ -550,7 +571,7 @@ def show_tasks_status(ctx):
             else:
                 next_run = "[dim]Unknown[/dim]"
                 
-            # 添加行
+            # Add a row
             table.add_row(
                 str(task.id),
                 task.name,
@@ -562,11 +583,11 @@ def show_tasks_status(ctx):
                 str(task.pid) if task.pid else "[dim]-[/dim]"
             )
             
-        # 显示表格
+        # Display the table
         console.print(table)
         console.print(f"\nTotal: {len(tasks)} tasks")
         
-        # 显示当前时间
+        # Display the current time
         console.print(f"[dim]Current time: {now.strftime('%Y-%m-%d %H:%M:%S')}[/dim]")
         
     except Exception as e:
@@ -580,7 +601,7 @@ def show_tasks_status(ctx):
 @click.option('--minutes', type=int, default=30, help="Minutes threshold for stuck tasks (default: 30)")
 @click.pass_context
 def reset_tasks(ctx, task_id, reset_all, force, minutes):
-    """重置卡住的调度任务"""
+    """Resets stuck scheduled tasks."""
     from rich.console import Console
     from puti.db.schedule_manager import ScheduleManager
     
@@ -589,7 +610,7 @@ def reset_tasks(ctx, task_id, reset_all, force, minutes):
     
     try:
         if task_id and force:
-            # 强制重置指定的任务
+            # Forcefully reset the specified task
             task = manager.get_by_id(task_id)
             if not task:
                 console.print(f"[red]Error: Task with ID {task_id} not found[/red]")
@@ -600,7 +621,7 @@ def reset_tasks(ctx, task_id, reset_all, force, minutes):
             return
             
         if task_id:
-            # 重置指定的任务，但仅当它卡住时
+            # Reset the specified task, but only if it's stuck
             task = manager.get_by_id(task_id)
             if not task:
                 console.print(f"[red]Error: Task with ID {task_id} not found[/red]")
@@ -620,7 +641,7 @@ def reset_tasks(ctx, task_id, reset_all, force, minutes):
             return
             
         if reset_all or force:
-            # 重置所有卡住的任务
+            # Reset all stuck tasks
             reset_count = manager.reset_stuck_tasks(max_minutes=minutes)
             if reset_count > 0:
                 console.print(f"[green]✓ {reset_count} stuck tasks have been reset[/green]")
@@ -628,7 +649,7 @@ def reset_tasks(ctx, task_id, reset_all, force, minutes):
                 console.print(f"[yellow]No stuck tasks found.[/yellow]")
             return
             
-        # 如果没有提供选项，显示帮助
+        # If no option is provided, show help
         console.print("[yellow]Please specify either --id, --all, or --force option.[/yellow]")
         console.print("Run 'puti scheduler reset --help' for more information.")
         

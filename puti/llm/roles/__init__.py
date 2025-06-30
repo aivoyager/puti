@@ -89,7 +89,7 @@ class RoleContext(BaseModel):
     subscribe_sender: set[str] = Field(default={}, description='Subscribe role name for solution-subscription mechanism')
     max_react_loop: int = Field(default=10, description='Max react loop number')
     state: int = Field(default=-1, description='State of the action')
-    todos: List[Message] = Field(default=[], exclude=True, description='Message contains fc information')
+    todos: List[Message] = Field(default=[], exclude=True, description='Message contains function calling information')
     action_taken: int = 0
     root: str = str(root_dir())
 
@@ -114,7 +114,7 @@ class Role(BaseModel):
 
     tool_calls_one_round: List[str] = Field(default=[], description='tool calls one round contains tool call id')
     cp: SerializeAsAny[Capture] = Field(default_factory=Capture, validate_default=True, description='Capture exception')
-    think_mode: bool = Field(default=False, description='return think proces')
+    think_mode: bool = Field(default=False, description='return think process')
 
     __hash__ = object.__hash__  # make sure hashable can be regarded as dict key
 
@@ -179,12 +179,12 @@ class Role(BaseModel):
         if not self.answer:
             return
 
-        # For multi angent
+        # For multi-agent
         if self.rc.env:
             self.rc.env.publish_message(self.answer)
             await self.rc.memory.add_one(self.answer)  # this one won't be perceived
             self.answer = None
-        # For single angent
+        # For single agent
         else:
             await self.rc.memory.add_one(self.answer, role=self)
             self.answer = None
@@ -204,7 +204,7 @@ class Role(BaseModel):
         return False, 'self-correction'
 
     async def _perceive(self, ignore_history: bool = False) -> bool:
-        """If have new message to handle with"""
+        """Check if there are new messages to handle."""
         news = self.rc.buffer.pop_all()
         history = [] if ignore_history else self.rc.memory.get()
         new_list = []
@@ -249,63 +249,30 @@ class Role(BaseModel):
             split_index = user_message_indices[-5]
         recent_messages = all_messages[split_index:]
 
-        # 4. Filter retrieved history to exclude items from the recent conversation.
-        recent_contents = set()
-        for msg in recent_messages:
-            if msg.role == RoleType.USER:
-                recent_contents.add(f"User asked: {msg.content}")
-            elif msg.role == RoleType.ASSISTANT:
-                recent_contents.add(f"{self} responded: {msg.content}")
+        # 4. Construct the final message list for the LLM.
+        # Start with the system prompt.
+        final_messages = [base_system_prompt]
 
-        filtered_relevant_history = [text for text in relevant_history if text not in recent_contents]
+        # Add relevant history from RAG search, ensuring no duplicates.
+        if relevant_history:
+            final_messages.append(SystemMessage(content=f"This is the relevant information for your reference:\n{relevant_history}").to_message_dict())
 
-        # 5. Inject filtered relevant history into the system prompt.
-        if filtered_relevant_history:
-            context_str = "\n".join(filtered_relevant_history)
-            enhanced_prompt = promptt.enhanced_memory.render(context_str=context_str)
-            enhanced_prompt = base_system_prompt['content'] + enhanced_prompt
-            base_system_prompt['content'] = enhanced_prompt
+        # Add the recent conversation history.
+        final_messages.extend(Message.to_message_list(recent_messages))
 
-        # 7. Construct the final message list for the LLM.
-        history_messages = recent_messages
-        message = [base_system_prompt] + [msg.to_message_dict() for msg in history_messages]
+        # Ask the LLM to generate a response.
+        resp = await self.llm.chat(messages=final_messages, tools=self.toolkit.tools, tool_choice=self.toolkit.tool_choice)
 
-        think: Any = await self.llm.chat(message, tools=self.toolkit.param_list)
-
-        chat_response = await self.llm.parse_chat_result(resp=think, toolkit=self.toolkit)
-
-        if chat_response.chat_state == ChatState.FINAL_ANSWER:
+        # Check for tool calls in the response.
+        if resp.tool_calls:
+            self.rc.todos = [ToolMessage(non_standard=i.model_dump()) for i in resp.tool_calls]
+            return True, self.rc.todos
+        else:
             self.answer = AssistantMessage(
-                content=chat_response.msg,
+                content=resp.content,
                 sender=self.name,
-                receiver={MessageRouter.ALL.val},
             )
             return False, self.answer
-        elif chat_response.chat_state == ChatState.IN_PROCESS_ANSWER:
-            self.answer = AssistantMessage(
-                content=chat_response.msg,
-                sender=self.name,
-                receiver={MessageRouter.ALL.val},
-            )
-            return False, self.answer
-        elif chat_response.chat_state == ChatState.SELF_REFLECTION:
-            reflection_msg = AssistantMessage(
-                content=chat_response.msg,
-                sender=self.name,
-                receiver=self.address,
-                self_reflection=True
-            )
-            self.rc.buffer.put_one_msg(reflection_msg)
-            return False, reflection_msg
-        elif chat_response.chat_state == ChatState.FC_CALL:
-            if chat_response.tool_call_id:
-                self.tool_calls_one_round.append(chat_response.tool_call_id)
-            call_message = ToolMessage(non_standard=think)  # for call message, we add origin to accord with official request
-            await self.rc.memory.add_one(call_message)
-
-            call_info_message = ToolMessage(non_standard=chat_response)  #
-            self.rc.todos.append(call_info_message)
-            return True, call_info_message
 
     async def _react(self) -> Message:
         message = Message.from_any('no tools taken yet')

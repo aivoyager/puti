@@ -49,7 +49,7 @@ class TwitterAPI(Client, ABC):
         self.conf = conf()
 
     def get_valid_access_token(self):
-        """获取有效的access token，如果过期则自动刷新，全部从redis操作"""
+        """Get a valid access token, automatically refreshing if it's expired. All operations are done via Redis."""
         redis_client = redis.StrictRedis.from_url(c.BROKER_URL)
         access_token = redis_client.get("tweet_token:twitter_access_token").decode()
         refresh_token = redis_client.get("tweet_token:twitter_refresh_token").decode()
@@ -63,10 +63,10 @@ class TwitterAPI(Client, ABC):
             expires_at = 0
         current_time = int(time.time())
         if not access_token or not refresh_token or not expires_at:
-            lgr.error("Redis中未找到token信息，请先授权。")
+            lgr.error("Token information not found in Redis, please authorize first.")
             return None
         if current_time >= (expires_at - 300):
-            lgr.info("Access token已过期或即将过期，正在刷新...")
+            lgr.info("Access token has expired or is about to expire, refreshing...")
             new_tokens = self._do_refresh_token_exchange(refresh_token)
             if new_tokens:
                 access_token = new_tokens["access_token"]
@@ -76,13 +76,13 @@ class TwitterAPI(Client, ABC):
                 redis_client.set("tweet_token:twitter_access_token", access_token)
                 redis_client.set("tweet_token:twitter_refresh_token", refresh_token)
                 redis_client.set("tweet_token:twitter_expires_at", expires_at)
-                lgr.info("Token已刷新并保存到redis。")
+                lgr.info("Token has been refreshed and saved to Redis.")
                 return access_token
             else:
-                lgr.error("刷新token失败。")
+                lgr.error("Failed to refresh token.")
                 return None
         else:
-            lgr.info("使用redis中已有的有效access token。")
+            lgr.info("Using the existing valid access token from Redis.")
             return access_token
 
     def _do_refresh_token_exchange(self, refresh_token):
@@ -169,8 +169,8 @@ class TwitterAPI(Client, ABC):
 
     def get_my_id(self) -> str:
         """
-        获取当前认证用户的ID
-        :return: 用户ID字符串
+        Get the ID of the currently authenticated user.
+        :return: User ID string.
         """
         self._refresh_headers()
         url = f"{self.base_url}/users/me"
@@ -179,5 +179,5 @@ class TwitterAPI(Client, ABC):
             resp.raise_for_status()
             return resp.json()["data"]["id"]
         except Exception as e:
-            lgr.error(f"获取用户ID失败: {e}")
+            lgr.error(f"Failed to get user ID: {e}")
             return ""

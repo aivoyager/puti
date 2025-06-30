@@ -35,17 +35,17 @@ class ScheduleManager(BaseManager[TweetSchedule]):
             cron_schedule: Cron expression for schedule timing
             enabled: Whether the schedule should be enabled
             params: Parameters for the task (like topic, tags, etc.)
-            task_type: 任务类型，默认为发推(post)，可以是reply(回复)、retweet(转发)等
+            task_type: The type of task, defaults to 'post', can be 'reply', 'retweet', etc.
             
         Returns:
             The created schedule object
         """
 
-        # 验证任务类型是否有效
+        # Validate the task type
         try:
             TaskType.elem_from_str(task_type)
         except ValueError:
-            lgr.warning(f"无效的任务类型: {task_type}，使用默认类型: {TaskType.POST.val}")
+            lgr.warning(f"Invalid task type: {task_type}, using default: {TaskType.POST.val}")
             task_type = TaskType.POST.val
         
         # Calculate next run time
@@ -85,12 +85,12 @@ class ScheduleManager(BaseManager[TweetSchedule]):
         Returns:
             True if successful, False otherwise
         """
-        # 如果更新任务类型，验证它是否有效
+        # If updating task type, validate it
         if 'task_type' in updates:
             try:
                 TaskType.elem_from_str(updates['task_type'])
             except ValueError:
-                lgr.error(f"无效的任务类型: {updates['task_type']}")
+                lgr.error(f"Invalid task type: {updates['task_type']}")
                 return False
                 
         # If updating cron schedule, recalculate next run time
@@ -116,52 +116,52 @@ class ScheduleManager(BaseManager[TweetSchedule]):
 
     def update(self, schedule_id: int, updates_or_dict: Union[Dict[str, Any], Any], **kwargs) -> bool:
         """
-        更新计划任务，支持字典参数或关键字参数。
+        Update a scheduled task, supporting dictionary or keyword arguments.
         
         Args:
-            schedule_id: 计划任务ID
-            updates_or_dict: 更新字段的字典，或者第一个字段的值
-            **kwargs: 如果updates_or_dict不是字典，则这里包含剩余的字段更新
+            schedule_id: The ID of the scheduled task
+            updates_or_dict: A dictionary of fields to update, or the value of the first field
+            **kwargs: If updates_or_dict is not a dictionary, this contains the remaining field updates
             
         Returns:
-            更新是否成功
+            Whether the update was successful
         """
         if isinstance(updates_or_dict, dict):
-            # 如果传入的是字典，直接使用
+            # If a dictionary is passed, use it directly
             updates = updates_or_dict
         else:
-            # 否则，假设第一个参数是字段名，值是第一个参数的值
+            # Otherwise, assume the first argument is the field name, and its value is the first argument's value
             field_names = list(self.model_type.__annotations__.keys())
             if field_names and field_names[0] not in kwargs:
-                # 将第一个参数作为第一个字段的值
+                # Treat the first argument as the value for the first field
                 updates = {field_names[0]: updates_or_dict}
                 updates.update(kwargs)
             else:
-                # 否则只使用kwargs
+                # Otherwise, just use kwargs
                 updates = kwargs
                 
-        # 为了兼容，调用父类的update方法
+        # For compatibility, call the parent class's update method
         return super().update(schedule_id, updates)
         
     def reset_stuck_tasks(self, max_minutes: int = 30) -> int:
         """
-        重置卡住的任务（标记为运行中但已超过规定时间）
+        Resets stuck tasks (marked as running but have exceeded the specified time).
         
         Args:
-            max_minutes: 最大运行时间（分钟），超过此时间的任务将被重置
+            max_minutes: Maximum running time in minutes; tasks exceeding this will be reset.
             
         Returns:
-            重置的任务数量
+            The number of reset tasks.
         """
         now = datetime.datetime.now()
         stuck_timeout = datetime.timedelta(minutes=max_minutes)
         reset_count = 0
         
-        # 查找所有标记为运行中的任务
+        # Find all tasks marked as running
         running_tasks = self.get_all(where_clause="is_running = 1 AND is_del = 0")
         
         for task in running_tasks:
-            # 如果任务有上次更新时间，并且超过了最大运行时间
+            # If the task has a last update time and has exceeded the max running time
             if task.updated_at and (now - task.updated_at > stuck_timeout):
                 lgr.warning(f'Task "{task.name}" (ID: {task.id}) appears to be stuck. '
                            f'Last update was at {task.updated_at}. Resetting status.')

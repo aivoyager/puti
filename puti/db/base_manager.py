@@ -14,7 +14,7 @@ from puti.logs import logger_factory
 
 lgr = logger_factory.db
 
-# 定义泛型类型变量
+# Define a generic type variable
 T = TypeVar('T', bound=Model)
 
 

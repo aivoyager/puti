@@ -34,16 +34,16 @@ ethan = Ethan()
 
 # @celery_app.task(task_always_eager=True)
 def add(x, y):
-    lgr.info('[任务] add 开始执行')
+    lgr.info('[Task] add starting execution')
     try:
         result = x + y
-        lgr.info(f'[任务] add 执行成功，结果: {result}')
+        lgr.info(f'[Task] add executed successfully, result: {result}')
         return result
     except Exception as e:
-        lgr.error(f'[任务] add 执行失败: {e}')
+        lgr.error(f'[Task] add execution failed: {e}')
         raise
     finally:
-        lgr.info('[任务] add 执行结束')
+        lgr.info('[Task] add execution finished')
 
 
 # @celery_app.task(task_always_eager=False)
@@ -54,7 +54,7 @@ def periodic_post_tweet():
         loop = asyncio.get_event_loop()
         tweet = loop.run_until_complete(cz.run('give me a tweet'))
         tweet = json.loads(tweet)['final_answer']
-        lgr.debug(f'[定时任务] 准备发送推文内容: {tweet}')
+        lgr.debug(f'[Scheduled Task] Preparing to send tweet content: {tweet}')
 
         @retry(stop=stop_after_attempt(3), wait=wait_fixed(1), reraise=True)
         def safe_post_tweet():
@@ -64,12 +64,12 @@ def periodic_post_tweet():
             return response.text
 
         result = safe_post_tweet()
-        lgr.debug('[定时任务] 耗时: {:.2f}s'.format((datetime.now() - start_time).total_seconds()))
-        lgr.debug(f"[定时任务] 定时任务执行成功: {result}")
+        lgr.debug('[Scheduled Task] Time taken: {:.2f}s'.format((datetime.now() - start_time).total_seconds()))
+        lgr.debug(f"[Scheduled Task] Scheduled task executed successfully: {result}")
     except Exception as e:
-        lgr.debug(f'[定时任务] 任务执行失败: {e.__class__.__name__} {str(e)}. {traceback.format_exc()}')
+        lgr.debug(f'[Scheduled Task] Task execution failed: {e.__class__.__name__} {str(e)}. {traceback.format_exc()}')
     finally:
-        lgr.debug(f'============== [定时任务] periodic_post_tweet 执行结束 ==============')
+        lgr.debug(f'============== [Scheduled Task] periodic_post_tweet execution finished ==============')
     return 'ok'
 
 
@@ -78,7 +78,7 @@ def periodic_get_mentions():
     start_time = datetime.now()
     try:
         url = f"https://api.game.com/ai/xx-bot/twikit/get_mentions?query_name={x_conf.USER_NAME}"
-        lgr.debug(f'[定时任务] 请求接口: {url}')
+        lgr.debug(f'[Scheduled Task] Requesting interface: {url}')
 
         @retry(stop=stop_after_attempt(3), wait=wait_fixed(1), reraise=True)
         def safe_get_mentions():
@@ -87,12 +87,12 @@ def periodic_get_mentions():
             return response.text
 
         result = safe_get_mentions()
-        lgr.debug('[定时任务] 耗时: {:.2f}s'.format((datetime.now() - start_time).total_seconds()))
-        lgr.debug(f"[定时任务] get_mentions 执行成功: {result}")
+        lgr.debug('[Scheduled Task] Time taken: {:.2f}s'.format((datetime.now() - start_time).total_seconds()))
+        lgr.debug(f"[Scheduled Task] get_mentions executed successfully: {result}")
     except Exception as e:
-        lgr.debug(f'[定时任务] get_mentions 任务执行失败: {e.__class__.__name__} {str(e)}. {traceback.format_exc()}')
+        lgr.debug(f'[Scheduled Task] get_mentions task execution failed: {e.__class__.__name__} {str(e)}. {traceback.format_exc()}')
     finally:
-        lgr.debug(f'============== [定时任务] periodic_get_mentions 执行结束 ==============')
+        lgr.debug(f'============== [Scheduled Task] periodic_get_mentions execution finished ==============')
     return 'ok'
 
 
@@ -103,7 +103,7 @@ def periodic_reply_to_tweet():
         db = SQLiteOperator()
         sql = "SELECT text, author_id, mention_id FROM twitter_mentions WHERE replied=0 AND is_del=0"
         rows = db.fetchall(sql)
-        lgr.debug(f'[定时任务] 查询待回复mentions数量: {len(rows)}')
+        lgr.debug(f'[Scheduled Task] Number of mentions to reply to: {len(rows)}')
         for row in rows:
             text, author_id, mention_id = row
             try:
@@ -111,10 +111,10 @@ def periodic_reply_to_tweet():
                 reply = loop.run_until_complete(twit_whiz.run(text))
                 reply_text = json.loads(reply).get('final_answer', '')
                 if not reply_text:
-                    lgr.debug(f'[定时任务] LLM未生成回复: {text}')
+                    lgr.debug(f'[Scheduled Task] LLM did not generate a reply for: {text}')
                     continue
                 url = f"https://api.game.com/ai/xx-bot/twikit/reply_to_tweet?text={quote(reply_text)}&tweet_id={mention_id}&author_id={author_id}"
-                lgr.debug(f'[定时任务] 请求接口: {url}')
+                lgr.debug(f'[Scheduled Task] Requesting interface: {url}')
 
                 @retry(stop=stop_after_attempt(3), wait=wait_fixed(1), reraise=True)
                 def safe_reply_to_tweet():
@@ -123,14 +123,14 @@ def periodic_reply_to_tweet():
                     return response.text
 
                 result = safe_reply_to_tweet()
-                lgr.debug(f"[定时任务] reply_to_tweet 执行成功: {result}")
+                lgr.debug(f"[Scheduled Task] reply_to_tweet executed successfully: {result}")
 
             except Exception as e:
-                lgr.debug(f'[定时任务] 单条回复失败: {e.__class__.__name__} {str(e)}. {traceback.format_exc()}')
+                lgr.debug(f'[Scheduled Task] Single reply failed: {e.__class__.__name__} {str(e)}. {traceback.format_exc()}')
     except Exception as e:
-        lgr.debug(f'[定时任务] reply_to_tweet 任务执行失败: {e.__class__.__name__} {str(e)}. {traceback.format_exc()}')
+        lgr.debug(f'[Scheduled Task] reply_to_tweet task execution failed: {e.__class__.__name__} {str(e)}. {traceback.format_exc()}')
     finally:
-        lgr.debug(f'============== [定时任务] periodic_reply_to_tweet 执行结束 ==============')
+        lgr.debug(f'============== [Scheduled Task] periodic_reply_to_tweet execution finished ==============')
     return 'ok'
 
 
@@ -149,16 +149,16 @@ def check_dynamic_schedules():
         from puti.db.schedule_manager import ScheduleManager
         manager = ScheduleManager()
         
-        # 1. 自动重置卡住的任务 (stuck tasks)
+        # 1. Automatically reset stuck tasks
         reset_count = manager.reset_stuck_tasks(max_minutes=10)
         if reset_count > 0:
             lgr.info(f'Reset {reset_count} stuck tasks')
         
-        # 2. 获取所有活跃的计划任务
+        # 2. Get all active scheduled tasks
         schedules = manager.get_all(where_clause="enabled = 1 AND is_del = 0")
         lgr.debug(f'Found {len(schedules)} active schedules to evaluate')
         
-        # 3. 检查并触发到期的任务
+        # 3. Check and trigger due tasks
         for schedule in schedules:
             # Skip schedules that are already running
             if schedule.is_running:
@@ -200,7 +200,7 @@ def check_dynamic_schedules():
                     lgr.info(f'[Scheduler] Schedule "{schedule.name}" executed. Next run at {new_next_run}.')
             except Exception as e:
                 lgr.error(f'Error processing schedule {schedule.id} ({schedule.name}): {str(e)}')
-                # 尝试设置下一次运行时间
+                # Attempt to set the next run time
                 try:
                     from croniter import croniter
                     new_next_run = croniter(schedule.cron_schedule, now).get_next(datetime)

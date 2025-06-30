@@ -1,7 +1,7 @@
 """
 @Author: obstacle
 @Time: 30/08/24
-@Description: 任务状态守护类，确保任务执行过程中状态字段的同步正确性
+@Description: Task state guard class to ensure the correct synchronization of status fields during task execution.
 """
 
 import os
@@ -20,27 +20,27 @@ lgr = logger_factory.default
 
 class TaskStateGuard:
     """
-    任务状态守护类，确保任务生命周期中字段同步正确。
+    Task state guard class to ensure correct field synchronization throughout the task lifecycle.
     
-    使用上下文管理器模式来确保无论任务是否成功，状态都能正确更新：
+    Uses a context manager pattern to ensure that the state is updated correctly, regardless of whether the task succeeds or not:
     
     with TaskStateGuard(task_id="123") as guard:
-        # 任务开始执行...
+        # Task execution starts...
         result = do_something()
-        # 可以在任务执行过程中记录中间状态
+        # Intermediate states can be recorded during task execution
         guard.update_state(progress=50)
-        # 继续执行...
+        # Continue execution...
         
-    # 退出上下文时，无论是否发生异常，任务状态都会更新
+    # When exiting the context, the task state will be updated, regardless of whether an exception occurred.
     """
     
     def __init__(self, task_id: Optional[str] = None, schedule_id: Optional[int] = None):
         """
-        初始化任务状态守护实例。
+        Initializes the task state guard instance.
         
         Args:
-            task_id: Celery 任务 ID
-            schedule_id: 数据库中的调度任务 ID
+            task_id: Celery task ID
+            schedule_id: The ID of the scheduled task in the database
         """
         if not task_id and not schedule_id:
             raise ValueError("Either task_id or schedule_id must be provided")
@@ -54,9 +54,9 @@ class TaskStateGuard:
         self.success = False
         
     def __enter__(self):
-        """上下文管理器进入时，标记任务开始运行"""
+        """When entering the context manager, mark the task as running."""
         try:
-            # 获取调度任务记录
+            # Get the scheduled task record
             if self.schedule_id:
                 self.schedule = self.manager.get_by_id(self.schedule_id)
             elif self.task_id:
@@ -69,7 +69,7 @@ class TaskStateGuard:
                 lgr.warning(f"TaskStateGuard: No schedule found for task_id={self.task_id}, schedule_id={self.schedule_id}")
                 return self
                 
-            # 记录PID和运行状态
+            # Record PID and running state
             pid = os.getpid()
             updates = {
                 "is_running": True,
@@ -85,26 +85,26 @@ class TaskStateGuard:
         return self
         
     def __exit__(self, exc_type, exc_val, exc_tb):
-        """上下文管理器退出时，标记任务结束"""
+        """When exiting the context manager, mark the task as finished."""
         if not self.schedule_id:
             return
             
         try:
-            # 生成基本的更新字典
+            # Generate the basic update dictionary
             updates = {
                 "is_running": False,
                 "pid": None
             }
             
-            # 计算下次运行时间
+            # Calculate the next run time
             try:
                 if self.schedule:
                     now = datetime.datetime.now()
-                    # 强制重新计算next_run
+                    # Force recalculation of next_run
                     next_run = croniter(self.schedule.cron_schedule, now).get_next(datetime.datetime)
                     updates["next_run"] = next_run
                     
-                    # 如果任务成功完成，更新last_run时间
+                    # If the task completed successfully, update the last_run time
                     if not exc_type:
                         self.success = True
                         updates["last_run"] = self.start_time
@@ -112,48 +112,48 @@ class TaskStateGuard:
             except Exception as e:
                 lgr.error(f"[TaskStateGuard] Error calculating next run time: {str(e)}")
                 
-            # 合并中间可能记录的状态
+            # Merge any intermediate state updates
             updates.update(self.state_updates)
                 
-            # 记录任务完成状态
+            # Record the task completion status
             status = "completed successfully" if self.success else f"failed with {exc_type.__name__}: {exc_val}" if exc_type else "completed with unknown state"
             lgr.info(f"[TaskStateGuard] Task {self.schedule_id} {status}")
             
-            # 更新数据库
+            # Update the database
             self.manager.update(self.schedule_id, updates)
             
-            # 记录执行时间
+            # Record the execution time
             end_time = datetime.datetime.now()
             execution_time = (end_time - self.start_time).total_seconds()
             lgr.info(f"[TaskStateGuard] Task {self.schedule_id} execution time: {execution_time:.2f} seconds")
             
         except Exception as e:
             lgr.error(f"[TaskStateGuard] Error during task cleanup: {str(e)}")
-            # 最后的安全措施：无论如何都要确保任务不再标记为运行中
+            # Final safety measure: ensure the task is no longer marked as running, no matter what.
             try:
                 self.manager.update(self.schedule_id, {"is_running": False, "pid": None})
             except:
                 pass
             
-        # 不捕获异常，让它向上传播
+        # Do not suppress the exception, let it propagate
         return False
         
     def update_state(self, **kwargs):
         """
-        更新任务状态。
+        Update the task's state.
         
         Args:
-            **kwargs: 字段和值的字典
+            **kwargs: A dictionary of fields and values.
         """
         if not self.schedule_id:
             lgr.warning("[TaskStateGuard] Cannot update state: no schedule_id")
             return
             
         try:
-            # 保存状态以便退出时更新
+            # Save the state to be updated on exit
             self.state_updates.update(kwargs)
             
-            # 立即更新数据库
+            # Immediately update the database
             self.manager.update(self.schedule_id, kwargs)
             lgr.debug(f"[TaskStateGuard] Updated task {self.schedule_id} state: {kwargs}")
             
@@ -164,15 +164,15 @@ class TaskStateGuard:
     @contextmanager
     def for_task(cls, task_id: str = None, schedule_id: int = None):
         """
-        为任务创建上下文管理器。
+        Create a context manager for a task.
         
         Args:
-            task_id: Celery 任务 ID
-            schedule_id: 数据库中的调度任务 ID
+            task_id: Celery task ID
+            schedule_id: The ID of the scheduled task in the database
             
-        用法:
+        Usage:
             with TaskStateGuard.for_task(task_id="123") as guard:
-                # 任务执行...
+                # Task execution...
                 guard.update_state(progress=50)
         """
         guard = cls(task_id=task_id, schedule_id=schedule_id)
@@ -183,7 +183,7 @@ class TaskStateGuard:
             guard.success = False
             raise
         finally:
-            # 确保状态更新
+            # Ensure the state is updated
             if guard.schedule_id:
                 try:
                     guard.manager.update(guard.schedule_id, {

@@ -108,7 +108,7 @@ Note: You MUST append a `sleep 0.02` to the end of the command for commands that
                         if stdout:
                             print(f"\033[35m{stdout.decode('utf-8')}\033[0m", end='')
                         if stderr:
-                            print('\033[91m' + stderr.decode('utf-8') + '\033[0m', end='', file=sys.stderr)  # 红色打印
+                            print('\033[91m' + stderr.decode('utf-8') + '\033[0m', end='', file=sys.stderr)  # Print in red
                         stdout = stdout.decode('utf-8').strip()
                         stderr = stderr.decode('utf-8').strip()
                         if stderr:
@@ -134,7 +134,8 @@ Note: You MUST append a `sleep 0.02` to the end of the command for commands that
 
     async def run_with_pty(self, command: str, *args, **kwargs) -> ToolResponse:
         """
-        使用pty创建伪终端执行命令，捕获终端原始输出，避免其他日志干扰。
+        Use pty to create a pseudo-terminal to execute commands and capture the raw terminal output,
+        avoiding interference from other logs.
         """
         import pty
         import select

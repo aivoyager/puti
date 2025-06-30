@@ -39,39 +39,39 @@ def run_async(coro):
         loop.close()
 
 
-# 在模块级别实例化Ethan角色，确保只创建一次实例
+# Instantiate the Ethan role at the module level to ensure it's created only once.
 _ethan_instance = None
-# 添加线程锁来保护_ethan_instance在多线程环境下的安全
+# Add a thread lock to protect _ethan_instance in a multi-threaded environment.
 _ethan_lock = threading.RLock()
 
 
-# 安全获取Ethan实例的函数
+# Function to safely get the Ethan instance.
 def get_ethan_instance():
     """
-    以线程安全的方式获取EthanG实例
+    Safely retrieves the EthanG instance in a thread-safe manner.
     
-    实现了懒加载和错误恢复功能：
-    1. 仅在首次访问时创建实例
-    2. 如果实例出现问题，尝试重新创建
+    Implements lazy loading and error recovery:
+    1. Creates the instance only on the first access.
+    2. Attempts to recreate the instance if it encounters issues.
     
     Returns:
-        EthanG实例
+        An EthanG instance.
     """
     global _ethan_instance
     
     with _ethan_lock:
-        # 懒加载：如果实例不存在，创建它
+        # Lazy loading: if the instance doesn't exist, create it.
         if _ethan_instance is None:
             lgr.info("Creating new EthanG instance")
             _ethan_instance = EthanG()
             
-        # 健康检查：确保实例是有效的EthanG对象
+        # Health check: ensure the instance is a valid EthanG object.
         try:
             if not isinstance(_ethan_instance, EthanG):
                 lgr.warning("Invalid EthanG instance detected, recreating...")
                 _ethan_instance = EthanG()
         except Exception as e:
-            # 错误恢复：如果检查过程中发生任何错误，重新创建实例
+            # Error recovery: if any error occurs during the check, recreate the instance.
             lgr.error(f"Error accessing EthanG instance: {str(e)}. Recreating...")
             _ethan_instance = EthanG()
             
@@ -97,54 +97,54 @@ def check_dynamic_schedules():
     try:
         manager = ScheduleManager()
         
-        # 首先重置任何卡住的任务
+        # First, reset any stuck tasks
         reset_count = manager.reset_stuck_tasks(max_minutes=30)
         if reset_count > 0:
             lgr.info(f'Reset {reset_count} stuck tasks')
             
-        # 获取所有启用的任务
+        # Get all enabled tasks
         schedules = manager.get_all(where_clause="enabled = 1 AND is_del = 0")
         lgr.info(f'Found {len(schedules)} active schedules to evaluate.')
 
         for schedule in schedules:
-            # 跳过正在运行的任务
+            # Skip running tasks
             if schedule.is_running:
                 lgr.debug(f'Schedule "{schedule.name}" is already running, skipping.')
                 continue
 
             try:
-                # 确定下次运行时间计算的基准时间
+                # Determine the base time for calculating the next run
                 last_run = schedule.last_run or datetime.fromtimestamp(0)
                 
-                # 检查任务是否应该运行
+                # Check if the task should run
                 cron = croniter(schedule.cron_schedule, last_run)
                 next_run_time = cron.get_next(datetime)
 
                 if next_run_time <= now:
                     lgr.info(f'Triggering task for schedule "{schedule.name}" (ID: {schedule.id})')
                     
-                    # 获取任务类型和参数
+                    # Get task type and parameters
                     task_type = schedule.task_type
                     params = schedule.params or {}
                     
-                    # 在任务映射中找到对应的Celery任务
+                    # Find the corresponding Celery task in the task map
                     task_name = TASK_MAP.get(task_type)
                     if not task_name:
                         lgr.error(f"No task found for type '{task_type}' on schedule {schedule.id}. Skipping.")
                         continue
 
-                    # 在派发任务前标记为正在运行
+                    # Mark as running before dispatching the task
                     manager.update(schedule.id, {"is_running": True})
 
-                    # 派发任务到Celery
+                    # Dispatch the task to Celery
                     from celery import current_app
                     task = current_app.send_task(task_name, kwargs=params)
                     
-                    # 更新计划的运行时间和任务ID
+                    # Update the schedule's run time and task ID
                     new_next_run = croniter(schedule.cron_schedule, now).get_next(datetime)
                     
-                    # 注意：last_run会在任务成功完成后由TaskStateGuard设置，
-                    # 这里只更新task_id和next_run
+                    # Note: last_run will be set by TaskStateGuard upon successful completion.
+                    # Here, we only update task_id and next_run.
                     schedule_updates = {
                         "next_run": new_next_run,
                         "task_id": task.id
@@ -155,7 +155,7 @@ def check_dynamic_schedules():
 
             except Exception as e:
                 lgr.error(f'Error processing schedule {schedule.id} ("{schedule.name}"): {str(e)}')
-                # 在发生错误时重置任务状态
+                # Reset task state on error
                 manager.update(schedule.id, {"is_running": False})
 
     except Exception as e:
@@ -174,51 +174,51 @@ def unimplemented_task(self, **kwargs):
 @shared_task(bind=True)
 def generate_tweet_task(self, topic: str = None):
     """
-    Graph Workflow生成和发布推文。
+    Generates and publishes a tweet using a Graph Workflow.
 
     Args:
-        topic: 推文生成的主题
+        topic: The topic for tweet generation.
     """
     from puti.db.schedule_manager import ScheduleManager
     from puti.db.task_state_guard import TaskStateGuard
 
     task_id = self.request.id
     
-    # 使用TaskStateGuard确保任务状态始终正确更新
+    # Use TaskStateGuard to ensure the task state is always updated correctly.
     with TaskStateGuard.for_task(task_id=task_id) as guard:
         lgr.info(f'[Task {task_id}] generate_tweet_task started, topic: {topic}')
         
-        # 可以在这里更新额外状态（如果需要）
+        # You can update additional states here if needed.
         guard.update_state(status="generating_tweet")
 
-        # 创建动作实例
+        # Create action instances.
         generate_tweet_action = GenerateTweetAction(topic=topic)
         post_tweet_action = PublishTweetAction()
         
-        # 使用模块级别的Ethan实例，避免重复创建
+        # Use the module-level Ethan instance to avoid repeated creation.
         ethan = get_ethan_instance()
 
-        # 创建工作图节点
+        # Create workflow graph nodes.
         generate_tweet_vertex = Vertex(id='generate_tweet', action=generate_tweet_action)
         post_tweet_vertex = Vertex(id='post_tweet', action=post_tweet_action, role=ethan)
 
-        # 构建工作流图
+        # Build the workflow graph.
         graph = Graph()
         graph.add_vertices(generate_tweet_vertex, post_tweet_vertex)
         graph.add_edge(generate_tweet_vertex.id, post_tweet_vertex.id)
         graph.set_start_vertex(generate_tweet_vertex.id)
 
-        # 更新任务状态
+        # Update task status.
         guard.update_state(status="running_workflow")
 
-        # 执行工作流
+        # Execute the workflow.
         workflow = Workflow(graph=graph)
         resp = run_async(workflow.run_until_vertex(post_tweet_vertex.id))
         
-        # 在这里不需要手动更新任务状态，TaskStateGuard会自动处理
-        # 成功完成时自动设置 is_running=False, pid=None, last_run=开始时间
+        # No need to manually update task status here; TaskStateGuard handles it automatically.
+        # On successful completion, it automatically sets is_running=False, pid=None, and last_run=start_time.
         
-        # 记录完成信息
+        # Log completion information.
         lgr.info(f'[Task {task_id}] Completed successfully')
         return resp
 
@@ -226,9 +226,9 @@ def generate_tweet_task(self, topic: str = None):
 @shared_task()
 def auto_manage_scheduler():
     """
-    自动管理调度器的状态。
-    - 如果有活跃任务但调度器未运行，则启动调度器
-    - 如果没有活跃任务且调度器正在运行，可以选择停止调度器（取决于配置）
+    Automatically manages the scheduler's state.
+    - If there are active tasks but the scheduler is not running, it starts the scheduler.
+    - If there are no active tasks and the scheduler is running, it can optionally be stopped (depending on configuration).
     """
     try:
         from puti.db.schedule_manager import ScheduleManager
@@ -237,29 +237,29 @@ def auto_manage_scheduler():
         manager = ScheduleManager()
         daemon = BeatDaemon()
         
-        # 获取所有已启用且未删除的任务
+        # Get all enabled and not deleted tasks
         active_schedules = manager.get_all(where_clause="enabled = 1 AND is_del = 0")
-        # 获取所有正在运行的任务
+        # Get all running tasks
         running_schedules = manager.get_all(where_clause="is_running = 1 AND is_del = 0")
         
-        # 检查调度器是否需要启动
+        # Check if the scheduler needs to be started
         if active_schedules and not daemon.is_running():
             lgr.info(f'Found {len(active_schedules)} active schedules but scheduler is not running. Starting scheduler...')
             daemon.start()
             lgr.info('Scheduler auto-started')
             return 'Scheduler auto-started'
         
-        # 检查调度器是否需要停止 - 默认不自动停止，仅记录日志
+        # Check if the scheduler can be stopped (optional logic)
+        # For example, if there are no active tasks and no tasks currently running
         if not active_schedules and not running_schedules and daemon.is_running():
-            lgr.info('No active or running schedules found and scheduler is running')
-            # 可选：取消下面的注释以启用自动停止
-            # lgr.info('Auto-stopping scheduler')
+            lgr.info('No active or running schedules. Scheduler will continue to run for now.')
+            # You could add logic here to stop the scheduler if desired:
             # daemon.stop()
+            # lgr.info('Scheduler auto-stopped')
             # return 'Scheduler auto-stopped'
-            return 'No active schedules, but scheduler kept running'
+            
+        return 'Scheduler status checked, no action needed'
         
-        return 'No scheduler management needed'
     except Exception as e:
-        lgr.error(f'Error in auto_manage_scheduler: {str(e)}. {traceback.format_exc()}')
-        return f'Error: {str(e)}' 
+        lgr.error(f'Error in auto_manage_scheduler: {str(e)}')
         return f'Error: {str(e)}' 

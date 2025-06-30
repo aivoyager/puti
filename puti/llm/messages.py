@@ -90,11 +90,11 @@ class Message(BaseModel):
             {{ user_message_2 }}<|eot_id|><|start_header_id|>assistant<|end_header_id|>
         """
         messages = cls.to_message_list(messages)
-        # 开始标记
+        # Start token
         prompt = "<|begin_of_text|>"
 
-        # 如果有 system 消息，就先处理 system
-        # 并且只取第一个 system 消息，当做系统提示
+        # If there is a system message, process it first
+        # and only take the first system message as the system prompt
         for msg in messages:
             if msg["role"] == "system":
                 system_text = msg["content"].strip()
@@ -104,7 +104,7 @@ class Message(BaseModel):
                 )
                 break
 
-        # 遍历所有非 system 消息，按顺序拼接 user/assistant
+        # Iterate through all non-system messages and concatenate user/assistant in order
         for msg in messages:
             role = msg["role"]
             if role == "system":
@@ -115,7 +115,7 @@ class Message(BaseModel):
                 f"{text}<|eot_id|>"
             )
 
-        # 最后留给 assistant 继续回复
+        # Finally, leave it for the assistant to continue responding
         prompt += "<|start_header_id|>assistant<|end_header_id|>"
         return prompt
 
@@ -141,7 +141,7 @@ class Message(BaseModel):
         if isinstance(content, list):
             has_image = any(item.get("type") == "image_url" for item in content)
         else:
-            has_image = False  # 或根据你需求保留为 None 或其他逻辑
+            has_image = False  # Or keep as None or other logic based on your needs
         return has_image
 
     def to_message_dict(self, ample: bool = True) -> dict:

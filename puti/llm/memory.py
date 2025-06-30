@@ -155,6 +155,6 @@ class Memory(BaseModel):
 
             thread = threading.Thread(target=_run_async_init)
             thread.start()
-            thread.join()  # 阻塞当前线程直到初始化完成
+            thread.join()  # Block the current thread until initialization is complete
 
 

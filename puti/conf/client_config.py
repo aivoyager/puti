@@ -40,13 +40,13 @@ class TwitterConfig(Config):
 
     def generate_oauth2_authorize_url(self, redirect_uri: str, scope: str = "tweet.read tweet.write users.read offline.access", state: str = "state", code_challenge: str = "challenge", code_challenge_method: str = "plain") -> str:
         """
-        构造 Twitter OAuth2 授权码流程的授权链接
-        :param redirect_uri: 回调地址（需在 Twitter 开发者后台配置）
-        :param scope: 授权范围，空格分隔
-        :param state: 防 CSRF 攻击的随机字符串
-        :param code_challenge: PKCE code_challenge
-        :param code_challenge_method: code_challenge_method，推荐使用 S256
-        :return: 授权链接
+        Construct the authorization URL for the Twitter OAuth2 Authorization Code Flow.
+        :param redirect_uri: Callback URL (needs to be configured in the Twitter developer backend).
+        :param scope: Authorization scope, separated by spaces.
+        :param state: A random string to prevent CSRF attacks.
+        :param code_challenge: PKCE code_challenge.
+        :param code_challenge_method: The code_challenge_method, S256 is recommended.
+        :return: The authorization URL.
         """
         base_url = "https://twitter.com/i/oauth2/authorize"
         params = {

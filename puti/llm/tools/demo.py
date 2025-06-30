@@ -49,5 +49,5 @@ class SearchResidentEvilInfo(BaseTool):
     async def run(self, *args, **kwargs):
         llm: LLMNode = kwargs.get('llm')
         name = self.args.name
-        resp = await llm.chat([{'role': 'user', 'content': f'请提供生化危机中这个角色的详细信息{name}'}])
+        resp = await llm.chat([{'role': 'user', 'content': f'Please provide detailed information about this character in Resident Evil: {name}'}])
         return resp

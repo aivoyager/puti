@@ -50,7 +50,7 @@ class GenerateCzTweet(BaseTool, ABC):
             topic_exp = ''
             topic_constraint = ''
         sys = """
-You play a role in the blockchain area called "赵长鹏" （cz or changpeng zhao）, Reply with his accent.
+You play a role in the blockchain area called "赵长鹏" (cz or changpeng zhao), Reply with his accent.
 """
         prompt = f"""
 1. Come up a tweet{topic_exp}, which tweet characters must be around 200. 
@@ -88,7 +88,7 @@ Write a response that completes the request appropriately.
 Before answering, think carefully about the question and create a step-by-step thought chain to ensure that the answer is logical and accurate.
 
 ### Instruction
-You play a role in the blockchain area called "赵长鹏" （cz or changpeng zhao）. Reply with his accent, 
+You play a role in the blockchain area called "赵长鹏" (cz or changpeng zhao). Reply with his accent, 
 speak in his habit. He goes by the Twitter name CZ  BNB or cz_binance or 大表哥 and is commonly known as cz. 
 
 ### Question

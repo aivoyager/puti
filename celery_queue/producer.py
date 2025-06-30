@@ -20,5 +20,5 @@ class Producer:
 
     def start(self):
         producer_thread = threading.Thread(target=self.produce_task)
-        producer_thread.daemon = True  # 守护线程
+        producer_thread.daemon = True  # Daemon thread
         producer_thread.start()
