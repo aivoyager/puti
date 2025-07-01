@@ -657,5 +657,82 @@ def reset_tasks(ctx, task_id, reset_all, force, minutes):
         console.print(f"[red]Error resetting tasks: {str(e)}[/red]")
 
 
+@scheduler.command('refresh')
+@click.option('--worker/--no-worker', default=True, help="Whether to refresh the Celery worker")
+@click.option('--beat/--no-beat', default=True, help="Whether to refresh the Celery beat scheduler")
+@click.option('--force', is_flag=True, help="Force kill processes if they don't stop gracefully")
+@click.pass_context
+def refresh_services(ctx, worker, beat, force):
+    """Refresh (restart) worker and/or beat processes to load code changes."""
+    from puti.constant.base import Pathh
+    from puti.scheduler import WorkerDaemon, BeatDaemon
+    
+    console = ctx.obj.get('console', Console())
+    
+    if worker:
+        worker_daemon = WorkerDaemon(name='worker', pid_file=Pathh.WORKER_PID.val, log_file=Pathh.WORKER_LOG.val)
+        console.print(Panel(Markdown("Refreshing Celery worker..."), border_style="yellow"))
+        
+        # Stop worker if running
+        if worker_daemon.is_running():
+            console.print("[yellow]Stopping Celery worker...[/yellow]")
+            if worker_daemon.stop(force=force):
+                console.print("[green]✓ Worker stopped successfully[/green]")
+            else:
+                console.print("[red]✗ Failed to stop worker[/red]")
+                if not force:
+                    console.print("[yellow]Tip: Try again with --force option to force kill the process[/yellow]")
+                    return
+        else:
+            console.print("[yellow]Celery worker is not running[/yellow]")
+            
+        # Start worker again
+        console.print("[yellow]Starting Celery worker...[/yellow]")
+        if worker_daemon.start():
+            console.print("[green]✓ Worker started successfully[/green]")
+        else:
+            console.print("[red]✗ Failed to start worker. Check logs at: {}[/red]".format(worker_daemon.log_file))
+            
+    if beat:
+        beat_daemon = BeatDaemon(name='beat', pid_file=Pathh.BEAT_PID.val, log_file=Pathh.BEAT_LOG.val)
+        console.print(Panel(Markdown("Refreshing Celery beat (scheduler)..."), border_style="yellow"))
+        
+        # Stop beat if running
+        if beat_daemon.is_running():
+            console.print("[yellow]Stopping Celery beat...[/yellow]")
+            if beat_daemon.stop(force=force):
+                console.print("[green]✓ Beat stopped successfully[/green]")
+            else:
+                console.print("[red]✗ Failed to stop beat[/red]")
+                if not force:
+                    console.print("[yellow]Tip: Try again with --force option to force kill the process[/yellow]")
+                    return
+        else:
+            console.print("[yellow]Celery beat is not running[/yellow]")
+            
+        # Start beat again
+        console.print("[yellow]Starting Celery beat...[/yellow]")
+        if beat_daemon.start():
+            console.print("[green]✓ Beat started successfully[/green]")
+        else:
+            console.print("[red]✗ Failed to start beat. Check logs at: {}[/red]".format(beat_daemon.log_file))
+            
+    if worker and beat and worker_daemon.is_running() and beat_daemon.is_running():
+        console.print(Panel(
+            Markdown("✅ **Refresh completed successfully!**\nAll processes are now running with the latest code."),
+            border_style="green"
+        ))
+    elif (worker and not beat and worker_daemon.is_running()) or (beat and not worker and beat_daemon.is_running()):
+        console.print(Panel(
+            Markdown("✅ **Partial refresh completed successfully!**\nSelected processes are running with the latest code."),
+            border_style="green"
+        ))
+    else:
+        console.print(Panel(
+            Markdown("⚠️ **Refresh completed with errors!**\nSome processes may not be running correctly."),
+            border_style="red"
+        ))
+
+
 if __name__ == '__main__':
     main()

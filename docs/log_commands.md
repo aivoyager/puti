@@ -115,6 +115,51 @@ python -m puti scheduler logs worker --filter ERROR -n 20
 python test/test_logs_command.py worker -f -n 10 --level WARNING --simple
 ```
 
+## 刷新Worker和Beat进程
+
+在代码更改后，需要重启Celery worker和beat进程才能使更改生效。`refresh`命令提供了便捷的方式来完成这一操作。
+
+### 基本用法
+
+```bash
+# 同时刷新worker和beat进程
+python -m puti.cli scheduler refresh
+
+# 只刷新worker进程
+python -m puti.cli scheduler refresh --beat=False
+
+# 只刷新beat进程（调度器）
+python -m puti.cli scheduler refresh --worker=False
+```
+
+### 强制刷新
+
+如果进程无法正常停止，可以使用`--force`选项强制停止进程：
+
+```bash
+# 强制刷新所有进程
+python -m puti.cli scheduler refresh --force
+```
+
+### 工作流程
+
+`refresh`命令的工作流程：
+
+1. 停止指定的进程（worker和/或beat）
+2. 启动新的进程，加载最新的代码更改
+3. 显示操作结果
+
+### 何时使用
+
+在以下情况下，您应该使用`refresh`命令：
+
+- 修改了任务代码后（如`simplified_tasks.py`）
+- 修改了工具代码后（如`twikitt.py`）
+- 修改了数据库管理代码后（如`task_state_guard.py`）
+- 修改了任何会被worker或beat进程使用的代码后
+
+使用`refresh`命令可以确保您的更改被立即应用，而不需要手动停止和启动进程。
+
 ## 注意事项
 
 1. 实时跟踪（`-f`）选项在有些终端环境下可能会有显示延迟
