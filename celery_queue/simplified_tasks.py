@@ -100,35 +100,47 @@ def check_dynamic_schedules():
                 continue
 
             try:
-                # Determine the base time for calculating the next run
+                lgr.info(f'Evaluating task "{schedule.name}" (ID: {schedule.id}) with type={schedule.task_type}')
+                
+                # To correctly handle overdue tasks, always initialize croniter with the current time.
+                cron = croniter(schedule.cron_schedule, now)
+                next_run_time = cron.get_prev(datetime)  # Get the most recent past scheduled time
+                
+                # A task should run if its last execution time is before the most recent scheduled time.
+                # This correctly handles tasks that were scheduled to run in the past but haven't executed yet.
                 last_run = schedule.last_run or datetime.fromtimestamp(0)
                 
-                # Check if the task should run
-                cron = croniter(schedule.cron_schedule, last_run)
-                next_run_time = cron.get_next(datetime)
-
-                if next_run_time <= now:
+                lgr.info(f'Schedule "{schedule.name}" - last_run: {last_run}, next_run_time: {next_run_time}, now: {now}')
+                lgr.info(f'Schedule "{schedule.name}" - should run? {last_run < next_run_time}')
+                
+                if last_run < next_run_time:
                     lgr.info(f'Triggering task for schedule "{schedule.name}" (ID: {schedule.id})')
                     
                     # Get task type and parameters
                     task_type = schedule.task_type
                     params = schedule.params or {}
+                    lgr.info(f'Task params for "{schedule.name}": {params}')
                     
                     # Find the corresponding Celery task in the task map
                     task_name = TASK_MAP.get(task_type)
                     if not task_name:
                         lgr.error(f"No task found for type '{task_type}' on schedule {schedule.id}. Skipping.")
                         continue
+                    
+                    lgr.info(f'Task name for "{schedule.name}": {task_name}')
 
                     # Mark as running before dispatching the task and include the schedule_id
                     manager.update(schedule.id, {"is_running": True})
+                    lgr.info(f'Marked "{schedule.name}" as running in the database')
 
                     # Dispatch the task to Celery with schedule_id and other params
                     from celery import current_app
                     task_kwargs = {"schedule_id": schedule.id, **params}
+                    lgr.info(f'Dispatching task "{task_name}" with kwargs: {task_kwargs}')
                     task = current_app.send_task(task_name, kwargs=task_kwargs)
+                    lgr.info(f'Task dispatched with ID: {task.id}')
                     
-                    # Update the schedule's run time and task ID
+                    # After triggering, calculate the actual next run time from now.
                     new_next_run = croniter(schedule.cron_schedule, now).get_next(datetime)
                     
                     # Note: last_run will be set by TaskStateGuard upon successful completion.
@@ -140,6 +152,8 @@ def check_dynamic_schedules():
                     manager.update(schedule.id, schedule_updates)
                     
                     lgr.info(f'Schedule "{schedule.name}" executed. Next run at {new_next_run}. Task ID: {task.id}')
+                else:
+                    lgr.info(f'Schedule "{schedule.name}" does not need to run yet')
 
             except Exception as e:
                 lgr.error(f'Error processing schedule {schedule.id} ("{schedule.name}"): {str(e)}')
@@ -222,8 +236,8 @@ async def reply_to_tweets_task(self, schedule_id, **kwargs):
         lgr.info(f"Executing async reply to tweets task for schedule_id: {schedule_id} with params: {kwargs}")
 
         # Explicitly extract known parameters from the task's keyword arguments.
-        time_value = kwargs.get('time_value')
-        time_unit = kwargs.get('time_unit')
+        time_value = int(kwargs.get('time_value', 7))
+        time_unit = str(kwargs.get('time_unit', 'days'))
 
         # Instantiate the graph and action
         graph = Graph()

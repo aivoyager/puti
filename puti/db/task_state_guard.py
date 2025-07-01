@@ -150,12 +150,27 @@ class TaskStateGuard:
             return
             
         try:
-            # Save the state to be updated on exit
-            self.state_updates.update(kwargs)
+            # 检查并过滤掉不存在的字段（特别是status字段）
+            valid_updates = {}
             
-            # Immediately update the database
-            self.manager.update(self.schedule_id, kwargs)
-            lgr.debug(f"[TaskStateGuard] Updated task {self.schedule_id} state: {kwargs}")
+            # 如果TweetSchedule的模型类里有这个字段的定义，才尝试更新它
+            if self.schedule:
+                model_fields = self.schedule.__annotations__.keys()
+                for key, value in kwargs.items():
+                    if key in model_fields:
+                        valid_updates[key] = value
+                    else:
+                        lgr.debug(f"[TaskStateGuard] Ignoring field '{key}' that doesn't exist in {self.schedule.__class__.__name__}")
+            else:
+                valid_updates = kwargs
+                
+            # 保存有效的状态更新
+            self.state_updates.update(valid_updates)
+            
+            # 如果有有效的字段需要更新，则立即更新数据库
+            if valid_updates:
+                self.manager.update(self.schedule_id, valid_updates)
+                lgr.debug(f"[TaskStateGuard] Updated task {self.schedule_id} state: {valid_updates}")
             
         except Exception as e:
             lgr.error(f"[TaskStateGuard] Error updating task state: {str(e)}")

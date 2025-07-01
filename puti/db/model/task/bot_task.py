@@ -27,6 +27,7 @@ class TweetSchedule(Model):
     next_run: Optional[datetime.datetime] = Field(None, description="Next scheduled execution time")
     is_running: bool = Field(False, description="Whether the task is currently running")
     pid: Optional[int] = Field(None, description="Process ID of the running task, if active")
+    status: Optional[str] = Field(None, max_length=255, description="Current status of the task (e.g., running, completed, failed)")
     
     @property
     def task_type_display(self) -> str:

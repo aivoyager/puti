@@ -249,30 +249,63 @@ class Role(BaseModel):
             split_index = user_message_indices[-5]
         recent_messages = all_messages[split_index:]
 
-        # 4. Construct the final message list for the LLM.
-        # Start with the system prompt.
-        final_messages = [base_system_prompt]
+        # 4. Filter retrieved history to exclude items from the recent conversation.
+        recent_contents = set()
+        for msg in recent_messages:
+            if msg.role == RoleType.USER:
+                recent_contents.add(f"User asked: {msg.content}")
+            elif msg.role == RoleType.ASSISTANT:
+                recent_contents.add(f"{self} responded: {msg.content}")
 
-        # Add relevant history from RAG search, ensuring no duplicates.
-        if relevant_history:
-            final_messages.append(SystemMessage(content=f"This is the relevant information for your reference:\n{relevant_history}").to_message_dict())
+        filtered_relevant_history = [text for text in relevant_history if text not in recent_contents]
 
-        # Add the recent conversation history.
-        final_messages.extend(Message.to_message_list(recent_messages))
+        # 5. Inject filtered relevant history into the system prompt.
+        if filtered_relevant_history:
+            context_str = "\n".join(filtered_relevant_history)
+            enhanced_prompt = promptt.enhanced_memory.render(context_str=context_str)
+            enhanced_prompt = base_system_prompt['content'] + enhanced_prompt
+            base_system_prompt['content'] = enhanced_prompt
 
-        # Ask the LLM to generate a response.
-        resp = await self.llm.chat(messages=final_messages, tools=self.toolkit.tools, tool_choice=self.toolkit.tool_choice)
+        # 7. Construct the final message list for the LLM.
+        history_messages = recent_messages
+        message = [base_system_prompt] + [msg.to_message_dict() for msg in history_messages]
 
-        # Check for tool calls in the response.
-        if resp.tool_calls:
-            self.rc.todos = [ToolMessage(non_standard=i.model_dump()) for i in resp.tool_calls]
-            return True, self.rc.todos
-        else:
+        think: Any = await self.llm.chat(message, tools=self.toolkit.param_list)
+
+        chat_response = await self.llm.parse_chat_result(resp=think, toolkit=self.toolkit)
+
+        if chat_response.chat_state == ChatState.FINAL_ANSWER:
             self.answer = AssistantMessage(
-                content=resp.content,
+                content=chat_response.msg,
                 sender=self.name,
+                receiver={MessageRouter.ALL.val},
             )
             return False, self.answer
+        elif chat_response.chat_state == ChatState.IN_PROCESS_ANSWER:
+            self.answer = AssistantMessage(
+                content=chat_response.msg,
+                sender=self.name,
+                receiver={MessageRouter.ALL.val},
+            )
+            return False, self.answer
+        elif chat_response.chat_state == ChatState.SELF_REFLECTION:
+            reflection_msg = AssistantMessage(
+                content=chat_response.msg,
+                sender=self.name,
+                receiver=self.address,
+                self_reflection=True
+            )
+            self.rc.buffer.put_one_msg(reflection_msg)
+            return False, reflection_msg
+        elif chat_response.chat_state == ChatState.FC_CALL:
+            if chat_response.tool_call_id:
+                self.tool_calls_one_round.append(chat_response.tool_call_id)
+            call_message = ToolMessage(non_standard=think)  # for call message, we add origin to accord with official request
+            await self.rc.memory.add_one(call_message)
+
+            call_info_message = ToolMessage(non_standard=chat_response)  #
+            self.rc.todos.append(call_info_message)
+            return True, call_info_message
 
     async def _react(self) -> Message:
         message = Message.from_any('no tools taken yet')

@@ -126,21 +126,15 @@ class ReplyToRecentUnrepliedTweetsAction(Action):
 
     time_value: int = Field(default=7, description="The number of time units to look back (e.g., 7).")
     time_unit: Literal['days', 'hours'] = Field(default='days', description="The unit of time, either 'days' or 'hours'.")
+    prompt: Union[Template, str] = Field(default=Template(
+        """Find all tweets from the last {{ final_time_value }} {{ final_time_unit }} that mention me,and have not been replied to. For each of these tweets, please draft and send a thoughtful reply."""
+    ), description="Template for the reply prompt.")
 
-    async def run(self, role, time_value: Optional[int] = None, time_unit: Optional[Literal['days', 'hours']] = None, *args, **kwargs):
-        """
-        Instructs the role to handle replying to recent tweets.
-        The time frame can be customized by passing 'time_value' and 'time_unit'.
-        """
-        final_time_value = time_value if time_value is not None else self.time_value
-        final_time_unit = time_unit if time_unit is not None else self.time_unit
-
-        lgr.info(f"Delegating the task of replying to unreplied tweets from the last {final_time_value} {final_time_unit}.")
-        # The instruction will be processed by the agent's LLM, which should use its tools.
-        instruction = (
-            f"Find all tweets from the last {final_time_value} {final_time_unit} that mention me "
-            f"and have not been replied to. For each of these tweets, "
-            f"please draft and send a thoughtful reply."
+    async def run(self, role, *args, **kwargs):
+        self.prompt = self.prompt.render(
+            final_time_value=self.time_value,
+            final_time_unit=self.time_unit
         )
-        return await role.run(instruction)
-
+        response = await super().run(role=role, *args, **kwargs)
+        lgr.debug("Reply to unreplied tweets completed")
+        return response

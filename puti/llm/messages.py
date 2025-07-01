@@ -3,6 +3,8 @@
 @Time:  2025-03-10 17:15
 @Description:  
 """
+import traceback
+
 from pydantic import BaseModel, Field, ConfigDict, field_validator
 from typing import Optional, List, Iterable, Literal
 from puti.constant.llm import RoleType
@@ -66,8 +68,11 @@ class Message(BaseModel):
             # for image format
             elif isinstance(msg, List):
                 msg = cls(non_standard=msg, **kwargs)
+            else:
+                msg = cls(content=msg, **kwargs)
         except Exception as e:
-            raise NotImplementedError('Message type error: {}'.format(e))
+            traceback.print_exc()
+            raise NotImplementedError('Message type error: {}'.format(traceback.print_exc()))
         else:
             return msg
 

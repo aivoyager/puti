@@ -2,6 +2,10 @@ import pytest
 import os
 from unittest.mock import AsyncMock
 from dotenv import load_dotenv
+import unittest
+import asyncio
+from unittest.mock import patch, MagicMock
+from celery_queue.simplified_tasks import reply_to_tweets_task
 
 from puti.llm.tools.twikitt import Twikitt, TwikittClientManager
 
