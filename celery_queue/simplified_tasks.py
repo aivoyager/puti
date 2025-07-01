@@ -174,85 +174,82 @@ def unimplemented_task(self, **kwargs):
 
 
 @shared_task(bind=True)
-async def generate_tweet_task(self, schedule_id, topic, **kwargs):
+def generate_tweet_task(self, schedule_id, topic, **kwargs):
     """
     Generates and publishes a tweet using a Graph Workflow.
-
+    This is a sync wrapper around an async operation.
     Args:
         topic: The topic for tweet generation.
     """
-    from puti.db.schedule_manager import ScheduleManager
+    import asyncio
     from puti.db.task_state_guard import TaskStateGuard
 
-    task_id = self.request.id
+    async def _async_run():
+        task_id = self.request.id
+        with TaskStateGuard.for_task(task_id=task_id, schedule_id=schedule_id) as guard:
+            lgr.info(f'[Task {task_id}] generate_tweet_task started, topic: {topic}')
+            guard.update_state(status="generating_tweet")
 
-    # Use TaskStateGuard to ensure the task state is always updated correctly.
-    with TaskStateGuard.for_task(task_id=task_id) as guard:
-        lgr.info(f'[Task {task_id}] generate_tweet_task started, topic: {topic}')
+            generate_tweet_action = GenerateTweetAction(topic=topic)
+            post_tweet_action = PublishTweetAction()
+            ethan = get_ethan_instance()
 
-        # You can update additional states here if needed.
-        guard.update_state(status="generating_tweet")
+            generate_tweet_vertex = Vertex(id='generate_tweet', action=generate_tweet_action)
+            post_tweet_vertex = Vertex(id='post_tweet', action=post_tweet_action, role=ethan)
 
-        # Create action instances.
-        generate_tweet_action = GenerateTweetAction(topic=topic)
-        post_tweet_action = PublishTweetAction()
+            graph = Graph()
+            graph.add_vertices(generate_tweet_vertex, post_tweet_vertex)
+            graph.add_edge(generate_tweet_vertex.id, post_tweet_vertex.id)
+            graph.set_start_vertex(generate_tweet_vertex.id)
 
-        # Use the module-level Ethan instance to avoid repeated creation.
-        ethan = get_ethan_instance()
+            guard.update_state(status="running_workflow")
+            workflow = Workflow(graph=graph)
+            resp = await workflow.run_until_vertex(post_tweet_vertex.id)
 
-        # Create workflow graph nodes.
-        generate_tweet_vertex = Vertex(id='generate_tweet', action=generate_tweet_action)
-        post_tweet_vertex = Vertex(id='post_tweet', action=post_tweet_action, role=ethan)
+            lgr.info(f'[Task {task_id}] Completed successfully')
+            return resp
 
-        # Build the workflow graph.
-        graph = Graph()
-        graph.add_vertices(generate_tweet_vertex, post_tweet_vertex)
-        graph.add_edge(generate_tweet_vertex.id, post_tweet_vertex.id)
-        graph.set_start_vertex(generate_tweet_vertex.id)
-
-        # Update task status.
-        guard.update_state(status="running_workflow")
-
-        # Execute the workflow.
-        workflow = Workflow(graph=graph)
-        resp = await workflow.run_until_vertex(post_tweet_vertex.id)
-
-        # No need to manually update task status here; TaskStateGuard handles it automatically.
-        # On successful completion, it automatically sets is_running=False, pid=None, and last_run=start_time.
-
-        # Log completion information.
-        lgr.info(f'[Task {task_id}] Completed successfully')
-        return resp
+    try:
+        return asyncio.run(_async_run())
+    except Exception as e:
+        lgr.error(f"Error in generate_tweet_task: {e}", exc_info=True)
+        raise
 
 
 @shared_task(bind=True)
-async def reply_to_tweets_task(self, schedule_id, **kwargs):
+def reply_to_tweets_task(self, schedule_id, **kwargs):
     """
     Celery task to reply to recent tweets based on a schedule.
-    It uses a TaskStateGuard to manage the lifecycle of the task.
-    This task is defined as async.
+    This is a sync wrapper around an async operation.
     """
-    with TaskStateGuard.for_task(task_id=self.request.id, schedule_id=schedule_id) as guard:
-        lgr.info(f"Executing async reply to tweets task for schedule_id: {schedule_id} with params: {kwargs}")
+    import asyncio
+    from puti.db.task_state_guard import TaskStateGuard
 
-        # Explicitly extract known parameters from the task's keyword arguments.
-        time_value = int(kwargs.get('time_value', 7))
-        time_unit = str(kwargs.get('time_unit', 'days'))
+    async def _async_run():
+        with TaskStateGuard.for_task(task_id=self.request.id, schedule_id=schedule_id) as guard:
+            lgr.info(f"Executing reply to tweets task for schedule_id: {schedule_id} with params: {kwargs}")
 
-        # Instantiate the graph and action
-        graph = Graph()
-        reply_action = ReplyToRecentUnrepliedTweetsAction(time_value=time_value, time_unit=time_unit)
-        reply_tweet_vertex = Vertex(id='reply_tweet', action=reply_action, role=get_ethan_instance())
-        graph.add_vertices(reply_tweet_vertex)
+            time_value = int(kwargs.get('time_value', 7))
+            time_unit = str(kwargs.get('time_unit', 'days'))
 
-        workflow = Workflow(graph=graph)
+            graph = Graph()
+            reply_action = ReplyToRecentUnrepliedTweetsAction(time_value=time_value, time_unit=time_unit)
+            reply_tweet_vertex = Vertex(id='reply_tweet', action=reply_action, role=get_ethan_instance())
+            graph.add_vertices(reply_tweet_vertex)
+            graph.set_start_vertex(reply_tweet_vertex.id)
+            workflow = Workflow(graph=graph)
+            guard.update_state(status="reply_tweet")
 
-        guard.update_state(status="reply_tweet")
+            resp = await workflow.run()
 
-        resp = await workflow.run()
+            lgr.info(f"Reply task for schedule {schedule_id} completed. Final result: {resp}")
+            return str(resp)
 
-        lgr.info(f"Reply task for schedule {schedule_id} completed. Final result: {resp}")
-        return str(resp)
+    try:
+        return asyncio.run(_async_run())
+    except Exception as e:
+        lgr.error(f"Error in reply_to_tweets_task: {e}", exc_info=True)
+        raise
 
 
 @shared_task()
