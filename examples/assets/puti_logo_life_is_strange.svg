@@ -1,0 +1,51 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="400" height="300" viewBox="0 0 400 300">
+  <defs>
+    <!-- 奇异人生主题色调渐变背景 -->
+    <linearGradient id="lisGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#0E0B16;stop-opacity:1" />
+      <stop offset="60%" style="stop-color:#1A1A2E;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#4B2D83;stop-opacity:1" />
+    </linearGradient>
+    
+    <!-- 灯塔光束渐变 - 更柔和的色调 -->
+    <linearGradient id="beamGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#E84545;stop-opacity:0.6" />
+      <stop offset="50%" style="stop-color:#F9B208;stop-opacity:0.5" />
+      <stop offset="100%" style="stop-color:#F5E6CA;stop-opacity:0.4" />
+    </linearGradient>
+    
+    <!-- 极光效果渐变 -->
+    <radialGradient id="auroraGlow" cx="50%" cy="50%" r="70%" fx="50%" fy="50%">
+      <stop offset="0%" style="stop-color:#E45A84;stop-opacity:0.3" />
+      <stop offset="60%" style="stop-color:#5195EA;stop-opacity:0.1" />
+      <stop offset="100%" style="stop-color:#A155B9;stop-opacity:0" />
+    </radialGradient>
+  </defs>
+  
+  <!-- 背景 -->
+  <rect width="400" height="300" fill="url(#lisGradient)" rx="15" ry="15" />
+  
+  <!-- 氛围光效 -->
+  <ellipse cx="200" cy="150" rx="180" ry="130" fill="url(#auroraGlow)" />
+  
+  <!-- 简化的灯塔光束 -->
+  <path d="M 200,80 L 60,180 L 340,180 Z" fill="url(#beamGradient)" opacity="0.5" />
+  
+  <!-- 蓝鹭湾的轮廓 - 简化版 -->
+  <path d="M 0,250 C 50,235 100,245 150,240 C 200,235 250,250 300,245 C 350,240 400,250 400,250 L 400,300 L 0,300 Z" fill="#1A1A2E" opacity="0.9" />
+  
+  <!-- 微弱的海面反光 -->
+  <path d="M 50,265 C 100,255 150,265 200,260 C 250,255 300,265 350,260" fill="none" stroke="#8696FE" stroke-width="0.5" opacity="0.3" />
+  
+  <!-- PUTI 字母 - 奇异人生标志性的手写风格 -->
+  <text x="58" y="180" font-family="Arial" font-size="38" font-weight="bold" fill="#E45A84" style="font-style: italic;">P</text>
+  <text x="142" y="180" font-family="Arial" font-size="38" font-weight="bold" fill="#5195EA" style="font-style: italic;">U</text>
+  <text x="226" y="180" font-family="Arial" font-size="38" font-weight="bold" fill="#A155B9" style="font-style: italic;">T</text>
+  <text x="310" y="180" font-family="Arial" font-size="38" font-weight="bold" fill="#F9B208" style="font-style: italic;">I</text>
+  
+  <!-- 灯塔顶端的光源 - 简化版 -->
+  <circle cx="200" cy="80" r="10" fill="#F5E6CA" opacity="0.8">
+    <animate attributeName="opacity" values="0.5;0.9;0.5" dur="4s" repeatCount="indefinite" />
+  </circle>
+  <circle cx="200" cy="80" r="20" fill="#F5E6CA" opacity="0.3" />
+</svg> 

@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="400" height="300" viewBox="0 0 400 300">
+  <defs>
+    <linearGradient id="skyGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#1a1a2e;stop-opacity:1" />
+      <stop offset="50%" style="stop-color:#16213e;stop-opacity:1" />
+      <stop offset="80%" style="stop-color:#7209b7;stop-opacity:0.8" />
+      <stop offset="100%" style="stop-color:#f72585;stop-opacity:0.7" />
+    </linearGradient>
+    <linearGradient id="beamGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#4361ee;stop-opacity:0.7" />
+      <stop offset="25%" style="stop-color:#7209b7;stop-opacity:0.7" />
+      <stop offset="50%" style="stop-color:#f72585;stop-opacity:0.7" />
+      <stop offset="75%" style="stop-color:#fb8500;stop-opacity:0.7" />
+      <stop offset="100%" style="stop-color:#ffffff;stop-opacity:0.5" />
+    </linearGradient>
+  </defs>
+  <rect width="400" height="300" fill="url(#skyGradient)" rx="15" ry="15" />
+  <path d="M 0,240 C 50,230 100,250 150,235 C 200,220 250,240 300,230 C 350,220 400,235 400,235 L 400,300 L 0,300 Z" fill="#1a1a2e" opacity="0.8" />
+  <path d="M 0,245 C 50,235 100,255 150,240 C 200,225 250,245 300,235 C 350,225 400,240 400,240" fill="none" stroke="#4cc9f0" stroke-width="2" opacity="0.5" />
+  <path d="M 0,255 C 60,245 120,265 180,250 C 240,235 300,255 360,245 C 380,240 400,250 400,250" fill="none" stroke="#4cc9f0" stroke-width="1.5" opacity="0.4" />
+  <path d="M 20,265 C 80,255 140,275 200,260 C 260,245 320,265 380,255" fill="none" stroke="#4cc9f0" stroke-width="1" opacity="0.3" />
+  <path d="M 150,240 L 180,200 L 230,200 L 260,240 Z" fill="#2b2d42" />
+  <rect x="190" y="120" width="30" height="80" fill="#e5e5e5" />
+  <rect x="185" y="110" width="40" height="10" fill="#2b2d42" />
+  <polygon points="185,110 205,70 225,110" fill="#e5e5e5" />
+  <circle cx="205" cy="85" r="8" fill="#fb8500" />
+  <path d="M 205,85 L 60,180 L 350,180 Z" fill="url(#beamGradient)" opacity="0.3" />
+  <ellipse cx="205" cy="85" rx="20" ry="20" fill="#fb8500" opacity="0.2" />
+  <text x="70" y="180" font-family="Arial" font-size="28" font-weight="bold" fill="#4361EE">P</text>
+  <text x="150" y="180" font-family="Arial" font-size="28" font-weight="bold" fill="#7209B7">U</text>
+  <text x="230" y="180" font-family="Arial" font-size="28" font-weight="bold" fill="#F72585">T</text>
+  <text x="310" y="180" font-family="Arial" font-size="28" font-weight="bold" fill="#FB8500">I</text>
+  <text x="200" y="220" font-family="Arial" font-size="14" font-style="italic" text-anchor="middle" fill="#e5e5e5">ARCADIA BAY</text>
+  <text x="200" y="260" font-family="Arial" font-size="16" text-anchor="middle" fill="#e5e5e5">Multi-Agent Framework</text>
+</svg> 

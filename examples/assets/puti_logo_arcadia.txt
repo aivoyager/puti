@@ -1,0 +1,23 @@
+PUTI Logo - Arcadia Bay 版本
+
+此SVG文件可以通过以下方式转换为PNG：
+
+1. 使用在线SVG转PNG工具：
+   - https://svgtopng.com/
+   - https://cloudconvert.com/svg-to-png
+   - https://www.pngtosvg.com/svg-to-png
+
+2. 使用命令行工具(如已安装):
+   ```bash
+   # 使用ImageMagick
+   convert examples/assets/puti_logo_arcadia.svg examples/assets/puti_logo_arcadia.png
+   
+   # 使用librsvg (通常Linux系统上安装)
+   rsvg-convert -h 300 examples/assets/puti_logo_arcadia.svg > examples/assets/puti_logo_arcadia.png
+   ```
+
+3. 使用图形编辑器:
+   - Inkscape: 打开SVG文件，然后"文件 > 导出PNG图像"
+   - Adobe Illustrator: 打开SVG，然后"文件 > 导出 > 导出为..."选择PNG
+
+转换后的PNG文件应保存在相同位置，以便在README中使用。 

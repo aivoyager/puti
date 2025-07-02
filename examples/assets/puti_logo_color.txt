@@ -1,0 +1,53 @@
+PUTI Logo - Arcadia Bay & Life is Strange 灵感
+
+图标描述:
+- 设计灵感来自Life is Strange中的Arcadia Bay灯塔
+- 灯塔光束照亮四个不同颜色的PUTI字母
+- 背景为日落时分的深蓝色和紫色渐变
+- 底部有海浪和"Arcadia Bay"文字
+- "Multi-Agent Framework"作为标语
+
+使用方法:
+在README.md中添加以下内容引用SVG logo:
+
+```markdown
+<p align="center">
+  <img src="examples/assets/puti_logo_arcadia.svg" alt="PUTI Logo" width="400"/>
+</p>
+```
+
+当SVG转换为PNG后，使用:
+
+```markdown
+<p align="center">
+  <img src="examples/assets/puti_logo_arcadia.png" alt="PUTI Logo" width="400"/>
+</p>
+```
+
+临时替代方案:
+在无法显示图像的环境下，可以使用以下ASCII艺术版本:
+
+```
+            *
+           ***
+          *****
+         /|   |\
+        / |   | \
+       /  |   |  \
+      /   |___|   \
+     /     | |     \
+    /      | |      \
+   /_______|_|_______\
+       ____| |____
+      /     |     \
+     /      |      \
+    /       |       \
+    |       |       |
+    |_______|_______|
+
+    P  U  T  I
+ ~~~~~~~~~~~~~~~~~~~
+   ARCADIA BAY
+
+Multi-Agent Framework
+``` 

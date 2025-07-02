@@ -1,9 +1,8 @@
 # Puti - Multi-Agent Framework 🤖
 
+<!-- 奇异人生(Life is Strange)风格Logo - Max的笔记本风格 -->
 <p align="center">
-  <a href="https://github.com/aivoyager/puti">
-    <img src="https://socialify.git.ci/aivoyager/puti/image?description=1&font=Inter&forks=1&issues=1&language=1&name=1&owner=1&pattern=Plus&stargazers=1&theme=Dark" alt="puti" width="650" height="325" />
-  </a>
+  <img src="examples/assets/puti_logo_final.svg" alt="PUTI Logo - Life is Strange Journal Style" width="400"/>
 </p>
 
 <p align="center">
@@ -11,11 +10,13 @@
 </p>
 
 <p align="center">
-    <a href="https://pypi.org/project/ai-puti/"><img src="https://img.shields.io/pypi/v/ai-puti.svg?style=flat-square&logo=pypi&logoColor=white" alt="PyPI version"></a>
-    <a href="https://pypi.org/project/ai-puti/"><img src="https://img.shields.io/pypi/pyversions/ai-puti.svg?style=flat-square&logo=python&logoColor=white" alt="Python versions"></a>
-    <a href="https://github.com/aivoyager/puti/blob/main/LICENSE"><img src="https://img.shields.io/github/license/aivoyager/puti?style=flat-square" alt="License"></a>
+    <a href="https://github.com/aivoyager/puti/stargazers"><img src="https://img.shields.io/github/stars/aivoyager/puti?style=flat-square" alt="Stars"></a>
+    <a href="https://github.com/aivoyager/puti/network/members"><img src="https://img.shields.io/github/forks/aivoyager/puti?style=flat-square" alt="Forks"></a>
     <a href="https://github.com/aivoyager/puti/issues"><img src="https://img.shields.io/github/issues/aivoyager/puti?style=flat-square" alt="Issues"></a>
     <a href="https://github.com/aivoyager/puti/pulls"><img src="https://img.shields.io/github/issues-pr/aivoyager/puti?style=flat-square" alt="Pull Requests"></a>
+    <a href="https://github.com/aivoyager/puti/blob/main/LICENSE"><img src="https://img.shields.io/github/license/aivoyager/puti?style=flat-square" alt="License"></a>
+    <a href="https://pypi.org/project/ai-puti/"><img src="https://img.shields.io/pypi/v/ai-puti.svg?style=flat-square&logo=pypi&logoColor=white" alt="PyPI version"></a>
+    <a href="https://pypi.org/project/ai-puti/"><img src="https://img.shields.io/pypi/pyversions/ai-puti.svg?style=flat-square&logo=python&logoColor=white" alt="Python versions"></a>
 </p>
 
 ## ✨ Introduction

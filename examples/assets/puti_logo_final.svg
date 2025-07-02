@@ -1,0 +1,54 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="400" height="200" viewBox="0 0 400 200">
+  <defs>
+    <!-- 纸张纹理的噪点 -->
+    <filter id="paperTexture" x="0%" y="0%" width="100%" height="100%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.04" numOctaves="5" stitchTiles="stitch" result="noise"/>
+      <feColorMatrix type="matrix" values="1 0 0 0 0 0 1 0 0 0 0 0 1 0 0 0 0 0 0.05 0" in="noise" result="noiseTrans"/>
+      <feComposite operator="in" in="noiseTrans" in2="SourceGraphic" result="noiseComp"/>
+    </filter>
+    
+    <!-- 手写字体的模糊阴影 -->
+    <filter id="handwrittenGlow" x="-10%" y="-10%" width="120%" height="120%">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="2" result="blur"/>
+      <feComposite in="SourceGraphic" in2="blur" operator="over"/>
+    </filter>
+  </defs>
+  
+  <!-- 笔记本页面背景 - 类似Max的日记 -->
+  <rect width="400" height="200" fill="#F8F8F0" filter="url(#paperTexture)"/>
+  
+  <!-- 顶部水平线 - 类似笔记本的横线 -->
+  <line x1="20" y1="20" x2="380" y2="20" stroke="#BDC9E5" stroke-width="1"/>
+  <line x1="20" y1="40" x2="380" y2="40" stroke="#BDC9E5" stroke-width="1"/>
+  <line x1="20" y1="160" x2="380" y2="160" stroke="#BDC9E5" stroke-width="1"/>
+  <line x1="20" y1="180" x2="380" y2="180" stroke="#BDC9E5" stroke-width="1"/>
+  
+  <!-- 左侧装订线 -->
+  <line x1="30" y1="10" x2="30" y2="190" stroke="#D0D0D0" stroke-width="2"/>
+  
+  <!-- 奇异人生风格的拍立得照片框架 -->
+  <rect x="70" y="50" width="260" height="100" fill="#FFFFFF" stroke="#D0D0D0" stroke-width="1"/>
+  <rect x="75" y="55" width="250" height="90" fill="none" stroke="#E0E0E0" stroke-width="1" stroke-dasharray="2,2"/>
+  
+  <!-- PUTI字母 - 使用类似Max手写风格的字体 -->
+  <g filter="url(#handwrittenGlow)">
+    <text x="90" y="120" font-family="Comic Sans MS, cursive" font-size="65" fill="#E45A84" style="font-style:italic; letter-spacing: 5px;">P</text>
+    <text x="150" y="120" font-family="Comic Sans MS, cursive" font-size="65" fill="#5195EA" style="font-style:italic; letter-spacing: 5px;">U</text>
+    <text x="220" y="120" font-family="Comic Sans MS, cursive" font-size="65" fill="#A155B9" style="font-style:italic; letter-spacing: 5px;">T</text>
+    <text x="280" y="120" font-family="Comic Sans MS, cursive" font-size="65" fill="#F9B208" style="font-style:italic; letter-spacing: 5px;">I</text>
+  </g>
+  
+  <!-- 模拟的胶带固定效果 -->
+  <rect x="70" y="45" width="40" height="10" fill="#E0E0E0" opacity="0.5" rx="2" ry="2"/>
+  <rect x="290" y="45" width="40" height="10" fill="#E0E0E0" opacity="0.5" rx="2" ry="2"/>
+  <rect x="70" y="145" width="40" height="10" fill="#E0E0E0" opacity="0.5" rx="2" ry="2"/>
+  <rect x="290" y="145" width="40" height="10" fill="#E0E0E0" opacity="0.5" rx="2" ry="2"/>
+  
+  <!-- 奇异人生标志性的蝴蝶 -->
+  <path d="M 350,30 C 355,25 360,28 362,30 C 365,32 365,35 362,38 C 360,40 355,43 350,38 C 348,35 348,32 350,30 Z" fill="#5195EA" opacity="0.6">
+    <animate attributeName="transform" attributeType="XML" type="rotate" from="0 356 34" to="10 356 34" dur="3s" repeatCount="indefinite" additive="sum" />
+  </path>
+  <path d="M 356,34 C 361,29 366,32 368,34 C 371,36 371,39 368,42 C 366,44 361,47 356,42 C 354,39 354,36 356,34 Z" fill="#A155B9" opacity="0.6">
+    <animate attributeName="transform" attributeType="XML" type="rotate" from="0 356 34" to="-10 356 34" dur="2.5s" repeatCount="indefinite" additive="sum" />
+  </path>
+</svg> 
