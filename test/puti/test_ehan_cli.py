@@ -30,12 +30,13 @@ def test_ethan_cli_debuggable_conversation():
         "What can you help me with regarding Twitter?",
         "Can you show me my recent Twitter mentions?",
         "What's my Twitter username and how many followers do I have?",
+        "I'd like to check if I've already replied to some tweets. Can you help me with that?",
         "Can you draft a tweet about AI that would be interesting to my followers?",
         "exit"
     ]
 
     # Join the inputs with newlines to simulate the user pressing Enter after each line
-    inputs = "\\n".join(conversation) + "\\n"
+    inputs = "\n".join(conversation) + "\n"
 
     # Invoke the command, passing the scripted inputs.
     # The `ethan_chat` function will now be called in this process.
@@ -56,5 +57,9 @@ def test_ethan_cli_debuggable_conversation():
     assert result.output.count("👤 You:") == len(conversation)
     assert result.output.count("🤖 Ethan") == len(conversation) - 1
 
-    print("\\n\\n===== CLI Debuggable Conversation Test Completed Successfully =====")
+    # 4. Check for specific content in the replies
+    assert "username" in result.output and "followers" in result.output, "Should mention username and followers"
+    assert "already replied" in result.output, "Should mention checking for already replied tweets"
+
+    print("\n\n===== CLI Debuggable Conversation Test Completed Successfully =====")
     print("The test successfully simulated a user conversation in-process.") 

@@ -36,7 +36,7 @@ async def test_alex_real_conversation_with_twikitt():
         return response
 
     # --- Turn 1: Get my info ---
-    await run_and_log("Can you get my Twitter profile information?")
+    await run_and_log("最近一周我有那些未回复的评论呢？")
 
     # --- Turn 2: Post a tweet ---
     tweet_content = f"Hello from a real integration test with my AI assistant Ethan! Timestamp: {int(time.time())}"

@@ -88,7 +88,7 @@ class TwikittArgs(ToolArgs, ABC):
     )
     text: Optional[str] = Field(None, description='The text content for a tweet or reply.')
     tweet_id: Optional[str] = Field(None, description='The ID of a specific tweet for operations like replying, liking, retweeting, checking for a reply, or fetching replies.')
-    tweet_ids: Optional[List[str]] = Field(None, description='A list of tweet IDs to check reply status for in a batch.')
+    tweet_ids: Optional[List[str]] = Field(None, description='A list of tweet IDs to check reply status for in batch operations like check_reply_status_batch or has_my_reply.')
     user_id: Optional[str] = Field(None, description='The ID of a user for lookup operations.')
     query: Optional[str] = Field(None, description='The keyword or content to search for tweets.')
     count: Optional[int] = Field(default=20, description='The number of items to retrieve. For reply checks, this is the number of your recent tweets to scan to find a reply.')
@@ -119,20 +119,79 @@ class Twikitt(BaseTool, ABC):
         except Exception as e:
             return ToolResponse.fail(str(e))
 
+    async def _check_reply_by_conversation(
+        self, client: Client, tweet_id: str
+    ) -> bool:
+        """
+        Check if the user has replied to a tweet by fetching the conversation/replies for that tweet.
+        This is a more direct and accurate method than checking in_reply_to fields.
+        
+        Args:
+            client: The Twitter client instance
+            tweet_id: The ID of the tweet to check for replies
+            
+        Returns:
+            bool: True if the user has replied to the tweet, False otherwise
+        """
+        try:
+            # Get the authenticated user
+            me = await client.user()
+            
+            # Get the conversation/replies for the tweet
+            tweet_with_replies = await client.get_tweet_by_id(tweet_id)
+            
+            # If we couldn't fetch the tweet or it has no replies, return False
+            if not tweet_with_replies or not tweet_with_replies.replies:
+                return False
+                
+            # Check if any of the replies are from the current user
+            for reply in tweet_with_replies.replies:
+                if reply.user.id == me.id:
+                    lgr.debug(f"Found direct reply to tweet {tweet_id} from user {me.id}")
+                    return True
+                    
+            # No replies from the current user were found
+            return False
+            
+        except Exception as e:
+            lgr.error(f"Error checking replies for tweet {tweet_id}: {e}")
+            return False  # Default to not replied on error
+
     async def _check_my_replies_to_tweets(
         self, client: Client, tweet_ids_to_check: List[str], my_tweets_count: int
     ) -> set:
-        """Checks which of the given tweet IDs have been replied to by the current user by fetching their latest tweets."""
+        """
+        Checks which of the given tweet IDs have been replied to by the current user.
+        
+        This method fetches both the user's tweets and their replies, then examines the 
+        'in_reply_to' field to determine which tweets in the provided list have already
+        been replied to.
+        """
         me = await client.user()
+        
+        # Fetch both regular tweets and replies to get comprehensive coverage
         my_tweets = await client.get_user_tweets(me.id, 'Tweets', count=my_tweets_count)
-
+        my_replies = await client.get_user_tweets(me.id, 'Replies', count=my_tweets_count)
+        
+        # Combine both sets of tweets
+        all_my_tweets = list(my_tweets) + list(my_replies)
+        
         # Get the set of tweet IDs that the user has replied to
         replied_to_parent_ids = {
-            tweet.in_reply_to for tweet in my_tweets if tweet.in_reply_to
+            tweet.in_reply_to for tweet in all_my_tweets if tweet.in_reply_to
         }
+        
+        # Log for debugging
+        lgr.debug(f"Tweet IDs to check: {tweet_ids_to_check}")
+        lgr.debug(f"Found regular tweets: {len(my_tweets)}")
+        lgr.debug(f"Found reply tweets: {len(my_replies)}")
+        lgr.debug(f"Total tweets examined: {len(all_my_tweets)}")
+        lgr.debug(f"Found replied_to_parent_ids: {replied_to_parent_ids}")
 
-        # Find the intersection
+        # Find the intersection - these are the tweets that the user has replied to
         found_replied_ids = set(tweet_ids_to_check) & replied_to_parent_ids
+        lgr.debug(f"Intersection (found_replied_ids): {found_replied_ids}")
+        
         return found_replied_ids
 
     async def run(self, *args, **kwargs) -> ToolResponse:
@@ -150,7 +209,7 @@ class Twikitt(BaseTool, ABC):
         if not command:
             return ToolResponse.fail("`command` is a required argument.")
 
-        if command == 'send_tweet':
+        if command == 'send_tweet':  # TODO：media support
             text = kwargs.get('text')
             if not text:
                 return ToolResponse.fail("`text` is required for send_tweet.")
@@ -167,15 +226,35 @@ class Twikitt(BaseTool, ABC):
                 return ToolResponse.fail("`text` and `tweet_id` are required for reply_to_tweet.")
 
             try:
-                # Real-time check to see if already replied
-                count = kwargs.get('count', 200)
-                found_replies = await self._check_my_replies_to_tweets(client, [tweet_id], count)
-                if found_replies:
+                # First, check if we've already replied by looking at our replies directly
+                count = kwargs.get('count', 500)
+                me = await client.user()
+                
+                # Get the user's replies specifically
+                my_replies = await client.get_user_tweets(me.id, 'Replies', count=count)
+                
+                # Check if any of these replies are to the tweet we're looking for
+                already_replied = any(reply.in_reply_to == tweet_id for reply in my_replies)
+                
+                # If we didn't find it through direct replies, try the comprehensive method
+                if not already_replied:
+                    lgr.debug(f"No direct reply found for tweet {tweet_id}, trying comprehensive check")
+                    found_replies = await self._check_my_replies_to_tweets(client, [tweet_id], count)
+                    already_replied = bool(found_replies)
+                
+                # If we still didn't find it, try the conversation check as a last resort
+                if not already_replied:
+                    lgr.debug(f"No reply found in user's tweets for {tweet_id}, trying conversation check")
+                    already_replied = await self._check_reply_by_conversation(client, tweet_id)
+                
+                if already_replied:
                     return ToolResponse.success(f"You have already replied to tweet {tweet_id}.")
 
+                # If we haven't replied yet, send the reply
                 reply_tweet = await client.create_tweet(text=text, reply_to=tweet_id)
                 return ToolResponse.success(f"Reply sent successfully to tweet {tweet_id}: {reply_tweet.id}")
             except Exception as e:
+                lgr.error(f"Failed to reply to tweet: {e}", exc_info=True)
                 return ToolResponse.fail(f"Failed to reply to tweet: {e}")
 
         elif command == 'get_mentions':
@@ -214,37 +293,173 @@ class Twikitt(BaseTool, ABC):
                 return ToolResponse.fail(f"Failed to get my tweets: {e}")
 
         elif command == 'has_my_reply':
+            # Support both single tweet_id and batch tweet_ids
             tweet_id = kwargs.get('tweet_id')
-            if not tweet_id:
-                return ToolResponse.fail("`tweet_id` is required for has_my_reply.")
+            tweet_ids = kwargs.get('tweet_ids')
+            
+            # Handle both single ID and list of IDs
+            if tweet_id and not tweet_ids:
+                # Convert single ID to list for consistent processing
+                tweet_ids = [tweet_id]
+            elif not tweet_ids:
+                return ToolResponse.fail("Either `tweet_id` or `tweet_ids` is required for has_my_reply.")
             
             try:
-                count = kwargs.get('count', 200)
-                found_replies = await self._check_my_replies_to_tweets(client, [tweet_id], count)
-                return ToolResponse.success({
-                    'tweet_id': tweet_id,
-                    'has_my_reply': bool(found_replies)
-                })
+                count = kwargs.get('count', 500)
+                me = await client.user()
+                
+                # Step 1: First check directly against replies - fastest and most accurate
+                my_replies = await client.get_user_tweets(me.id, 'Replies', count=count)
+                
+                # Create a set of tweets we've directly replied to
+                direct_replies_set = set()
+                for reply in my_replies:
+                    if reply.in_reply_to and reply.in_reply_to in tweet_ids:
+                        direct_replies_set.add(reply.in_reply_to)
+                
+                lgr.debug(f"Direct reply check found {len(direct_replies_set)} replied tweets")
+                
+                # Step 2: For tweets we didn't find direct replies to, use the comprehensive method
+                remaining_tweets = set(tweet_ids) - direct_replies_set
+                
+                if remaining_tweets:
+                    lgr.debug(f"Checking {len(remaining_tweets)} remaining tweets with comprehensive method")
+                    additional_replies_set = await self._check_my_replies_to_tweets(client, list(remaining_tweets), count)
+                    lgr.debug(f"Comprehensive check found {len(additional_replies_set)} additional replied tweets")
+                else:
+                    additional_replies_set = set()
+                
+                # Step 3: For any still not found, do the direct conversation check
+                # This is more expensive, so we only do it if we have a reasonable number of tweets left
+                final_remaining = remaining_tweets - additional_replies_set
+                conversation_replies_set = set()
+                
+                # Only do conversation checks if we have 5 or fewer tweets to check
+                # to avoid making too many API calls
+                if final_remaining and len(final_remaining) <= 5:
+                    lgr.debug(f"Checking {len(final_remaining)} remaining tweets with conversation method")
+                    for tweet_id in final_remaining:
+                        has_reply = await self._check_reply_by_conversation(client, tweet_id)
+                        if has_reply:
+                            conversation_replies_set.add(tweet_id)
+                    
+                    lgr.debug(f"Conversation check found {len(conversation_replies_set)} additional replied tweets")
+                
+                # Combine all replied tweets from the three methods
+                all_replied_ids = direct_replies_set | additional_replies_set | conversation_replies_set
+                unreplied_ids = set(tweet_ids) - all_replied_ids
+                
+                # Create result for each tweet ID
+                results = {}
+                for tid in tweet_ids:
+                    reply_found = tid in all_replied_ids
+                    method = None
+                    if tid in direct_replies_set:
+                        method = "direct"
+                    elif tid in additional_replies_set:
+                        method = "comprehensive"
+                    elif tid in conversation_replies_set:
+                        method = "conversation"
+                    
+                    results[tid] = {
+                        "has_reply": reply_found,
+                        "method": method if reply_found else None
+                    }
+                
+                # For backwards compatibility, if there was only one tweet_id, include the single result format
+                response = {
+                    "tweet_ids": tweet_ids,
+                    "results": results,
+                    "replied_ids": list(all_replied_ids),
+                    "unreplied_ids": list(unreplied_ids),
+                    "reply_counts": {
+                        "direct": len(direct_replies_set),
+                        "comprehensive": len(additional_replies_set),
+                        "conversation": len(conversation_replies_set),
+                        "total": len(all_replied_ids)
+                    }
+                }
+                
+                # If this was a single tweet_id request, add simplified format for backwards compatibility
+                if len(tweet_ids) == 1:
+                    response["tweet_id"] = tweet_ids[0]
+                    response["has_my_reply"] = results[tweet_ids[0]]["has_reply"]
+                
+                return ToolResponse.success(response)
             except Exception as e:
-                return ToolResponse.fail(f"Failed to check reply status for tweet {tweet_id}: {e}")
+                lgr.error(f"Failed to check reply status for tweets {tweet_ids}: {e}", exc_info=True)
+                return ToolResponse.fail(f"Failed to check reply status for tweets {tweet_ids}: {e}")
 
-        elif command == 'check_reply_status_batch':  # TODO: All unreplied tweet fix
+        elif command == 'check_reply_status_batch':
             tweet_ids = kwargs.get('tweet_ids')
             if not tweet_ids:
                 return ToolResponse.fail("`tweet_ids` list is required.")
 
             try:
-                count = kwargs.get('count', 200)
-                found_replies_set = await self._check_my_replies_to_tweets(client, tweet_ids, count)
+                count = kwargs.get('count', 500)  # Increased from default 200
+                me = await client.user()
                 
-                replied_ids = list(found_replies_set)
-                unreplied_ids = list(set(tweet_ids) - found_replies_set)
+                # Step 1: First check directly against replies - this is fast and most accurate
+                my_replies = await client.get_user_tweets(me.id, 'Replies', count=count)
+                
+                # Create a set of tweets we've directly replied to
+                direct_replies_set = set()
+                for reply in my_replies:
+                    if reply.in_reply_to and reply.in_reply_to in tweet_ids:
+                        direct_replies_set.add(reply.in_reply_to)
+                
+                lgr.debug(f"Direct reply check found {len(direct_replies_set)} replied tweets")
+                
+                # Step 2: For tweets we didn't find direct replies to, use the comprehensive method
+                remaining_tweets = set(tweet_ids) - direct_replies_set
+                
+                if remaining_tweets:
+                    lgr.debug(f"Checking {len(remaining_tweets)} remaining tweets with comprehensive method")
+                    additional_replies_set = await self._check_my_replies_to_tweets(client, list(remaining_tweets), count)
+                    lgr.debug(f"Comprehensive check found {len(additional_replies_set)} additional replied tweets")
+                else:
+                    additional_replies_set = set()
+                
+                # Step 3: For any still not found, do the direct conversation check
+                final_remaining = remaining_tweets - additional_replies_set
+                conversation_replies_set = set()
+                
+                if final_remaining:
+                    lgr.debug(f"Checking {len(final_remaining)} remaining tweets with conversation method")
+                    for tweet_id in final_remaining:
+                        has_reply = await self._check_reply_by_conversation(client, tweet_id)
+                        if has_reply:
+                            conversation_replies_set.add(tweet_id)
+                    
+                    lgr.debug(f"Conversation check found {len(conversation_replies_set)} additional replied tweets")
+                
+                # Combine all replied tweets from the three methods
+                all_replied_ids = direct_replies_set | additional_replies_set | conversation_replies_set
+                unreplied_ids = set(tweet_ids) - all_replied_ids
+                
+                # Convert to lists for the response
+                replied_ids = list(all_replied_ids)
+                unreplied_ids = list(unreplied_ids)
+                
+                # Log the final results
+                lgr.debug(f"check_reply_status_batch final results:")
+                lgr.debug(f"- Direct replies: {len(direct_replies_set)}")
+                lgr.debug(f"- Additional via comprehensive check: {len(additional_replies_set)}")
+                lgr.debug(f"- Additional via conversation check: {len(conversation_replies_set)}")
+                lgr.debug(f"- Total replied: {len(replied_ids)}")
+                lgr.debug(f"- Unreplied: {len(unreplied_ids)}")
 
                 return ToolResponse.success({
                     'replied_ids': replied_ids,
-                    'unreplied_ids': unreplied_ids
+                    'unreplied_ids': unreplied_ids,
+                    'reply_counts': {
+                        'direct': len(direct_replies_set),
+                        'comprehensive': len(additional_replies_set),
+                        'conversation': len(conversation_replies_set)
+                    }
                 })
             except Exception as e:
+                lgr.error(f"Failed to batch check reply status: {e}", exc_info=True)
                 return ToolResponse.fail(f"Failed to batch check reply status: {e}")
         
         # Other commands remain unchanged as they don't use the database
