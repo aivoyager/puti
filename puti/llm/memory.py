@@ -115,7 +115,7 @@ class Memory(BaseModel):
         if num_to_retrieve == 0:
             return []
 
-        query_embedding = await self.llm.embedding(text=query)  # TODO: Cache same query embedding
+        query_embedding = await self.llm.embedding(text=query)  # TODO: Cache same query embedding. Using tool second time
         vector = np.array([query_embedding], dtype="float32")
         distances, indices = self.index.search(vector, k=num_to_retrieve)
 

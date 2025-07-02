@@ -228,7 +228,7 @@ class Twikitt(BaseTool, ABC):
             except Exception as e:
                 return ToolResponse.fail(f"Failed to check reply status for tweet {tweet_id}: {e}")
 
-        elif command == 'check_reply_status_batch':
+        elif command == 'check_reply_status_batch':  # TODO: All unreplied tweet fix
             tweet_ids = kwargs.get('tweet_ids')
             if not tweet_ids:
                 return ToolResponse.fail("`tweet_ids` list is required.")

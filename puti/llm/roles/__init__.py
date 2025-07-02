@@ -289,13 +289,19 @@ class Role(BaseModel):
             )
             return False, self.answer
         elif chat_response.chat_state == ChatState.SELF_REFLECTION:
-            reflection_msg = AssistantMessage(
+            error_msg = AssistantMessage(
                 content=chat_response.msg,
                 sender=self.name,
+                receiver={MessageRouter.ALL.val},
+            )
+            reflection_msg = UserMessage(
+                content=chat_response.msg,
+                sender=RoleType.USER.val,
                 receiver=self.address,
                 self_reflection=True
             )
             self.rc.buffer.put_one_msg(reflection_msg)
+            await self.rc.memory.add_one(error_msg)
             return False, reflection_msg
         elif chat_response.chat_state == ChatState.FC_CALL:
             if chat_response.tool_call_id:
@@ -356,12 +362,12 @@ class Role(BaseModel):
                 if isinstance(reply, AssistantMessage) and reply.self_reflection:
                     continue  # in next round handle issue
                 await self.publish_message()
-                return reply
+                return reply if not isinstance(reply, Message) else reply.content
 
             resp = await self._react()
 
         self.rc.todos = []
-        return resp
+        return resp if not isinstance(resp, Message) else resp.content
 
     @property
     def _env_prompt(self):
