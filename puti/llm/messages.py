@@ -68,6 +68,8 @@ class Message(BaseModel):
             # for image format
             elif isinstance(msg, List):
                 msg = cls(non_standard=msg, **kwargs)
+            elif isinstance(msg, Message):
+                pass
             else:
                 msg = cls(content=msg, **kwargs)
         except Exception as e:
