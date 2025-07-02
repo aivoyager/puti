@@ -23,10 +23,10 @@
 Puti is a versatile, multi-agent framework designed to simplify the development of applications powered by Large Language Models (LLMs). It provides a structured, extensible architecture for creating, managing, and coordinating intelligent agents that can collaborate to solve complex problems.
 
 ### Alex-Chat
-![Alex Chat Demo](docs/puti_alex.gif)
+![Alex Chat Demo](examples/puti_alex.gif)
 
 ### Ethan-Chat
-![Ethan Chat Demo](docs/ethan.png)
+![Ethan Chat Demo](examples/ethan.png)
 
 ### Key Features
 * **Multi-Agent Collaboration**: Easily define and manage multiple agents that can communicate and work together.
@@ -189,7 +189,7 @@ class SoftwareEngineer(McpRole):
 ### 5. 📅 Task Scheduler (`puti scheduler`)
 Puti includes a powerful, built-in task scheduler for automating recurring tasks like posting tweets or replying to mentions. It runs as a persistent background process and can be managed entirely from the command line.
 
-![Puti Scheduler Logs](docs/puti_scheduler.png)
+![Puti Scheduler Logs](examples/puti_scheduler.png)
 
 #### Managing the Scheduler Process
 The scheduler runs as a daemon process managed by Celery Beat.
@@ -244,22 +244,31 @@ puti scheduler logs --simple
 puti scheduler logs --raw
 ```
 
+## 📚 Documentation
+
+For detailed documentation, please refer to:
+
+- **[Project Description](docs/proj/description.md)**: An overview of Puti's goals and architecture.
+- **[CLI Guide](docs/proj/cli.md)**: Instructions for using the command-line interface.
+- **[Agent Patterns](docs/agent/)**: Guides for single-agent and multi-agent patterns.
+- **[Integration Guides](docs/integration/)**: Detailed instructions for integrations like MCP, Celery, and Twitter.
+- **[Roadmap](docs/proj/ROADMAP.MD)**: The future development plan for Puti.
+
+## 🙏 Acknowledgements
+
+Puti is inspired by and builds upon the work of several outstanding open-source projects in the multi-agent and LLM space. We extend our heartfelt gratitude to the developers and communities behind these projects:
+
+-   [**MetaGPT**](https://github.com/geekan/MetaGPT): For pioneering the concept of role-based multi-agent collaboration and providing a strong foundation for structured, human-like workflows.
+-   [**OpenManus**](https://github.com/aivoyager/openmanus): For its innovative approach to long-term memory and self-improving agents, which has been influential in shaping our memory management system.
+-   [**AgentScope**](https://github.com/modelscope/agentscope): For its flexible and easy-to-use multi-agent framework, which has been a great reference for our agent communication and environment design.
+-   [**LangGraph**](https://github.com/langchain-ai/langgraph): For its powerful graph-based approach to building stateful, multi-agent applications, which has inspired our own graph and workflow patterns.
+
+We are grateful for their contributions to the open-source community, which have made projects like Puti possible.
 
 ## 🤝 Contributing
 
-Contributions are welcome! Please refer to the contribution guide (if available) or contribute by submitting Issues or Pull Requests.
+We welcome contributions to Puti! Please see our [Contributing Guide](CONTRIBUTING.md) for more details on how to get started.
 
-1.  Fork the repository
-2.  Create your Feature branch (`git checkout -b feature/AmazingFeature`)
-3.  Commit your changes (`git commit -m 'Add some AmazingFeature'`)
-4.  Push to the branch (`git push origin feature/AmazingFeature`)
-5.  Open a Pull Request
+## 📄 License
 
-## 📜 License
-
-This project is licensed under the MIT License. See [LICENSE](LICENSE) file for details.
-
----
-
-_Let the Puti framework empower your multi-agent application development!_
-
+Puti is licensed under the [MIT License](LICENSE). 
