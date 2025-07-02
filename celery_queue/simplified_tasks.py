@@ -49,17 +49,17 @@ def get_ethan_instance():
         # Lazy loading: if the instance doesn't exist, create it.
         if _ethan_instance is None:
             lgr.info("Creating new EthanG instance")
-            _ethan_instance = EthanG()
+            _ethan_instance = EthanG(disable_history_search=True)
             
         # Health check: ensure the instance is a valid EthanG object.
         try:
             if not isinstance(_ethan_instance, EthanG):
                 lgr.warning("Invalid EthanG instance detected, recreating...")
-                _ethan_instance = EthanG()
+                _ethan_instance = EthanG(disable_history_search=True)
         except Exception as e:
             # Error recovery: if any error occurs during the check, recreate the instance.
             lgr.error(f"Error accessing EthanG instance: {str(e)}. Recreating...")
-            _ethan_instance = EthanG()
+            _ethan_instance = EthanG(disable_history_search=True)
             
         return _ethan_instance
 

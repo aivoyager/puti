@@ -115,6 +115,7 @@ class Role(BaseModel):
     tool_calls_one_round: List[str] = Field(default=[], description='tool calls one round contains tool call id')
     cp: SerializeAsAny[Capture] = Field(default_factory=Capture, validate_default=True, description='Capture exception')
     think_mode: bool = Field(default=False, description='return think process')
+    disable_history_search: bool = Field(default=False, description='Disable RAG search of historical messages to save tokens')
 
     __hash__ = object.__hash__  # make sure hashable can be regarded as dict key
 
@@ -239,7 +240,8 @@ class Role(BaseModel):
 
         # 2. Perform RAG search on the entire long-term memory.
         relevant_history = []
-        if last_user_message and last_user_message.content:
+        if not self.disable_history_search and last_user_message and last_user_message.content:
+            # Only perform RAG search if disable_history_search is False
             relevant_history = await self.rc.memory.search(last_user_message.content)
 
         # 3. Identify the last 5 conversation rounds.
@@ -343,10 +345,14 @@ class Role(BaseModel):
                 self.answer = message
         return message
 
-    async def run(self, msg: Optional[Union[str, Dict, Message]] = None, ignore_history: bool = False, *args, **kwargs) -> Optional[Union[Message, str]]:
+    async def run(self, msg: Optional[Union[str, Dict, Message]] = None, ignore_history: bool = False, disable_history_search: Optional[bool] = None, *args, **kwargs) -> Optional[Union[Message, str]]:
         if msg:
             msg = Message.from_any(msg)
             self.rc.buffer.put_one_msg(msg)
+            
+        # Set disable_history_search if provided
+        if disable_history_search is not None:
+            self.disable_history_search = disable_history_search
 
         self.rc.action_taken = 0
         resp = Message(content='No action taken yet', role=RoleType.SYSTEM)
@@ -458,6 +464,7 @@ class GraphRole(Role):
             self,
             msg: Optional[Union[str, Dict, Message]] = None,
             previous_result: Optional[Any] = None,
+            disable_history_search: Optional[bool] = None,
             *args, **kwargs
     ) -> Optional[Union[Message, str]]:
         """
@@ -467,6 +474,7 @@ class GraphRole(Role):
         Args:
             msg: The message to process
             previous_result: The result from the previous vertex in the graph
+            disable_history_search: If True, disables RAG search during thinking to save tokens
             
         Returns:
             The response message
@@ -490,7 +498,7 @@ class GraphRole(Role):
         if action_name:
             kwargs.update({"action": {"name": action_name, "description": action_description}})
         
-        return await super().run(msg=msg, *args, **kwargs)
+        return await super().run(msg=msg, disable_history_search=disable_history_search, *args, **kwargs)
         
     def set_vertex_id(self, vertex_id: str):
         """Set the vertex ID for this role."""

@@ -252,6 +252,7 @@ For detailed documentation, please refer to:
 - **[CLI Guide](docs/proj/cli.md)**: Instructions for using the command-line interface.
 - **[Agent Patterns](docs/agent/)**: Guides for single-agent and multi-agent patterns.
 - **[Integration Guides](docs/integration/)**: Detailed instructions for integrations like MCP, Celery, and Twitter.
+- **[Memory Optimization](docs/proj/memory_optimization.md)**: Guide to optimize token usage by controlling historical search.
 - **[Roadmap](docs/proj/ROADMAP.MD)**: The future development plan for Puti.
 
 ## 🙏 Acknowledgements
