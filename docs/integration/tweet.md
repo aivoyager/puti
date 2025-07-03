@@ -17,6 +17,9 @@ This document explains how to use the Twitter integration in Puti, which allows 
 - [Automated Twitter Tasks](#automated-twitter-tasks)
   - [Task Types](#task-types)
   - [Setting Up Scheduled Tasks](#setting-up-scheduled-tasks)
+- [Context-Aware Replies](#context-aware-replies)
+  - [How It Works](#how-it-works)
+  - [Using Context-Aware Replies](#using-context-aware-replies)
 - [Best Practices](#best-practices)
 - [Troubleshooting](#troubleshooting)
 
@@ -166,10 +169,12 @@ Puti's scheduler integration allows you to automate Twitter tasks.
 
 ### Task Types
 
-Two primary task types are available:
+Puti's Twitter integration supports several automated tasks:
 
-1. **Post Task**: Automatically generates and posts tweets on specific topics
-2. **Reply Task**: Automatically responds to mentions within a specified time window
+1. **Scheduled Tweets**: Post tweets on a regular schedule
+2. **Reply to Mentions**: Find and reply to mentions
+3. **Context-Aware Replies**: Reply to tweets with full conversation context awareness
+4. **Reply to Unreplied Mentions**: Find and reply to unreplied mentions with context awareness
 
 ### Setting Up Scheduled Tasks
 
@@ -184,6 +189,87 @@ puti scheduler create hourly_replies "0 * * * *" --type reply --params '{"time_v
 ```
 
 See the [Celery Integration](celery.md) documentation for more details on task scheduling.
+
+## Context-Aware Replies
+
+One of Ethan's most powerful features is the ability to respond to tweets with full awareness of the conversation context.
+
+### How It Works
+
+When Ethan replies to a tweet using the context-aware feature:
+
+1. It retrieves the full conversation thread, tracing back to the original tweet
+2. It considers all parent tweets in the conversation
+3. It generates a response that's relevant to the entire conversation, not just the immediate tweet
+
+This creates much more coherent and meaningful interactions, as Ethan understands the context of each reply.
+
+### Using Context-Aware Replies
+
+#### Command Line Interface
+
+You can use context-aware replies directly from the command line:
+
+```bash
+# Reply to a specific tweet with context awareness
+puti context-aware-reply --id 1234567890123456789
+
+# Control how far back to trace the conversation (default is 5 levels)
+puti context-aware-reply --id 1234567890123456789 --depth 3
+
+# Find and reply to all unreplied mentions from the last 7 days
+puti reply-to-mentions
+
+# Customize the time window (hours instead of days)
+puti reply-to-mentions --hours 12
+
+# Control the maximum number of mentions to process
+puti reply-to-mentions --max 10
+```
+
+#### Programmatic Usage
+
+You can also use the context-aware reply functionality programmatically:
+
+```python
+from puti.llm.roles.agents import Ethan
+from puti.llm.actions.x_bot import ContextAwareReplyAction, ContextAwareReplyToMentionsAction
+
+async def reply_to_tweet_with_context():
+    # Create an Ethan agent
+    ethan = Ethan()
+    
+    # Create a context-aware reply action for a specific tweet
+    action = ContextAwareReplyAction(
+        tweet_id="1234567890123456789",
+        max_context_depth=5  # How far back to trace the conversation
+    )
+    
+    # Run the action
+    result = await action.run(ethan)
+    print(f"Reply result: {result}")
+    
+async def find_and_reply_to_mentions():
+    # Create an Ethan agent
+    ethan = Ethan()
+    
+    # Create an action to find and reply to unreplied mentions
+    action = ContextAwareReplyToMentionsAction(
+        time_value=7,
+        time_unit="days",  # "days" or "hours"
+        max_context_depth=5,
+        max_mentions=5  # Limit to prevent rate limiting
+    )
+    
+    # Run the action
+    result = await action.run(ethan)
+    print(f"Process summary: {result}")
+
+# Run the async functions
+import asyncio
+asyncio.run(reply_to_tweet_with_context())
+asyncio.run(find_and_reply_to_mentions())
+```
 
 ## Best Practices
 

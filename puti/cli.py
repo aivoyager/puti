@@ -132,6 +132,92 @@ def ethan_chat(name):
         console.print("\n[bold yellow]Chat session ended. Goodbye![/bold yellow]")
 
 
+@main.command()
+@click.option('--id', required=True, help='Tweet ID to reply to with context awareness.')
+@click.option('--depth', default=5, help='Maximum depth for tracing conversation history.')
+def context_aware_reply(id, depth):
+    """Reply to a specific tweet with full conversation context awareness."""
+    ensure_twikit_config_is_present()
+    
+    from puti.llm.roles.agents import Ethan
+    from puti.llm.actions.x_bot import ContextAwareReplyAction
+    
+    console.print(Panel(
+        f"Preparing to reply to tweet ID: {id} with context awareness (max depth: {depth})",
+        title="🤖 Ethan Context-Aware Reply",
+        border_style="cyan"
+    ))
+    
+    ethan_agent = Ethan(name="Ethan")
+    action = ContextAwareReplyAction(tweet_id=id, max_context_depth=depth)
+    
+    async def run_reply():
+        with console.status("[bold cyan]Analyzing conversation context...", spinner="dots"):
+            result = await action.run(ethan_agent)
+        
+        if hasattr(result, 'is_success') and result.is_success():
+            console.print(Panel(
+                f"✅ [bold green]Successfully sent context-aware reply![/bold green]\n\n{result.data}",
+                title="Reply Status",
+                border_style="green"
+            ))
+        else:
+            console.print(Panel(
+                f"❌ [bold red]Failed to send reply[/bold red]\n\n{result}",
+                title="Reply Status",
+                border_style="red"
+            ))
+    
+    asyncio.run(run_reply())
+
+
+@main.command()
+@click.option('--days', default=7, help='Number of days to look back for unreplied mentions.')
+@click.option('--hours', default=None, help='Number of hours to look back for unreplied mentions. Takes precedence over days if both are specified.')
+@click.option('--depth', default=5, help='Maximum depth for tracing conversation history.')
+@click.option('--max', default=5, help='Maximum number of mentions to process.')
+def reply_to_mentions(days, hours, depth, max):
+    """Find unreplied mentions and reply with full conversation context awareness."""
+    ensure_twikit_config_is_present()
+    
+    from puti.llm.roles.agents import Ethan
+    from puti.llm.actions.x_bot import ContextAwareReplyToMentionsAction
+    
+    # Determine time unit and value
+    time_unit = 'days'
+    time_value = days
+    
+    if hours is not None:
+        time_unit = 'hours'
+        time_value = hours
+    
+    console.print(Panel(
+        f"Finding unreplied mentions from the last {time_value} {time_unit} and replying with context awareness (max depth: {depth})",
+        title="🤖 Ethan Context-Aware Reply to Mentions",
+        border_style="cyan"
+    ))
+    
+    ethan_agent = Ethan(name="Ethan")
+    action = ContextAwareReplyToMentionsAction(
+        time_value=time_value,
+        time_unit=time_unit,
+        max_context_depth=depth,
+        max_mentions=max
+    )
+    
+    async def run_reply_to_mentions():
+        with console.status("[bold cyan]Finding and processing mentions...", spinner="dots"):
+            result = await action.run(ethan_agent)
+        
+        console.print(Panel(
+            f"[bold]Results:[/bold]\n\n{result}",
+            title="Process Summary",
+            border_style="green"
+        ))
+    
+    asyncio.run(run_reply_to_mentions())
+
+
 @main.group()
 @click.pass_context
 def scheduler(ctx):

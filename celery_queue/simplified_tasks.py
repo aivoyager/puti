@@ -14,7 +14,7 @@ from celery import shared_task
 from croniter import croniter
 from puti.logs import logger_factory
 from puti.constant.base import TaskType
-from puti.llm.actions.x_bot import GenerateTweetAction, PublishTweetAction, ReplyToRecentUnrepliedTweetsAction
+from puti.llm.actions.x_bot import GenerateTweetAction, PublishTweetAction, ReplyToRecentUnrepliedTweetsAction, ContextAwareReplyToMentionsAction
 from puti.llm.roles.agents import Ethan, EthanG
 from puti.llm.workflow import Workflow
 from puti.llm.graph import Graph, Vertex
@@ -67,6 +67,7 @@ def get_ethan_instance():
 TASK_MAP = {
     TaskType.POST.val: 'celery_queue.simplified_tasks.generate_tweet_task',
     TaskType.REPLY.val: 'celery_queue.simplified_tasks.reply_to_tweets_task',
+    TaskType.CONTEXT_REPLY.val: 'celery_queue.simplified_tasks.context_aware_reply_task',
     TaskType.RETWEET.val: 'celery_queue.simplified_tasks.unimplemented_task',
     TaskType.UNIMPLEMENTED.val: 'celery_queue.simplified_tasks.unimplemented_task'
 }
@@ -249,6 +250,67 @@ def reply_to_tweets_task(self, schedule_id, **kwargs):
         return asyncio.run(_async_run())
     except Exception as e:
         lgr.error(f"Error in reply_to_tweets_task: {e}", exc_info=True)
+        raise e
+
+
+@shared_task(bind=True)
+def context_aware_reply_task(self, schedule_id, **kwargs):
+    """
+    Celery task to find and reply to mentions with full conversation context awareness.
+    This task traces back the conversation thread for each mention before replying.
+    
+    Args:
+        schedule_id: The ID of the schedule triggering this task.
+        **kwargs: Additional parameters including:
+            - time_value: How far back to look for mentions (default: 7)
+            - time_unit: Unit of time ('days' or 'hours', default: 'days')
+            - max_depth: Maximum depth to trace conversation history (default: 5)
+            - max_mentions: Maximum number of mentions to process (default: 5)
+    """
+    import asyncio
+    from puti.db.task_state_guard import TaskStateGuard
+
+    async def _async_run():
+        with TaskStateGuard.for_task(task_id=self.request.id, schedule_id=schedule_id) as guard:
+            lgr.info(f"Executing context-aware reply task for schedule_id: {schedule_id} with params: {kwargs}")
+
+            # Extract parameters with defaults
+            time_value = int(kwargs.get('time_value', 7))
+            time_unit = str(kwargs.get('time_unit', 'days'))
+            max_depth = int(kwargs.get('max_depth', 5))
+            max_mentions = int(kwargs.get('max_mentions', 5))
+
+            # Create the graph with the context-aware reply action
+            graph = Graph()
+            context_reply_action = ContextAwareReplyToMentionsAction(
+                time_value=time_value,
+                time_unit=time_unit,
+                max_context_depth=max_depth,
+                max_mentions=max_mentions
+            )
+            
+            # Use the action in a vertex with Ethan
+            context_reply_vertex = Vertex(
+                id='context_aware_reply', 
+                action=context_reply_action, 
+                role=get_ethan_instance()
+            )
+            
+            # Set up the graph
+            graph.add_vertices(context_reply_vertex)
+            graph.set_start_vertex(context_reply_vertex.id)
+            
+            # Update task state and run the graph directly
+            guard.update_state(status="context_aware_reply")
+            resp = await graph.run()
+
+            lgr.info(f"Context-aware reply task for schedule {schedule_id} completed. Final result: {resp}")
+            return str(resp)
+
+    try:
+        return asyncio.run(_async_run())
+    except Exception as e:
+        lgr.error(f"Error in context_aware_reply_task: {e}", exc_info=True)
         raise
 
 

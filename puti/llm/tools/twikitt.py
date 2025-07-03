@@ -81,10 +81,10 @@ class TwikittArgs(ToolArgs, ABC):
     command: Literal[
         'send_tweet', 'reply_to_tweet', 'browse_tweets', 'get_mentions', 'get_my_info',
         'get_my_tweets', 'like_tweet', 'retweet', 'get_user_name_by_id', 'has_my_reply',
-        'check_reply_status_batch', 'get_tweet_replies'
+        'check_reply_status_batch', 'get_tweet_replies', 'get_conversation_thread'
     ] = Field(
         ...,
-        description='The command to run. Can be "send_tweet", "reply_to_tweet", "get_mentions", "has_my_reply", "check_reply_status_batch", "get_tweet_replies", etc.'
+        description='The command to run. Can be "send_tweet", "reply_to_tweet", "get_mentions", "has_my_reply", "check_reply_status_batch", "get_tweet_replies", "get_conversation_thread", etc.'
     )
     text: Optional[str] = Field(None, description='The text content for a tweet or reply.')
     tweet_id: Optional[str] = Field(None, description='The ID of a specific tweet for operations like replying, liking, retweeting, checking for a reply, or fetching replies.')
@@ -94,6 +94,7 @@ class TwikittArgs(ToolArgs, ABC):
     count: Optional[int] = Field(default=20, description='The number of items to retrieve. For reply checks, this is the number of your recent tweets to scan to find a reply.')
     start_time: Optional[str] = Field(None, description='The start time for fetching mentions, in ISO 8601 format (e.g., "2023-01-01T12:00:00Z"). Used with "get_mentions".')
     cursor: Optional[str] = Field(None, description='A pagination cursor to retrieve the next set of results for commands like "get_tweet_replies".')
+    max_depth: Optional[int] = Field(default=5, description='The maximum depth to trace back in the conversation thread.')
 
 
 class Twikitt(BaseTool, ABC):
@@ -156,6 +157,113 @@ class Twikitt(BaseTool, ABC):
         except Exception as e:
             lgr.error(f"Error checking replies for tweet {tweet_id}: {e}")
             return False  # Default to not replied on error
+
+    async def _get_conversation_thread(
+        self, client: Client, tweet_id: str, max_depth: int = 5
+    ) -> dict:
+        """
+        Gets the full conversation thread for a tweet, tracing back to the original tweet
+        and including all relevant context.
+        
+        Args:
+            client: The Twitter client instance
+            tweet_id: The ID of the tweet to get the conversation for
+            max_depth: Maximum number of parent tweets to trace back
+            
+        Returns:
+            dict: A dictionary containing the conversation thread with original tweet,
+                  parent tweets, and any replies
+        """
+        try:
+            conversation_thread = {
+                "original_tweet": None,
+                "parent_tweets": [],
+                "current_tweet": None,
+                "replies": []
+            }
+            
+            # Get the current tweet
+            current_tweet = await client.get_tweet_by_id(tweet_id)
+            if not current_tweet:
+                return conversation_thread
+                
+            conversation_thread["current_tweet"] = {
+                "id": current_tweet.id,
+                "text": current_tweet.text,
+                "user": {
+                    "id": current_tweet.user.id,
+                    "name": current_tweet.user.name,
+                    "screen_name": current_tweet.user.screen_name
+                },
+                "created_at": current_tweet.created_at
+            }
+            
+            # If this tweet has replies, add them
+            if current_tweet.replies:
+                replies_data = [{
+                    "id": r.id,
+                    "text": r.text,
+                    "user": {
+                        "id": r.user.id,
+                        "name": r.user.name,
+                        "screen_name": r.user.screen_name
+                    },
+                    "created_at": r.created_at
+                } for r in current_tweet.replies]
+                
+                conversation_thread["replies"] = replies_data
+            
+            # Trace back to parent tweets
+            parent_id = current_tweet.in_reply_to
+            depth = 0
+            
+            while parent_id and depth < max_depth:
+                parent_tweet = await client.get_tweet_by_id(parent_id)
+                if not parent_tweet:
+                    break
+                    
+                parent_data = {
+                    "id": parent_tweet.id,
+                    "text": parent_tweet.text,
+                    "user": {
+                        "id": parent_tweet.user.id,
+                        "name": parent_tweet.user.name,
+                        "screen_name": parent_tweet.user.screen_name
+                    },
+                    "created_at": parent_tweet.created_at
+                }
+                
+                # Add to the beginning of parent_tweets list to maintain chronological order
+                conversation_thread["parent_tweets"].insert(0, parent_data)
+                
+                # If this is the first parent we find, it might be the original tweet
+                if depth == 0 and not parent_tweet.in_reply_to:
+                    conversation_thread["original_tweet"] = parent_data
+                
+                # Move up the chain
+                parent_id = parent_tweet.in_reply_to
+                depth += 1
+            
+            # If we didn't set the original tweet and we hit the depth limit,
+            # use the oldest parent tweet we found as the original
+            if not conversation_thread["original_tweet"] and conversation_thread["parent_tweets"]:
+                conversation_thread["original_tweet"] = conversation_thread["parent_tweets"][0]
+            
+            # If there are no parent tweets, the current tweet is the original
+            if not conversation_thread["parent_tweets"] and not conversation_thread["original_tweet"]:
+                conversation_thread["original_tweet"] = conversation_thread["current_tweet"]
+                
+            return conversation_thread
+            
+        except Exception as e:
+            lgr.error(f"Error getting conversation thread for tweet {tweet_id}: {e}")
+            return {
+                "original_tweet": None,
+                "parent_tweets": [],
+                "current_tweet": None,
+                "replies": [],
+                "error": str(e)
+            }
 
     async def _check_my_replies_to_tweets(
         self, client: Client, tweet_ids_to_check: List[str], my_tweets_count: int
@@ -550,6 +658,26 @@ class Twikitt(BaseTool, ABC):
                 })
             except Exception as e:
                 return ToolResponse.fail(f"Failed to get replies for tweet {tweet_id}: {e}")
+
+        elif command == 'get_conversation_thread':
+            tweet_id = kwargs.get('tweet_id')
+            if not tweet_id:
+                return ToolResponse.fail("`tweet_id` is required for get_conversation_thread.")
+            
+            try:
+                # Optional parameter for maximum depth to trace back
+                max_depth = kwargs.get('max_depth', 5)
+                
+                # Get the full conversation thread using our helper method
+                conversation_thread = await self._get_conversation_thread(
+                    client, 
+                    tweet_id,
+                    max_depth=max_depth
+                )
+                
+                return ToolResponse.success(conversation_thread)
+            except Exception as e:
+                return ToolResponse.fail(f"Failed to get conversation thread for tweet {tweet_id}: {e}")
 
         else:
             return ToolResponse.fail(f"Unknown command: {command}") 

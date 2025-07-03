@@ -133,6 +133,7 @@ class Resp(Base):
 class TaskType(Base):
     POST = ('post', 'Post Task')
     REPLY = ('reply', 'Reply Task')
+    CONTEXT_REPLY = ('context_reply', 'Context-Aware Reply Task')
     RETWEET = ('retweet', 'Retweet Task')
     LIKE = ('like', 'Like Task')
     FOLLOW = ('follow', 'Follow Task')
