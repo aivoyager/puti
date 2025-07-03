@@ -12,11 +12,13 @@ from datetime import datetime
 
 from celery import shared_task
 from croniter import croniter
+
+from puti.llm.workflow import Workflow
 from puti.logs import logger_factory
 from puti.constant.base import TaskType
-from puti.llm.actions.x_bot import GenerateTweetAction, PublishTweetAction, ReplyToRecentUnrepliedTweetsAction, ContextAwareReplyToMentionsAction
+from puti.llm.actions.x_bot import GenerateTweetAction, PublishTweetAction, ReplyToRecentUnrepliedTweetsAction, \
+    ContextAwareReplyAction, GetUnrepliedMentionsAction
 from puti.llm.roles.agents import Ethan, EthanG
-from puti.llm.workflow import Workflow
 from puti.llm.graph import Graph, Vertex
 from puti.db.schedule_manager import ScheduleManager
 from puti.db.task_state_guard import TaskStateGuard
@@ -256,16 +258,9 @@ def reply_to_tweets_task(self, schedule_id, **kwargs):
 @shared_task(bind=True)
 def context_aware_reply_task(self, schedule_id, **kwargs):
     """
-    Celery task to find and reply to mentions with full conversation context awareness.
-    This task traces back the conversation thread for each mention before replying.
-    
-    Args:
-        schedule_id: The ID of the schedule triggering this task.
-        **kwargs: Additional parameters including:
-            - time_value: How far back to look for mentions (default: 7)
-            - time_unit: Unit of time ('days' or 'hours', default: 'days')
-            - max_depth: Maximum depth to trace conversation history (default: 5)
-            - max_mentions: Maximum number of mentions to process (default: 5)
+    Finds and replies to unreplied mentions using a two-step Graph workflow.
+    1. Get unreplied mention IDs.
+    2. Reply to each mention with context awareness.
     """
     import asyncio
     from puti.db.task_state_guard import TaskStateGuard
@@ -274,43 +269,56 @@ def context_aware_reply_task(self, schedule_id, **kwargs):
         with TaskStateGuard.for_task(task_id=self.request.id, schedule_id=schedule_id) as guard:
             lgr.info(f"Executing context-aware reply task for schedule_id: {schedule_id} with params: {kwargs}")
 
-            # Extract parameters with defaults
-            time_value = int(kwargs.get('time_value', 7))
-            time_unit = str(kwargs.get('time_unit', 'days'))
-            max_depth = int(kwargs.get('max_depth', 5))
-            max_mentions = int(kwargs.get('max_mentions', 5))
+            # Extract parameters or use defaults
+            time_value = int(kwargs.get('time_value', 24))
+            time_unit = str(kwargs.get('time_unit', 'hours'))
+            max_mentions = int(kwargs.get('max_mentions', 3))
+            max_context_depth = int(kwargs.get('max_context_depth', 5))
 
-            # Create the graph with the context-aware reply action
-            graph = Graph()
-            context_reply_action = ContextAwareReplyToMentionsAction(
+            # Get the Ethan instance
+            ethan = get_ethan_instance()
+
+            # 1. Define actions for the graph
+            get_mentions_action = GetUnrepliedMentionsAction(
                 time_value=time_value,
                 time_unit=time_unit,
-                max_context_depth=max_depth,
                 max_mentions=max_mentions
             )
-            
-            # Use the action in a vertex with Ethan
-            context_reply_vertex = Vertex(
-                id='context_aware_reply', 
-                action=context_reply_action, 
-                role=get_ethan_instance()
+            reply_action = ContextAwareReplyAction(
+                max_context_depth=max_context_depth
             )
-            
-            # Set up the graph
-            graph.add_vertices(context_reply_vertex)
-            graph.set_start_vertex(context_reply_vertex.id)
-            
-            # Update task state and run the graph directly
-            guard.update_state(status="context_aware_reply")
-            resp = await graph.run()
 
-            lgr.info(f"Context-aware reply task for schedule {schedule_id} completed. Final result: {resp}")
-            return str(resp)
+            # 2. Create vertices
+            get_mentions_vertex = Vertex(
+                id='get_unreplied_mentions',
+                action=get_mentions_action,
+                role=ethan
+            )
+            reply_vertex = Vertex(
+                id='context_aware_reply',
+                action=reply_action,
+                role=ethan
+            )
+
+            # 3. Create and configure the graph
+            graph = Graph()
+            graph.add_vertices(get_mentions_vertex, reply_vertex)
+            graph.add_edge(get_mentions_vertex.id, reply_vertex.id)
+            graph.set_start_vertex(get_mentions_vertex.id)
+
+            # 4. Run the graph
+            guard.update_state(status="running_context_aware_reply_graph")
+            final_result = await graph.run()
+
+            lgr.info(f"Context-aware reply task for schedule {schedule_id} completed. Final result: {final_result}")
+            return str(final_result)
 
     try:
+        # Run the async function synchronously
         return asyncio.run(_async_run())
     except Exception as e:
         lgr.error(f"Error in context_aware_reply_task: {e}", exc_info=True)
+        # You might want to re-raise the exception to mark the Celery task as failed
         raise
 
 

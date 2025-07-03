@@ -4,12 +4,11 @@
 @Description: Tests for the context-aware reply functionality
 """
 import pytest
-import asyncio
 import logging
-import os
 
 from puti.llm.roles.agents import Ethan
-from puti.llm.actions.x_bot import ContextAwareReplyAction, ContextAwareReplyToMentionsAction
+from puti.llm.actions.x_bot import GetUnrepliedMentionsAction, ContextAwareReplyAction
+from puti.llm.graph import Graph, Vertex
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -18,76 +17,67 @@ lgr = logging.getLogger("test_context_aware_reply")
 
 @pytest.mark.integration
 @pytest.mark.asyncio
-async def test_context_aware_reply_integration():
+async def test_context_aware_reply_graph_integration():
     """
-    Tests the ContextAwareReplyAction with the real Twitter API.
-    
-    This test first asks Ethan to find an unreplied mention, then replies to it.
-    This makes the test more dynamic and self-contained.
-    
+    Tests the full context-aware reply graph workflow with the real Twitter API.
+
+    This test simulates the Celery task by:
+    1. Creating a graph with GetUnrepliedMentionsAction followed by ContextAwareReplyAction.
+    2. Running the entire graph.
+
+    This provides an end-to-end test of the reply logic.
+
     To run this test:
-       pytest test/x_bot/test_context_aware_reply.py::test_context_aware_reply_integration -v -s
+       pytest test/x_bot/test_context_aware_reply.py::test_context_aware_reply_graph_integration -v -s
     """
     # Create Ethan instance with Twitter capabilities
     ethan = Ethan()
 
-    # Ask Ethan to find a recent unreplied tweet and return its ID
-    lgr.info("Asking Ethan to find an unreplied mention...")
-    find_tweet_prompt = "Find a recent tweet mentioning me that I haven't replied to yet from the last 24 hours. Just return the tweet ID, and nothing else."
-
-    tweet_id_response = await ethan.run(find_tweet_prompt)
-
-    # Extract the tweet ID from the response (it should be a number)
-    import re
-    match = re.search(r'\d{18,}', str(tweet_id_response))
-
-    if not match:
-        pytest.skip(f"Could not find an unreplied tweet ID to test with. Ethan's response: {tweet_id_response}")
-
-    tweet_id = match.group(0)
-    lgr.info(f"Found tweet ID to reply to: {tweet_id}")
-
-    # Configure action with the tweet ID
-    action = ContextAwareReplyAction(tweet_id=tweet_id)
-
-    # Run the action
-    result = await action.run(ethan)
-
-    # Verify result
-    lgr.info(f"Integration test result: {result}")
-    assert "error" not in str(result).lower()
-
-    # Print the result for manual verification
-    print(f"\nContext-aware reply sent successfully. Result: {result}")
-
-
-@pytest.mark.integration
-@pytest.mark.asyncio
-async def test_context_aware_reply_to_mentions_integration():
-    """
-    Tests the ContextAwareReplyToMentionsAction with the real Twitter API.
-    
-    This test will find and reply to real mentions. Use with caution.
-    
-    To run this test:
-       pytest test/x_bot/test_context_aware_reply.py::test_context_aware_reply_to_mentions_integration -v -s
-    """
-    # Create Ethan instance with Twitter capabilities
-    ethan = Ethan()
-
-    # Configure action to look for mentions in the last hour
-    action = ContextAwareReplyToMentionsAction(
-        time_value=1,
+    # 1. Define actions for the graph, mirroring the Celery task setup
+    get_mentions_action = GetUnrepliedMentionsAction(
+        time_value=24,       # Look back 24 hours
         time_unit="hours",
-        max_mentions=2
+        max_mentions=2       # Limit to 2 for testing to be quicker
+    )
+    reply_action = ContextAwareReplyAction(
+        max_context_depth=5
     )
 
-    # Run the action
-    result = await action.run(ethan)
+    # 2. Create vertices
+    get_mentions_vertex = Vertex(
+        id='get_unreplied_mentions',
+        action=get_mentions_action,
+        role=ethan
+    )
+    reply_vertex = Vertex(
+        id='context_aware_reply',
+        action=reply_action,
+        role=ethan
+    )
 
-    # Verify result
-    lgr.info(f"Mentions reply integration test result: {result}")
-    assert "error" not in str(result).lower()
+    # 3. Create and configure the graph
+    graph = Graph()
+    graph.add_vertices(get_mentions_vertex, reply_vertex)
+    graph.add_edge('get_unreplied_mentions', 'context_aware_reply')
+    graph.set_start_vertex('get_unreplied_mentions')
+
+    # 4. Run the graph
+    lgr.info("Running the context-aware reply graph...")
+    result = await graph.run()
+
+    # The first vertex result (list of IDs) might be useful for context.
+    get_mentions_result = graph.get_vertex('get_unreplied_mentions').result
+    if not get_mentions_result:
+        pytest.skip("GetUnrepliedMentionsAction did not find any tweets to process. This is not a failure.")
+
+    # Verify final result from the reply vertex
+    lgr.info(f"Graph execution completed. Final result map: {result}")
+
+    # The final result is a map of vertex_id -> result. We care about the last step's result.
+    final_reply_result = result.get('context_aware_reply', '')
+
+    assert "error" not in str(final_reply_result).lower()
+    assert "Success" in str(final_reply_result)
 
     # Print the result for manual verification
-    print(f"\nContext-aware reply to mentions finished. Result: {result}")
+    print(f"\nGraph-based context-aware reply test finished. Final summary: {final_reply_result}")

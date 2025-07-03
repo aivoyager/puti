@@ -148,15 +148,15 @@ class ReplyToRecentUnrepliedTweetsAction(Action):
 
 class ContextAwareReplyAction(Action):
     """
-    An action to reply to a tweet with awareness of the full conversation context.
-    This action retrieves the full conversation thread before generating and sending a reply.
+    An action to reply to one or more tweets with awareness of the full conversation context.
+    This action retrieves the full conversation thread for each tweet before generating and sending a reply.
     """
     model_config = ConfigDict(arbitrary_types_allowed=True, extra="allow")
 
     name: str = 'context_aware_reply'
-    description: str = 'Generates and sends a reply to a tweet with full conversation context awareness.'
+    description: str = 'Generates and sends context-aware replies to a batch of tweets.'
     
-    tweet_id: str = Field(..., description="The ID of the tweet to reply to")
+    tweet_ids: Optional[List[str]] = Field(default=None, description="A list of tweet IDs to reply to. If not provided, it will be taken from the previous action's result.")
     max_context_depth: int = Field(default=5, description="Maximum depth for tracing conversation history")
     
     prompt: Template = Field(default=Template(
@@ -184,248 +184,140 @@ The reply should be concise (under 280 characters), engaging, and directly addre
 """
     ), description="Template for generating the reply with context")
     
-    async def run(self, role, *args, **kwargs):
+    async def run(self, role, previous_result=None, *args, **kwargs):
         """
-        Executes the context-aware reply process:
-        1. Retrieves the full conversation thread for the tweet
-        2. Generates a contextually appropriate reply
-        3. Sends the reply
+        Executes the context-aware reply process for each tweet in the list.
         
         Args:
             role: The agent role that will perform the actions
+            previous_result: The result from the previous action, expected to be a list of tweet IDs.
             *args: Variable length argument list
             **kwargs: Arbitrary keyword arguments
             
         Returns:
-            The response from sending the reply
+            A summary of the reply actions taken.
         """
-        try:
-            
-            lgr.info(f"Starting context-aware reply for tweet {self.tweet_id}")
-            
-            # Step 1: Get the conversation thread
-            # Instead of using use_tool directly, we create a prompt for the agent
-            # to use the Twikitt tool to get the conversation thread
-            get_thread_prompt = f"""Use the twikitt tool with the get_conversation_thread command to retrieve the full conversation thread for tweet ID {self.tweet_id}. Set max_depth={self.max_context_depth}. The result should be a JSON string."""
-            
-            # Run the agent to get the conversation thread
-            thread_response = await role.run(get_thread_prompt)
-            
-            # Process the response to extract the thread data
-            # This requires parsing the JSON from the response
+        tweet_ids_to_process = self.tweet_ids
+        if not tweet_ids_to_process and previous_result:
+            if isinstance(previous_result, list):
+                tweet_ids_to_process = previous_result
+            else:
+                lgr.info(f"Previous result is not a list, attempting to parse IDs from string: {previous_result}")
+                tweet_ids_to_process = re.findall(r'\d{18,}', str(previous_result))
+
+        if not tweet_ids_to_process:
+            return "No tweet IDs provided or found from previous step. Nothing to do."
+
+        results = []
+        lgr.info(f"Starting batch context-aware reply for {len(tweet_ids_to_process)} tweets.")
+
+        for tweet_id in tweet_ids_to_process:
             try:
-                # Try to extract JSON from the response string
+                lgr.info(f"Processing tweet ID: {tweet_id}")
                 
-                # Look for JSON object in the response
-                json_match = re.search(r'```json\n(.*?)\n```', thread_response, re.DOTALL)
-                if not json_match:
-                    json_match = re.search(r'{.*}', thread_response, re.DOTALL)
+                # Step 1: Get the conversation thread
+                get_thread_prompt = f"""Use the twikitt tool with the get_conversation_thread command to retrieve the full conversation thread for tweet ID {tweet_id}. Set max_depth={self.max_context_depth}. The result should be a JSON string."""
+                thread_response = await role.run(get_thread_prompt)
+                
+                # Step 2: Parse thread data
+                thread_data = {}
+                try:
+                    json_match = re.search(r'```json\n(.*?)\n```', thread_response, re.DOTALL)
+                    if not json_match:
+                        json_match = re.search(r'{.*}', thread_response, re.DOTALL)
                     
-                if json_match:
-                    thread_data_str = json_match.group(1) if '```' in json_match.group(0) else json_match.group(0)
-                    thread_data = json.loads(thread_data_str)
-                else:
-                    # If we can't extract JSON, use a simplified approach
-                    lgr.warning(f"Could not extract thread data from response: {thread_response}")
-                    # Create a simple thread structure with just the current tweet
-                    thread_data = {
-                        "original_tweet": None,
-                        "parent_tweets": [],
-                        "current_tweet": {
-                            "id": self.tweet_id,
-                            "text": "Tweet content not available",
-                            "user": {
-                                "id": "unknown",
-                                "name": "Twitter User",
-                                "screen_name": "user"
-                            }
-                        },
-                        "replies": []
-                    }
-            except Exception as e:
-                lgr.error(f"Error parsing thread data: {e}")
-                # Simplified thread structure as fallback
-                thread_data = {
-                    "original_tweet": None,
-                    "parent_tweets": [],
-                    "current_tweet": {
-                        "id": self.tweet_id,
-                        "text": "Tweet content not available",
-                        "user": {
-                            "id": "unknown",
-                            "name": "Twitter User",
-                            "screen_name": "user"
-                        }
-                    },
-                    "replies": []
-                }
-            
-            # Step 2: Generate reply using the conversation context
-            prompt = self.prompt.render(
-                original_tweet=thread_data.get("original_tweet"),
-                parent_tweets=thread_data.get("parent_tweets", []),
-                current_tweet=thread_data.get("current_tweet")
-            )
-            
-            # Use the agent to generate a contextual reply
-            reply_generation = await role.run(prompt)
-            
-            # Extract the reply text - should be the direct output from the agent
-            reply_text = reply_generation
-            
-            # Make sure reply is within Twitter character limit
-            if len(reply_text) > 280:
-                lgr.warning(f"Generated reply exceeds 280 characters, truncating: {reply_text}")
-                reply_text = reply_text[:277] + "..."
-            
-            # Step 3: Send the reply
-            reply_prompt = f"""Use the twikitt tool with the reply_to_tweet command to reply to tweet ID {self.tweet_id} with the following text:
-            
+                    if json_match:
+                        thread_data_str = json_match.group(1) if '```' in json_match.group(0) else json_match.group(0)
+                        thread_data = json.loads(thread_data_str)
+                    else:
+                        lgr.warning(f"Could not extract thread data for tweet {tweet_id} from response: {thread_response}")
+                except Exception as e:
+                    lgr.error(f"Error parsing thread data for tweet {tweet_id}: {e}")
+
+                # Step 3: Generate reply
+                generation_prompt = self.prompt.render(
+                    original_tweet=thread_data.get("original_tweet"),
+                    parent_tweets=thread_data.get("parent_tweets", []),
+                    current_tweet=thread_data.get("current_tweet", {"id": tweet_id, "text": "Content not available", "user": {"name": "Unknown", "screen_name": "unknown"}})
+                )
+                reply_text = await role.run(generation_prompt)
+                
+                if len(reply_text) > 280:
+                    reply_text = reply_text[:277] + "..."
+
+                # Step 4: Send the reply
+                reply_prompt = f"""Use the twikitt tool with the reply_to_tweet command to reply to tweet ID {tweet_id} with the following text:
+                
 "{reply_text}"
 """
+                reply_response = await role.run(reply_prompt)
+                
+                results.append({"tweet_id": tweet_id, "status": "success", "response": reply_response})
+                lgr.info(f"Successfully sent reply to tweet {tweet_id}.")
+
+            except Exception as e:
+                error_message = f"Failed to process tweet {tweet_id}: {e}"
+                lgr.error(error_message, exc_info=True)
+                results.append({"tweet_id": tweet_id, "status": "error", "response": error_message})
             
-            # Run the agent to send the reply
-            reply_response = await role.run(reply_prompt)
+            # Add a small delay between replies to avoid rate limiting
+            await asyncio.sleep(2)
+
+        # Summarize the results
+        success_count = sum(1 for r in results if r["status"] == "success")
+        error_count = len(results) - success_count
+        summary = f"Batch reply finished. Success: {success_count}, Failed: {error_count}.\n"
+        for res in results:
+            summary += f"- Tweet {res['tweet_id']}: {res['status']}\n"
             
-            return reply_response
-            
-        except Exception as e:
-            lgr.error(f"Error in context-aware reply action: {str(e)}")
-            return f"Error in context-aware reply: {str(e)}"
+        return summary
 
 
-class ContextAwareReplyToMentionsAction(Action):
+class GetUnrepliedMentionsAction(Action):
     """
-    An action that finds unreplied mentions and replies to them with full conversation context awareness.
-    This combines finding mentions with context-aware replies.
+    An action that finds recent, unreplied mentions and returns their IDs.
     """
     model_config = ConfigDict(arbitrary_types_allowed=True, extra="allow")
 
-    name: str = 'context_aware_reply_to_mentions'
-    description: str = 'Finds and replies to unreplied mentions with full conversation context awareness.'
+    name: str = 'get_unreplied_mentions'
+    description: str = 'Finds and returns a list of tweet IDs for recent, unreplied mentions.'
     
-    time_value: int = Field(default=7, description="The number of time units to look back (e.g., 7).")
-    time_unit: Literal['days', 'hours'] = Field(default='days', description="The unit of time, either 'days' or 'hours'.")
-    max_context_depth: int = Field(default=5, description="Maximum depth for tracing conversation history")
-    max_mentions: int = Field(default=5, description="Maximum number of mentions to process")
+    time_value: int = Field(default=24, description="The number of time units to look back (e.g., 24).")
+    time_unit: Literal['days', 'hours'] = Field(default='hours', description="The unit of time, either 'days' or 'hours'.")
+    max_mentions: int = Field(default=3, description="Maximum number of mention IDs to return.")
     
     prompt: Template = Field(default=Template(
-        """Find all tweets from the last {{ time_value }} {{ time_unit }} that mention me and have not been replied to yet. List them in chronological order (oldest first), showing the tweet ID, author, and content."""
-    ), description="Template for finding unreplied mentions")
+        """Find up to {{ max_mentions }} recent tweets mentioning me from the last {{ time_value }} {{ time_unit }} that I haven't replied to yet. Just return a Python-style list of the tweet IDs as strings, and nothing else. For example: ['123', '456']"""
+    ), description="Template for finding unreplied mentions.")
     
     async def run(self, role, *args, **kwargs):
         """
-        Executes the context-aware reply to mentions process:
-        1. Finds unreplied mentions within the specified time frame
-        2. For each mention, gets the full conversation context
-        3. Generates and sends a contextually appropriate reply
+        Executes the process of finding unreplied mentions.
         
         Args:
-            role: The agent role that will perform the actions
-            *args: Variable length argument list
-            **kwargs: Arbitrary keyword arguments
+            role: The agent role that will perform the actions.
             
         Returns:
-            Summary of actions taken
+            A list of tweet IDs.
         """
-        lgr.info(f"Starting context-aware replies to mentions from last {self.time_value} {self.time_unit}")
+        lgr.info(f"Finding up to {self.max_mentions} unreplied mentions from the last {self.time_value} {self.time_unit}.")
         
-        # Format the time for the query
-        time_ago = None
-        if self.time_unit == 'days':
-            time_ago = (datetime.datetime.now() - datetime.timedelta(days=self.time_value)).isoformat()
-        elif self.time_unit == 'hours':
-            time_ago = (datetime.datetime.now() - datetime.timedelta(hours=self.time_value)).isoformat()
+        prompt_str = self.prompt.render(
+            max_mentions=self.max_mentions,
+            time_value=self.time_value,
+            time_unit=self.time_unit
+        )
         
-        try:
-            # Step 1: Get unreplied mentions
-            mentions_prompt = self.prompt.render(
-                time_value=self.time_value,
-                time_unit=self.time_unit
-            )
+        response = await role.run(prompt_str)
+        
+        # Extract tweet IDs from the response string
+        tweet_ids = re.findall(r'\'(\d{18,})\'|\"(\d{18,})\"', str(response))
+        # re.findall with groups returns tuples, so we need to flatten the list
+        extracted_ids = [item for tpl in tweet_ids for item in tpl if item]
+
+        if not extracted_ids:
+            lgr.warning(f"Could not extract any tweet IDs from response: {response}")
+            return []
             
-            # Run the agent to get mentions
-            mentions_response = await role.run(mentions_prompt)
-            
-            # Parse the response to extract mention IDs
-            
-            # Look for JSON array or mention IDs in the response
-            mention_ids = []
-            
-            # Try to extract JSON from the response
-            lgr.info(f"Mentions response: {mentions_response[:200]}...")
-            
-            # First try with standard JSON code block format
-            json_match = re.search(r'```json\s*(.*?)\s*```', mentions_response, re.DOTALL)
-            
-            # If that fails, try with a more flexible pattern that can handle indentation
-            if not json_match:
-                json_match = re.search(r'```json\s*\n\s*(\[.*?\])\s*\n\s*```', mentions_response, re.DOTALL)
-            
-            # If that still fails, try to find any JSON array
-            if not json_match:
-                json_match = re.search(r'\[\s*{.*?}\s*(?:,\s*{.*?}\s*)*\]', mentions_response, re.DOTALL)
-                
-            if json_match:
-                lgr.info(f"Found JSON match in response")
-                try:
-                    json_str = json_match.group(1) if '```' in json_match.group(0) else json_match.group(0)
-                    # Remove leading/trailing whitespace and normalize indentation
-                    json_str = re.sub(r'^\s+', '', json_str, flags=re.MULTILINE)
-                    lgr.info(f"Extracted JSON string: {json_str[:100]}...")
-                    
-                    mentions_data = json.loads(json_str)
-                    lgr.info(f"Parsed mentions data: {mentions_data}")
-                    if isinstance(mentions_data, list):
-                        for mention in mentions_data:
-                            if isinstance(mention, dict) and 'mention_id' in mention:
-                                mention_ids.append(mention['mention_id'])
-                except Exception as e:
-                    lgr.error(f"Error parsing mentions JSON: {e}")
-                    lgr.error(f"JSON string that failed to parse: {json_str if 'json_str' in locals() else 'Not extracted'}")
-            
-            # If JSON extraction failed, try to find mention IDs in the text
-            if not mention_ids:
-                lgr.info("JSON extraction failed, trying to find mention IDs in text")
-                # Look for patterns like "ID: 123456789" or "mention_id: 123456789"
-                id_matches = re.findall(r'(?:ID|id|mention_id):\s*(\d+)', mentions_response)
-                lgr.info(f"Found ID matches: {id_matches}")
-                mention_ids.extend(id_matches)
-            
-            # Limit the number of mentions to process
-            mention_ids = mention_ids[:self.max_mentions]
-            
-            if not mention_ids:
-                return "No unreplied mentions found."
-            
-            # Step 2: Reply to each unreplied mention with context awareness
-            results = []
-            for tweet_id in mention_ids:
-                # Create and run a context-aware reply action for this mention
-                context_action = ContextAwareReplyAction(
-                    tweet_id=tweet_id,
-                    max_context_depth=self.max_context_depth
-                )
-                
-                reply_result = await context_action.run(role)
-                
-                # Store the result
-                results.append({
-                    'tweet_id': tweet_id,
-                    'result': str(reply_result)
-                })
-                
-                # Add a small delay between API calls to avoid rate limits
-                await asyncio.sleep(2)
-            
-            # Step 3: Summarize the results
-            summary = f"Processed {len(results)} unreplied mentions:\n"
-            for result in results:
-                summary += f"- Tweet {result['tweet_id']}: Replied\n"
-            
-            lgr.info(summary)
-            return summary
-            
-        except Exception as e:
-            lgr.error(f"Error in context-aware reply to mentions action: {str(e)}")
-            return f"Error in context-aware reply to mentions: {str(e)}"
+        lgr.info(f"Found {len(extracted_ids)} unreplied mention(s): {extracted_ids}")
+        return extracted_ids
