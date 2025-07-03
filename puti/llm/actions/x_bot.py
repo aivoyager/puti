@@ -206,7 +206,7 @@ The reply should be concise (under 280 characters), engaging, and directly addre
             # Step 1: Get the conversation thread
             # Instead of using use_tool directly, we create a prompt for the agent
             # to use the Twikitt tool to get the conversation thread
-            get_thread_prompt = f"""Use the twikitt tool with the get_conversation_thread command to retrieve the full conversation thread for tweet ID {self.tweet_id}. Set max_depth={self.max_context_depth}."""
+            get_thread_prompt = f"""Use the twikitt tool with the get_conversation_thread command to retrieve the full conversation thread for tweet ID {self.tweet_id}. Set max_depth={self.max_context_depth}. The result should be a JSON string."""
             
             # Run the agent to get the conversation thread
             thread_response = await role.run(get_thread_prompt)
