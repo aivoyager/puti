@@ -14,7 +14,7 @@ def get_reqs(req_file):
 
 setup(
     name="ai_puti",
-    version="0.1.0b14",
+    version="0.1.0b15",
     description="puti: MultiAgent-based package for LLM",
     long_description=long_description,
     long_description_content_type="text/markdown",

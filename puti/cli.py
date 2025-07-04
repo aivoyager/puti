@@ -16,6 +16,7 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.markdown import Markdown
 from rich.table import Table
+from rich import box
 
 from puti.core.config_setup import ensure_twikit_config_is_present
 from puti.db.schedule_manager import ScheduleManager
@@ -39,8 +40,10 @@ def alex_chat(name):
     """Starts an interactive chat with Alex agent."""
     console.print(Panel(
         Markdown("Alex is an all-purpose bot with multiple integrated tools to help you with a wide range of tasks."),
-        title="🤖 Meet Alex",
-        border_style="cyan"
+        title="[bold magenta]🤖 Meet Alex[/bold magenta]",
+        subtitle="Your friendly, all-purpose AI assistant",
+        border_style="magenta",
+        padding=(1, 2)
     ))
     welcome_message = Markdown(f"""
 # 💬 Chat with {name}
@@ -49,29 +52,37 @@ def alex_chat(name):
 *   Press `Ctrl+D` or `Ctrl+C` to exit immediately.
 """)
     console.print(welcome_message)
+    console.rule("[bold yellow]Chat Session Started[/bold yellow]")
 
     alex_agent = Alex(name=name)
 
     async def chat_loop():
         while True:
             try:
-                user_input = await questionary.text("👤 You:", qmark="").ask_async()
+                user_input = await questionary.text("👤 You:", qmark=">>>").ask_async()
                 if user_input is None or user_input.lower() in ['exit', 'quit']:
                     break
 
-                console.print(Panel(user_input, title="👤 You", border_style="blue"))
+                console.print(Panel(
+                    user_input,
+                    title="[b]👤 You[/b]",
+                    border_style="bright_blue",
+                    padding=(1, 2),
+                    title_align="left"
+                ))
 
                 # Show a thinking indicator
-                with console.status(f"[bold cyan]{name} is thinking...", spinner="dots"):
+                with console.status(f"[bold magenta]{name} is thinking...", spinner="dots"):
                     response = await alex_agent.run(user_input)
 
                 # Print the response in a styled panel
                 response_panel = Panel(
                     Markdown(response),
-                    title=f"🤖 {name}",
-                    border_style="green",
-                    title_align="left"
-            )
+                    title=f"[b]🤖 {name}[/b]",
+                    border_style="magenta",
+                    title_align="right",
+                    padding=(1, 2)
+                )
                 console.print(response_panel)
 
             except (KeyboardInterrupt, EOFError):
@@ -81,7 +92,7 @@ def alex_chat(name):
     try:
         asyncio.run(chat_loop())
     finally:
-        console.print("\n[bold yellow]Chat session ended. Goodbye![/bold yellow]")
+        console.print(Panel("[bold yellow]Chat session ended. Goodbye! 👋[/bold yellow]", box=box.ROUNDED, border_style="yellow"))
 
 
 @main.command()
@@ -90,9 +101,16 @@ def ethan_chat(name):
     """Starts an interactive chat with Ethan agent."""
     ensure_twikit_config_is_present()
     console.print(Panel(
-        Markdown("Ethan is a Twitter bot designed to help you manage your daily Twitter activities."),
-        title="🤖 Meet Ethan",
-        border_style="cyan"
+        Markdown("""
+```
+(-_o)
+```
+Ethan is a Twitter bot designed to help you manage your daily Twitter activities.
+"""),
+        title="[bold cyan]Meet Ethan, the X-Bot[/bold cyan]",
+        subtitle="Your witty companion for the X-verse",
+        border_style="cyan",
+        padding=(1, 2)
     ))
     welcome_message = Markdown(f"""
 # 💬 Chat with {name}
@@ -101,27 +119,35 @@ def ethan_chat(name):
 *   Press `Ctrl+D` or `Ctrl+C` to exit immediately.
 """)
     console.print(welcome_message)
+    console.rule("[bold yellow]Chat Session Started[/bold yellow]")
 
     ethan_agent = Ethan(name=name)
 
     async def chat_loop():
         while True:
             try:
-                user_input = await questionary.text("👤 You:", qmark="").ask_async()
+                user_input = await questionary.text("👤 You:", qmark=">>>").ask_async()
                 if user_input is None or user_input.lower() in ['exit', 'quit']:
                     break
 
-                console.print(Panel(user_input, title="👤 You", border_style="blue"))
+                console.print(Panel(
+                    user_input,
+                    title="[b]👤 You[/b]",
+                    border_style="bright_blue",
+                    padding=(1, 2),
+                    title_align="left"
+                ))
 
                 with console.status(f"[bold cyan]{name} is thinking...", spinner="dots"):
                     response = await ethan_agent.run(user_input)
 
                 response_panel = Panel(
                     Markdown(response),
-                    title=f"🤖 {name}",
-                    border_style="green",
-                    title_align="left"
-            )
+                    title=f"[b](-_o) {name}[/b]",
+                    border_style="cyan",
+                    title_align="right",
+                    padding=(1, 2)
+                )
                 console.print(response_panel)
 
             except (KeyboardInterrupt, EOFError):
@@ -130,7 +156,7 @@ def ethan_chat(name):
     try:
         asyncio.run(chat_loop())
     finally:
-        console.print("\n[bold yellow]Chat session ended. Goodbye![/bold yellow]")
+        console.print(Panel("[bold yellow]Chat session ended. Goodbye! 👋[/bold yellow]", box=box.ROUNDED, border_style="yellow"))
 
 
 @main.command()

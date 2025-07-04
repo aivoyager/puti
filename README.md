@@ -71,15 +71,8 @@ python -m puti.bootstrap
 
 ## 🚀 Quick Start
 
-### Chat with Alex
-Get started immediately with Puti's interactive, all-purpose AI assistant, Alex. Alex is an all-purpose bot with multiple integrated tools to help you with a wide range of tasks.
-
-```bash
-puti alex-chat
-```
-
 ### Chat with Ethan (Twikit Integration)
-Interact with Ethan, an agent specialized in Twitter interactions using the `twikit` library. Ethan is a Twitter bot designed to help you manage your daily Twitter activities.
+Interact with Ethan, an agent specialized in Twitter interactions using the `twikit` library. Ethan is a Twitter bot designed to help you with your daily Twitter activities.
 
 ```bash
 puti ethan-chat
@@ -91,6 +84,38 @@ puti ethan-chat
 3.  **Validation**: It checks if the file exists at the provided path.
 4.  **Secure Storage**: The path is saved to your local `.env` file for future sessions.
 
+#### Cookie File Format
+To use Ethan, you need a `cookie.json` file containing your authentication cookies from your account on X.com (formerly Twitter). This allows Ethan to interact with the platform on your behalf.
+
+The file should be a JSON object with the following structure. You must replace the placeholder values with your actual cookie values, which can be obtained from your web browser's developer tools while logged into X.com.
+
+**Example `cookie.json` structure:**
+```json
+{
+    "auth_token": "your_auth_token_value_here",
+    "ct0": "your_ct0_value_here",
+    "twid": "your_twid_value_here",
+    "guest_id": "your_guest_id_value_here",
+    "personalization_id": "your_personalization_id_value_here",
+    "kdt": "your_kdt_value_here",
+    "dnt": "1",
+    "lang": "en",
+    "guest_id_ads": "your_guest_id_ads_value_here",
+    "guest_id_marketing": "your_guest_id_marketing_value_here",
+    "gt": "your_gt_value_here",
+    "g_state": "your_g_state_value_here",
+    "external_referer": "your_external_referer_value_here",
+    "att": "your_att_value_here",
+    "__cf_bm": "your_cf_bm_value_here"
+}
+```
+
+### Chat with Alex
+Get started immediately with Puti's interactive, all-purpose AI assistant, Alex. Alex is an all-purpose bot with multiple integrated tools to help you with a wide range of tasks.
+
+```bash
+puti alex-chat
+```
 
 **On your first run**, Puti provides a guided setup experience:
 1.  🕵️ **Auto-detection**: The app checks if your OpenAI credentials are set up.
