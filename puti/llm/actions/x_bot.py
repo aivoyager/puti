@@ -287,12 +287,17 @@ class GetUnrepliedMentionsAction(Action):
     max_mentions: int = Field(default=3, description="Maximum number of mention IDs to return.")
     
     prompt: Template = Field(default=Template(
-        """Find up to {{ max_mentions }} recent tweets mentioning me from the last {{ time_value }} {{ time_unit }} that I haven't replied to yet. Just return a Python-style list of the tweet IDs as strings, and nothing else. For example: ['123', '456']"""
+        """Find up to {{ max_mentions }} recent tweets mentioning me from the last {{ time_value }} {{ time_unit }} that I haven't replied to yet. 
+        
+        Use the twikitt tool with the get_mentions command to retrieve recent mentions.
+        Then check which ones I haven't replied to yet.
+        
+        Return a Python-style list of the tweet IDs as strings, and nothing else. For example: ['123456789012345678', '123456789012345679']"""
     ), description="Template for finding unreplied mentions.")
     
     async def run(self, role, *args, **kwargs):
         """
-        Executes the process of finding unreplied mentions.
+        Executes the process of finding unreplied mentions using the role's LLM capabilities.
         
         Args:
             role: The agent role that will perform the actions.
@@ -302,12 +307,14 @@ class GetUnrepliedMentionsAction(Action):
         """
         lgr.info(f"Finding up to {self.max_mentions} unreplied mentions from the last {self.time_value} {self.time_unit}.")
         
+        # Generate the prompt for the LLM
         prompt_str = self.prompt.render(
             max_mentions=self.max_mentions,
             time_value=self.time_value,
             time_unit=self.time_unit
         )
         
+        # Ask the role (Ethan) to get unreplied mentions
         response = await role.run(prompt_str)
         
         # Extract tweet IDs from the response string

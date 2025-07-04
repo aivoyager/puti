@@ -286,11 +286,38 @@ def list_tasks(ctx):
 @scheduler.command('create')
 @click.argument('name')
 @click.argument('cron')
-@click.option('--type', 'task_type', required=True, help="Type of the task (e.g., 'post_tweet').")
-@click.option('--params', help="JSON string of parameters for the task.", default='{}')
+@click.option('--type', 'task_type', required=True, 
+              help="任务类型，可选值：'post'(发布推文), 'reply'(回复推文), 'context_reply'(上下文感知回复)")
+@click.option('--params', 
+              help="任务参数的 JSON 字符串。不同任务类型需要不同参数，详见文档。例如：'post' 类型需要 '{\"topic\": \"AI技术\"}'", 
+              default='{}')
 @click.pass_context
 def create_task(ctx, name, cron, task_type, params):
-    """Creates a new task (disabled by default)."""
+    """创建新的定时任务（默认为禁用状态）。
+    
+    参数:
+      NAME    任务的唯一名称，用于在列表和日志中标识任务
+      CRON    标准 cron 表达式，定义任务执行时间表，格式：'分 时 日 月 周'
+    
+    常用 cron 示例:
+      "0 12 * * *"    - 每天中午12点
+      "0 */3 * * *"   - 每3小时执行一次
+      "0 9 * * 1-5"   - 工作日上午9点
+      "*/30 * * * *"  - 每30分钟执行一次
+    
+    任务类型及参数示例:
+      post: 发布推文
+        --params '{"topic": "AI技术"}'
+      
+      reply: 回复推文
+        --params '{"time_value": 24, "time_unit": "hours"}'
+      
+      context_reply: 上下文感知回复
+        --params '{"time_value": 24, "time_unit": "hours", "max_mentions": 3}'
+    
+    注意: 新创建的任务默认为禁用状态，需要使用 'puti scheduler enable TASK_ID' 来启用。
+    详细文档: docs/proj/scheduler_create_command.md
+    """
     console = ctx.obj.get('console', Console())
     manager = ctx.obj['manager']
     try:
@@ -304,11 +331,12 @@ def create_task(ctx, name, cron, task_type, params):
             params=params_dict,
             enabled=False  # Always created as disabled
         )
-        console.print(f"[green]✓ Task '{name}' created successfully with ID: {task.id}[/green]")
+        console.print(f"[green]✓ 任务 '{name}' 创建成功，ID: {task.id}[/green]")
+        console.print(f"[yellow]提示: 使用 'puti scheduler enable {task.id}' 来启用此任务[/yellow]")
     except json.JSONDecodeError:
-        console.print("[red]Error: Invalid JSON string for --params.[/red]")
+        console.print("[red]错误: --params 的 JSON 字符串格式无效。请确保使用双引号包裹键名，例如: '{\"key\": \"value\"}'[/red]")
     except Exception as e:
-        console.print(f"[red]Error creating task: {str(e)}[/red]")
+        console.print(f"[red]创建任务时出错: {str(e)}[/red]")
 
 
 @scheduler.command('delete')

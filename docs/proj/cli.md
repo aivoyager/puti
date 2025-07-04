@@ -94,8 +94,13 @@ puti scheduler list
 
 # Create a new task
 puti scheduler create [NAME] [CRON_SCHEDULE] --type TYPE --params JSON_PARAMS
+```
 
-# Examples:
+> **Note:** For detailed information about the `create` command parameters and task types, see the [Scheduler Create Command Documentation](scheduler_create_command.md).
+
+**Examples:**
+
+```bash
 # Post a daily tweet about AI at noon
 puti scheduler create daily_ai_post "0 12 * * *" --type "post" --params '{"topic": "AI"}'
 
