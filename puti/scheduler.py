@@ -199,7 +199,7 @@ class WorkerDaemon(Daemon):
 
     def get_command(self) -> str:
         return (
-            f"celery -A celery_queue.celery_app worker "
+            f"celery -A puti.celery_queue.celery_app worker "
             f"--loglevel=INFO --detach "
             f"--pidfile={self.pid_file} "
             f"--logfile={self.log_file}"
@@ -211,7 +211,7 @@ class BeatDaemon(Daemon):
 
     def get_command(self) -> str:
         return (
-            f"celery -A celery_queue.celery_app beat "
+            f"celery -A puti.celery_queue.celery_app beat "
             f"--loglevel=INFO --detach "
             f"--pidfile={self.pid_file} "
             f"--logfile={self.log_file}"

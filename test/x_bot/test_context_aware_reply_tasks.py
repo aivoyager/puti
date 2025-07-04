@@ -11,19 +11,12 @@ from datetime import datetime
 import json
 import re
 
-# Configure logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-logger = logging.getLogger("test_context_aware_reply")
+import pytest
 
-# Add project root to Python path to ensure correct imports
-script_dir = os.path.dirname(os.path.abspath(__file__))
-project_root = os.path.dirname(os.path.dirname(script_dir))
-sys.path.insert(0, project_root)
-
-# Import necessary modules
 from puti.db.task_state_guard import TaskStateGuard
 from puti.llm.roles.agents import Ethan
-from puti.llm.actions.x_bot import ContextAwareReplyAction, ContextAwareReplyToMentionsAction
+from puti.llm.actions.x_bot import ContextAwareReplyAction
+
 from puti.llm.tools.twikitt import ToolResponse
 
 
@@ -281,15 +274,47 @@ async def test_context_aware_reply_task_real():
         TaskStateGuard.for_task = original_for_task
 
 
-if __name__ == "__main__":
-    # Parse command line arguments to determine which test to run
-    import argparse
-    
-    parser = argparse.ArgumentParser(description="Test context-aware tweet replies")
-    parser.add_argument("--real-api", action="store_true", help="Run test with real API calls (use with caution!)")
-    args = parser.parse_args()
-    
-    if args.real_api:
-        asyncio.run(test_context_aware_reply_task_real())
-    else:
-        asyncio.run(test_context_aware_reply_task_with_mock()) 
+async def test_context_aware_reply_task():
+    """
+    Test the context_aware_reply_task by directly invoking the Celery task.
+    This test runs in a local environment without mocks, relying on the test configuration.
+    """
+    import puti.bootstrap
+    from puti.celery_queue.simplified_tasks import context_aware_reply_task
+    from puti.logs import logger_factory
+
+    lgr = logger_factory.default
+
+    # Ensure the application is bootstrapped
+    lgr.info("Starting direct invocation of context_aware_reply_task")
+
+    try:
+        # Define task parameters
+        params = {
+            "time_value": 24,
+            "time_unit": "hours",
+            "max_mentions": 2,
+            "max_context_depth": 3,
+            "schedule_id": "hihi"
+        }
+        
+        # Directly call the task's `apply` method with the arguments
+        # Using `apply` instead of `delay` or `apply_async` runs the task in the current process
+        result = context_aware_reply_task.apply(kwargs=params)
+        
+        lgr.info(f"Task result: {result.get()}")
+        print(f"\nTask execution result: {result.get()}")
+        
+        # You can add assertions here based on expected results
+        assert result.successful(), "The task did not complete successfully."
+        
+        task_output = result.get()
+        assert isinstance(task_output, str)
+        assert "Processed" in task_output
+
+    except Exception as e:
+        lgr.error(f"An error occurred during the task execution: {e}", exc_info=True)
+        pytest.fail(f"Task execution failed with an exception: {e}")
+
+# To run this specific test, you can use pytest:
+# pytest test/x_bot/test_context_aware_reply_tasks.py::test_context_aware_reply_task

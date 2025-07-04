@@ -7,8 +7,9 @@ import unittest
 import threading
 import time
 import os
+from unittest.mock import patch
 
-from celery_queue.simplified_tasks import get_ethan_instance
+from puti.celery_queue.simplified_tasks import get_ethan_instance
 
 
 class TestEthanSingleton(unittest.TestCase):
@@ -71,8 +72,8 @@ class TestEthanSingleton(unittest.TestCase):
         
         # 模拟实例损坏
         # 通过直接修改模块中的_ethan_instance变量（这只是为了测试）
-        import celery_queue.simplified_tasks
-        celery_queue.simplified_tasks._ethan_instance = None
+        import puti.celery_queue.simplified_tasks
+        puti.celery_queue.simplified_tasks._ethan_instance = None
         
         # 重新获取实例
         instance2 = get_ethan_instance()
@@ -80,6 +81,15 @@ class TestEthanSingleton(unittest.TestCase):
         # 确保新实例是有效的
         self.assertIsNotNone(instance2)
         self.assertEqual(instance2.__class__.__name__, "EthanG")
+
+    @patch('puti.llm.graph.ethan_graph.Graph')
+    @patch('puti.llm.graph.ethan_graph.Vertex')
+    def test_singleton_behavior(self, mock_vertex, mock_graph):
+        import puti.celery_queue.simplified_tasks
+        puti.celery_queue.simplified_tasks._ethan_instance = None
+        # First call to get_ethan_instance should create a new instance
+        ethan1 = get_ethan_instance()
+        self.assertIsNotNone(ethan1)
 
 
 if __name__ == "__main__":

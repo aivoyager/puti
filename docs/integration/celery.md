@@ -114,7 +114,11 @@ puti scheduler logs --follow
 You can create custom tasks by extending the basic task classes:
 
 ```python
-from celery_queue.simplified_tasks import BaseTask
+from celery import Celery, Task
+from celery.schedules import crontab
+from loguru import logger as lgr
+
+from puti.celery_queue.simplified_tasks import BaseTask
 
 class CustomTwitterTask(BaseTask):
     """A custom task that performs specialized Twitter operations"""
@@ -133,7 +137,7 @@ class CustomTwitterTask(BaseTask):
         return result
 
 # Register the task
-from celery_queue.celery_app import app
+from puti.celery_queue.celery_app import app
 app.register_task(CustomTwitterTask())
 
 # Schedule the task using the CLI
@@ -214,10 +218,10 @@ For advanced debugging, you can start the worker with increased verbosity:
 
 ```bash
 # Start the worker with debug logging
-celery -A celery_queue.celery_app worker --loglevel=DEBUG
+celery -A puti.celery_queue.celery_app worker --loglevel=DEBUG
 
 # Start the beat scheduler with debug logging
-celery -A celery_queue.celery_app beat --loglevel=DEBUG
+celery -A puti.celery_queue.celery_app beat --loglevel=DEBUG
 ```
 
 ### Resetting the Scheduler

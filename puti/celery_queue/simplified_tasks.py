@@ -22,6 +22,8 @@ from puti.llm.roles.agents import Ethan, EthanG
 from puti.llm.graph import Graph, Vertex
 from puti.db.schedule_manager import ScheduleManager
 from puti.db.task_state_guard import TaskStateGuard
+from puti.llm.roles import Role, agents
+
 
 
 lgr = logger_factory.default
@@ -66,12 +68,12 @@ def get_ethan_instance():
         return _ethan_instance
 
 
-TASK_MAP = {
-    TaskType.POST.val: 'celery_queue.simplified_tasks.generate_tweet_task',
-    TaskType.REPLY.val: 'celery_queue.simplified_tasks.reply_to_tweets_task',
-    TaskType.CONTEXT_REPLY.val: 'celery_queue.simplified_tasks.context_aware_reply_task',
-    TaskType.RETWEET.val: 'celery_queue.simplified_tasks.unimplemented_task',
-    TaskType.UNIMPLEMENTED.val: 'celery_queue.simplified_tasks.unimplemented_task'
+task_map = {
+    TaskType.POST.val: 'puti.celery_queue.simplified_tasks.generate_tweet_task',
+    TaskType.REPLY.val: 'puti.celery_queue.simplified_tasks.reply_to_tweets_task',
+    TaskType.CONTEXT_REPLY.val: 'puti.celery_queue.simplified_tasks.context_aware_reply_task',
+    TaskType.RETWEET.val: 'puti.celery_queue.simplified_tasks.unimplemented_task',
+    TaskType.UNIMPLEMENTED.val: 'puti.celery_queue.simplified_tasks.unimplemented_task'
 }
 
 
@@ -125,7 +127,7 @@ def check_dynamic_schedules():
                     lgr.info(f'Task params for "{schedule.name}": {params}')
                     
                     # Find the corresponding Celery task in the task map
-                    task_name = TASK_MAP.get(task_type)
+                    task_name = task_map.get(task_type)
                     if not task_name:
                         lgr.error(f"No task found for type '{task_type}' on schedule {schedule.id}. Skipping.")
                         continue

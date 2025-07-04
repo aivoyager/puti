@@ -9,6 +9,7 @@ import logging
 from puti.llm.roles.agents import Ethan
 from puti.llm.actions.x_bot import GetUnrepliedMentionsAction, ContextAwareReplyAction
 from puti.llm.graph import Graph, Vertex
+from puti.celery_queue.simplified_tasks import context_aware_reply_task
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -81,3 +82,8 @@ async def test_context_aware_reply_graph_integration():
 
     # Print the result for manual verification
     print(f"\nGraph-based context-aware reply test finished. Final summary: {final_reply_result}")
+
+
+async def test_context_aware_reply_task():
+    resp = context_aware_reply_task()
+    print('')

@@ -36,23 +36,35 @@ def is_process_running(keyword):
 
 
 def check_celery_worker_and_beat():
-    worker_cmd = 'celery -A celery_queue.celery_app worker'
-    beat_cmd = 'celery -A celery_queue.celery_app beat'
-    worker_running = is_process_running(worker_cmd)
-    beat_running = is_process_running(beat_cmd)
+    # worker_cmd = 'celery -A celery_queue.celery_app worker'
+    # beat_cmd = 'celery -A celery_queue.celery_app beat'
+    # Define the command and arguments
+    worker_command = [
+        'celery',
+        '-A',
+        'puti.celery_queue.celery_app',
+        'worker',
+        '--loglevel=info',
+        '--concurrency=4'
+    ]
+    beat_command = [
+        'celery',
+        '-A',
+        'puti.celery_queue.celery_app',
+        'beat',
+        '--loglevel=info'
+    ]
+    worker_running = is_process_running(' '.join(worker_command))
+    beat_running = is_process_running(' '.join(beat_command))
 
     if not worker_running:
-        subprocess.Popen([
-            'celery', '-A', 'celery_queue.celery_app', 'worker', '--loglevel=info', '--concurrency=4'
-        ])
+        subprocess.Popen(worker_command)
         lgr.info('[Automatically trying to start Celery Worker]')
     else:
         lgr.info('[Celery Worker] Already running')
 
     if not beat_running:
-        subprocess.Popen([
-            'celery', '-A', 'celery_queue.celery_app', 'beat', '--loglevel=info'
-        ])
+        subprocess.Popen(beat_command)
         lgr.info('[Automatically trying to start Celery Beat]')
     else:
         lgr.info('[Celery Beat] Already running')

@@ -22,7 +22,7 @@ def make_celery(app_name):
 
     cel_app.config_from_object(celery_config)
 
-    cel_app.autodiscover_tasks(['celery_queue', 'celery_queue.simplified_tasks'])
+    cel_app.autodiscover_tasks(['puti.celery_queue', 'puti.celery_queue.simplified_tasks'])
 
     return cel_app
 

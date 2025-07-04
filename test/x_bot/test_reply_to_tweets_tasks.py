@@ -7,7 +7,7 @@ import sys
 import asyncio
 import argparse
 import logging
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch, MagicMock, AsyncMock
 from datetime import datetime
 
 # 配置日志
@@ -20,7 +20,10 @@ project_root = os.path.dirname(os.path.dirname(script_dir))
 sys.path.insert(0, project_root)
 
 # 导入必要的模块
-from celery_queue.simplified_tasks import reply_to_tweets_task
+from puti.celery_queue.simplified_tasks import reply_to_tweets_task
+from puti.client.twitter.twitter_client import TwikitClient
+from puti.db.model.chat.chat import ChatRecord
+from puti.db.model.client.twitter import TweetModel
 from puti.db.task_state_guard import TaskStateGuard
 
 

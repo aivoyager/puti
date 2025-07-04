@@ -15,9 +15,9 @@ setup(
     author="obstaclews",
     author_email="obstaclesws@qq.com",
     url="https://github.com/aivoyager/puti",
-    packages=find_packages(exclude=["test*", "celery_queue*", "data", "docs", "api*"]),
+    packages=find_packages(exclude=["test*", "data", "docs", "api*"]),
     package_data={
-        'puti': ['conf/config.yaml'],
+        'puti': ['conf/config.yaml', 'py.typed'],
     },
     include_package_data=True,
     install_requires=[

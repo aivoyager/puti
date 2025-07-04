@@ -51,15 +51,15 @@ task_queues = (
 )
 
 task_routes = {
-    'celery_queue.simplified_tasks.generate_tweet_task': {'queue': 'high_priority'},
-    'celery_queue.simplified_tasks.check_dynamic_schedules': {'queue': 'default'},
+    'puti.celery_queue.simplified_tasks.generate_tweet_task': {'queue': 'high_priority'},
+    'puti.celery_queue.simplified_tasks.check_dynamic_schedules': {'queue': 'default'},
 }
 
 # Schedule settings
 beat_schedule = {
     # Check dynamic schedules every minute
     'check-dynamic-schedules': {
-        'task': 'celery_queue.simplified_tasks.check_dynamic_schedules',
+        'task': 'puti.celery_queue.simplified_tasks.check_dynamic_schedules',
         'schedule': crontab(minute='*'),  # Run every minute
         'args': (),
         'options': {'queue': 'default'}

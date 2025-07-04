@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 import unittest
 import asyncio
 from unittest.mock import patch, MagicMock
-from celery_queue.simplified_tasks import reply_to_tweets_task
+from puti.celery_queue.simplified_tasks import reply_to_tweets_task
 
 from puti.llm.tools.twikitt import Twikitt, TwikittClientManager
 
@@ -270,4 +270,8 @@ async def test_twikit_unknown_command(twikit_tool, monkeypatch):
     
     response = await twikit_tool.run('non_existent_command')
     assert not response.is_success()
-    assert "Unknown command: non_existent_command" in response.msg 
+    assert "Unknown command: non_existent_command" in response.msg
+
+
+def test_reply_to_tweets_task():
+    asyncio.run(reply_to_tweets_task.s().apply()) 
