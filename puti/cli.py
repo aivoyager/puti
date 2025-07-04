@@ -9,6 +9,7 @@ import click
 import asyncio
 import questionary
 import subprocess
+import re
 from typing import Optional, Dict, Any, List
 from pathlib import Path
 from rich.console import Console

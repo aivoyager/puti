@@ -48,7 +48,13 @@ We need the path to your `cookies.json` file for Twikit to work.
             cookie_path = "" # Reset to re-trigger the loop
 
     # --- Save configuration to .env file ---
-    CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+    Path(CONFIG_DIR).mkdir(parents=True, exist_ok=True)
+    
+    # Pre-check: If the .env file path exists as a directory, remove it.
+    if Path(CONFIG_FILE).is_dir():
+        Path(CONFIG_FILE).rmdir()
+        console.print(f"Warning: Removed existing directory at `{CONFIG_FILE}` to create config file.", style="yellow")
+
     set_key(CONFIG_FILE, "TWIKIT_COOKIE_PATH", cookie_path)
     os.environ["TWIKIT_COOKIE_PATH"] = cookie_path  # Update current session's environment
 
@@ -106,12 +112,18 @@ This information will be saved locally in a `.env` file in `{CONFIG_DIR}` for fu
     # --- Save configurations to .env file ---
     if new_configs:
         # Ensure the ~/.puti directory exists before writing to it.
-        CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+        Path(CONFIG_DIR).mkdir(parents=True, exist_ok=True)
+
+        # Pre-check: If the .env file path exists as a directory, remove it.
+        if Path(CONFIG_FILE).is_dir():
+            Path(CONFIG_FILE).rmdir()
+            console.print(f"Warning: Removed existing directory at `{CONFIG_FILE}` to create config file.", style="yellow")
+
         for key, value in new_configs.items():
             # Only save if the value is not None (it can be an empty string)
             if value is not None:
                 set_key(CONFIG_FILE, key, str(value))
-                os.environ[key] = str(value) # Update the current session's environment
+                os.environ[key] = str(value)  # Update the current session's environment
 
     console.print(Markdown(f"\n✅ Configuration saved successfully to `{CONFIG_FILE}`. Let's get started!"))
     console.print("-" * 20)

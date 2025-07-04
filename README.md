@@ -23,24 +23,32 @@
 
 Puti is a versatile, multi-agent framework designed to simplify the development of applications powered by Large Language Models (LLMs). It provides a structured, extensible architecture for creating, managing, and coordinating intelligent agents that can collaborate to solve complex problems.
 
+-   **🤖 Multi-Agent Systems**: Design sophisticated workflows where multiple agents collaborate, delegate tasks, and solve problems together.
+-   **🛠️ Extensible Tools**: Equip agents with a powerful set of built-in tools (`web_search`, `file_io`, `terminal`, `python`) or easily create your own.
+-   **🔄 Persistent Task Scheduling**: Automate workflows with a built-in, cron-like scheduler managed via a simple CLI.
+-   **🗣️ Interactive & Scriptable**: Use agents interactively through the command line or integrate them seamlessly into your Python scripts.
+-   **🚀 Ready-to-Use Agents**: Get started quickly with pre-built agents like `Alex` (general-purpose) and `Ethan` (Twitter-focused).
+
 ### Alex-Chat
 ![Alex Chat Demo](examples/puti_alex.gif)
 
 ### Ethan-Chat
 ![Ethan Chat Demo](examples/ethan.png)
 
-### Key Features
-* **Multi-Agent Collaboration**: Easily define and manage multiple agents that can communicate and work together.
-* **Extensible Tool System**: Equip agents with a wide range of tools, including web search, file management, and terminal access.
+## 🚀 Upcoming Features
 
-## 🚀 Features
+We are continuously improving Puti. Here's what's on the horizon:
 
-*   🤝 **Multi-Agent Collaboration**: Supports communication and collaboration between multiple agents.
-*   🎭 **Flexible Agent Roles**: Allows defining agent roles with different goals and capabilities (e.g., Talker, Debater).
-*   🛠️ **Powerful Tools**: Agents are equipped with `web search`, `file tool`, `terminal tool`, and `python tool` capabilities.
-*   💡 **Interactive Setup**: Get started instantly with a guided setup for your credentials.
-*   🌍 **Environment Management**: Provides an environment for managing agent interactions and message passing.
-*   🧩 **Extensible**: Easy to build and integrate your own agents and tools.
+-   **✨ Enhanced Developer Experience**:
+    -   **Syntactic Sugar**: Introducing more intuitive and expressive syntax to simplify agent and task definitions, making development faster and more enjoyable.
+    -   **Improved Abstractions**: Refining the core abstractions for even easier customization and extension.
+
+-   **🌐 Web UI for Visualization & Management**:
+    -   A comprehensive web interface to visualize agent interactions, manage scheduled tasks, and monitor system performance in real-time.
+
+-   **🧠 Advanced Agent Capabilities**:
+    -   **Memory Optimization**: Implementing more sophisticated memory management to allow for longer conversations and more complex task execution.
+    -   **Dynamic Goal Setting**: Enabling agents to dynamically set and adapt their own goals based on new information.
 
 ## 📦 Installation
 
@@ -188,62 +196,62 @@ class SoftwareEngineer(McpRole):
 ```
 
 ### 5. 📅 Task Scheduler (`puti scheduler`)
-Puti includes a powerful, built-in task scheduler for automating recurring tasks like posting tweets or replying to mentions. It runs as a persistent background process and can be managed entirely from the command line.
+Puti includes a powerful, built-in task scheduler for automating recurring tasks. It runs as a persistent background process powered by Celery and can be managed entirely from the command line.
 
 ![Puti Scheduler Logs](examples/puti_scheduler.png)
 
-#### Managing the Scheduler Process
-The scheduler runs as a daemon process managed by Celery Beat.
+A few key commands:
 ```bash
-# Start the scheduler in the background
+# Start, stop, or check the status of the scheduler daemon
 puti scheduler start
-
-# Stop the scheduler
 puti scheduler stop
-
-# Check the status of the scheduler and all tasks
 puti scheduler status
-```
 
-#### Managing Tasks
-You can create, list, and manage individual scheduled tasks.
-```bash
-# List all scheduled tasks in a table
+# List all scheduled tasks
 puti scheduler list
 
-# Create a new task (it will be disabled by default)
-# This example creates a daily task to post a tweet about "AI News" at 12:00
-puti scheduler create daily_post "0 12 * * *" --type "post" --params '{"topic": "AI News"}'
+# Create a task to run every 5 minutes
+# It's disabled by default; enable it with `puti scheduler enable <ID>`
+puti scheduler create my_task "*/5 * * * *" --type "post" --params '{"topic": "AI News"}'
 
-# Create a task to reply to unreplied mentions from the last 3 days, running every hour
-puti scheduler create hourly_reply "0 * * * *" --type "reply" --params '{"time_value": 3, "time_unit": "days"}'
-
-# Enable or disable a task by its ID
-puti scheduler enable 1
-puti scheduler disable 2
-
-# Logically delete a task
-puti scheduler delete 1
-```
-
-#### Viewing Logs
-The scheduler comes with a robust, real-time logging command with powerful filtering options.
-```bash
-# Stream logs in real-time (like tail -f)
+# Follow the real-time logs for all tasks
+# Other options like --filter, --level are also available
 puti scheduler logs --follow
-
-# Filter logs for a specific keyword (e.g., "error")
-puti scheduler logs --filter "error"
-
-# Show only logs of a certain level (e.g., "WARNING")
-puti scheduler logs --level "WARNING"
-
-# Show simplified output without timestamps and other metadata
-puti scheduler logs --simple
-
-# Show raw, unformatted log lines
-puti scheduler logs --raw
 ```
+
+## 📜 Development History
+
+Puti has evolved significantly since its inception. Here are some of the key milestones in its journey:
+
+-   **🌱 Phase 1: Foundation & Core Concepts (4 months ago)**
+    -   The project was born with the core concepts of `Agent`, `Environment`, and `Message`.
+    -   The initial use case was a multi-agent `Debate` scenario, establishing the foundation for agent collaboration.
+    -   Support for multiple LLM providers, including `Ollama` and `Deepseek`, was integrated early on.
+
+-   **🛠️ Phase 2: Tooling & Agent Capabilities (3-4 months ago)**
+    -   A powerful tool system was introduced, equipping agents with `terminal`, `python`, `file I/O`, and `web_search` capabilities through Function Calling.
+    -   The `MCP` (Multi-agent Collaboration Protocol) was established to standardize agent interactions.
+
+-   **🐦 Phase 3: Twitter Automation & Scheduling (2-3 months ago)**
+    -   The focus shifted towards practical automation with deep integration of `Twikit` for Twitter operations.
+    -   A robust, persistent task scheduler, powered by `Celery` and `Celery Beat`, was built to handle recurring tasks like automated posts and replies.
+    -   This phase laid the groundwork for creating autonomous social media agents.
+
+-   **🧠 Phase 4: Intelligent Agents & Framework Refinement (1-2 months ago)**
+    -   Ready-to-use, pre-built agents like `Alex` (a general-purpose assistant) and `Ethan` (a Twitter specialist) were created.
+    -   Advanced concepts such as `RAG` (Retrieval-Augmented Generation) and enhanced memory systems were explored to make agents smarter.
+    -   The `puti` CLI was born, providing a user-friendly entry point for interacting with the framework.
+
+-   **🚀 Phase 5: CLI Enhancement & Code Refactoring (Recent)**
+    -   The command-line interface, especially `puti scheduler`, was significantly enhanced with features like real-time logs, status checks, and dynamic task management.
+    -   Major code refactoring, such as moving the `celery_queue` module into the main `puti` package, was undertaken to improve project structure and maintainability.
+    -   Continuous bug fixes and refinements to solidify the framework's stability and reliability.
+
+## 🌟 Our Vision
+
+Our goal for Puti is to build more than just a framework; we aim to cultivate a vibrant, open-source ecosystem for multi-agent AI. We envision a future where developers and researchers can easily create, share, and deploy sophisticated autonomous agents that tackle real-world challenges.
+
+We are committed to making Puti a benchmark for reliability, flexibility, and ease of use. With the support of the community, we hope to grow Puti into a highly successful and impactful project that pushes the boundaries of what's possible with collaborative AI.
 
 ## 📚 Documentation
 

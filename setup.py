@@ -1,12 +1,20 @@
 from setuptools import setup, find_packages
 import os
 
-with open(os.path.join(os.path.dirname(__file__), "README.md"), "r", encoding="utf-8") as fh:
+_PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
+
+with open(os.path.join(_PROJECT_ROOT, "README.md"), "r", encoding="utf-8") as fh:
     long_description = fh.read()
+
+
+def get_reqs(req_file):
+    with open(os.path.join(_PROJECT_ROOT, req_file), 'r') as f:
+        return [line.strip() for line in f if line.strip() and not line.startswith('#')]
+
 
 setup(
     name="ai_puti",
-    version="0.1.0b11",
+    version="0.1.0b14",
     description="puti: MultiAgent-based package for LLM",
     long_description=long_description,
     long_description_content_type="text/markdown",
@@ -20,34 +28,7 @@ setup(
         'puti': ['conf/config.yaml', 'py.typed'],
     },
     include_package_data=True,
-    install_requires=[
-        "wheel>=0.40.0",
-        "ollama>=0.4.0",
-        "click>=8.1.3",
-        "pytest>=8.0.0",
-        "googlesearch-python>=1.1.0",
-        "scikit-learn>=1.3.0",
-        "tiktoken>=0.5.0",
-        "openai>=1.10.0",
-        "mcp>=1.8.0",
-        "anthropic>=0.18.0",
-        "python-box>=7.1.0",
-        "pyyaml>=6.0.0",
-        "faiss-cpu>=1.7.4",
-        "pandas>=2.0.0",
-        "jinja2>=3.1.0",
-        "twikit>=2.0.0",
-        "pytest-asyncio>=0.21.0",
-        "pydantic>=2.5.0",
-        "questionary>=2.0.0",
-        "rich>=13.0.0",
-        "python-dotenv>=1.0.0",
-        "numpy>=2.0.0",
-        "numexpr>=2.8.0",
-        "celery>=5.3.0",
-        "tenacity>=8.2.0",
-        "croniter>=2.0.0"
-    ],
+    install_requires=get_reqs('requirements.txt'),
     python_requires=">=3.10",
     classifiers=[
         "Programming Language :: Python :: 3",
