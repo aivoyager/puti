@@ -9,7 +9,7 @@ from enum import Enum
 from puti.utils.path import root_dir
 from typing import Type, TypeVar, Union, Any
 
-T = TypeVar("T", bound='Base')
+BaseSub = TypeVar("BaseSub", bound='Base')
 
 
 class Base(Enum):
@@ -23,14 +23,14 @@ class Base(Enum):
         return self.value[1]
 
     @classmethod
-    def elem_from_str(cls: Type[T], s: str) -> 'Base':
+    def elem_from_str(cls: Type[BaseSub], s: str) -> 'Base':
         for item in cls:
             if item.val == s:
                 return item
         raise ValueError(f'{s} is not a valid {cls.__name__}')
 
     @classmethod
-    def keys(cls: Type[T]) -> set:
+    def keys(cls: Type[BaseSub]) -> set:
         return {item.val for item in cls}
 
 
