@@ -30,6 +30,9 @@ class ParamResp(TypedDict):
     function: Required[Dict]
 
 
+BaseToolCls = Type['BaseTool']
+
+
 class ToolArgs(BaseModel, ABC):
     """ Action arguments """
 

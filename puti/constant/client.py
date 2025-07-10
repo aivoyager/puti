@@ -25,5 +25,6 @@ class TwikitSearchMethod(Base):
 
 
 class McpTransportMethod(Base):
-    STDIO = ('stdio', 'stdio transport')
-    SSE = ('sse', 'sse transport')
+    STDIO = ('stdio', 'Standard I/O transport')
+    SSE = ('sse', 'Server-Sent Events transport')
+    WEBSOCKET = ('websocket', 'WebSocket transport')

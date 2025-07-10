@@ -13,12 +13,13 @@ from puti.llm.tools.common import GetTodayDate
 from puti.llm.tools.web_search import WebSearch
 from puti.llm.roles.agents import Alex
 from puti.llm.nodes import OpenAINode
+from puti.llm.tools import Toolkit
 
 
 def test_base_tool_inherit():
     a = toolkit.add_tool(GetFlightInfo)
     b = toolkit.add_tools([GetFlightInfo])
-    for name, tool in toolkit.toolkit.items():
+    for name, tool in toolkit.tools.items():
         print(tool.param)
 
 

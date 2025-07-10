@@ -7,7 +7,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from typing import Optional, TypeVar, Dict, Union, Any, Generic, Literal
 from puti.constant.api import RequestMethod
 
-RequestParamsT = TypeVar('RequestParamsT', bound=Optional['RequestParams', Dict[str, Any]])
+RequestParamsT = TypeVar('RequestParamsT', bound=Union['RequestParams', Dict[str, Any], None])
 
 
 class RequestParams(BaseModel):
@@ -24,12 +24,10 @@ class Request(BaseModel, Generic[RequestParamsT]):
     method: RequestMethod
 
 
-class JSONRPCRequest(Request[dict[str, Any], RequestMethod]):
+class JSONRPCRequest(Request[Optional[dict[str, Any]]]):
 
     jsonrpc: Literal['2.0']
     id: Union[int, str] = Field(..., union_mode='left_to_right')
-    method: RequestMethod
-    params: Optional[dict[str, Any]] = None
 
 
 

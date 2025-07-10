@@ -11,3 +11,8 @@ class RequestMethod(Base):
     POST = ('POST', 'post method')
     PUT = ('PUT', 'put method')
     DELETE = ('DELETE', 'delete method')
+
+
+class McpTransportMethod(Base):
+    STDIO = ('stdio', 'stdio transport method')
+    SSE = ('sse', 'sse transport method')
